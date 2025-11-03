@@ -1,0 +1,4 @@
+[2025-11-03 23:11:36] [Error: SELECT `value` FROM setting WHERE `key` = 'database_version'  limit 1 - SQLITE_ERROR: no such table: setting] {
+  errno: 1,
+  code: 'SQLITE_ERROR'
+}

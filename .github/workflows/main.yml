@@ -1,0 +1,39 @@
+name: Continuous Deployment Uptime-Kuma
+
+# Controls when the workflow will run
+on:
+  # Allows you to run this workflow manually from the Actions tab
+  #  push:
+  #    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+  schedule:
+    - cron: '0 */24 * * *'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Setup SSH keys and known hosts
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          ssh-keyscan github.com >> ~/.ssh/known_hosts
+          ssh-keyscan "${{ secrets.SERVER_IP }}" >> ~/.ssh/known_hosts
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          eval "$(ssh-agent -s)"
+          ssh-add ~/.ssh/id_rsa
+      - name: Set git config
+        run: |
+          git config --global user.email "${{ secrets.GIT_USER_EMAIL }}"
+          git config --global user.name "${{ secrets.GIT_USER_NAME }}"
+      - name: Deploy to server
+        run: |
+          REPO_NAME=$(basename $GITHUB_REPOSITORY .git)
+          LAST_WORD=$(echo $REPO_NAME | awk '{print $NF}')
+          ssh -o "StrictHostKeyChecking=no" organic@"${{ secrets.SERVER_IP }}" "cd /home/organic/dev/$LAST_WORD && sudo git fetch && sudo git add . && sudo git diff-index --quiet HEAD || (sudo git commit -m 'Added changes' && sudo git push --set-upstream origin main)"

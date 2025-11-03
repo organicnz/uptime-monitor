@@ -1,0 +1,93 @@
+name: Chunk SQL Database
+
+on:
+  workflow_dispatch:
+    inputs:
+      chunk_size:
+        description: 'Chunk size in MB'
+        required: false
+        default: '50'
+        type: string
+      upload_artifacts:
+        description: 'Upload chunks as artifacts'
+        required: false
+        default: true
+        type: boolean
+  schedule:
+    - cron: '0 2 * * 0'  # Weekly on Sunday at 2 AM UTC
+
+jobs:
+  chunk-database:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install SQLite
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y sqlite3
+
+      - name: Check if database exists
+        run: |
+          if [ ! -f "uptime/kuma.db" ]; then
+            echo "Database file not found, creating dummy database for testing"
+            mkdir -p uptime
+            sqlite3 uptime/kuma.db "CREATE TABLE test (id INTEGER PRIMARY KEY, data TEXT);"
+            for i in {1..1000}; do
+              sqlite3 uptime/kuma.db "INSERT INTO test (data) VALUES ('Sample data row $i with some content to make it larger');"
+            done
+          fi
+
+      - name: Show database info
+        run: |
+          echo "Database file size:"
+          ls -lh uptime/kuma.db
+          echo "Database tables:"
+          sqlite3 uptime/kuma.db ".tables"
+
+      - name: Run SQL chunking script
+        run: |
+          ./scripts/chunk_sql.sh \
+            --db-path uptime/kuma.db \
+            --chunk-size ${{ inputs.chunk_size || '50' }} \
+            --output-dir sql-chunks
+
+      - name: Show chunking results
+        run: |
+          echo "Generated chunks:"
+          ls -lh sql-chunks/ || echo "No chunks directory found"
+          echo "Total chunks created:"
+          ls sql-chunks/*.sql 2>/dev/null | wc -l || echo "0"
+
+      - name: Upload SQL dump
+        if: ${{ inputs.upload_artifacts != false }}
+        uses: actions/upload-artifact@v3
+        with:
+          name: sql-dump
+          path: kuma_dump.sql
+          retention-days: 7
+
+      - name: Upload SQL chunks
+        if: ${{ inputs.upload_artifacts != false }}
+        uses: actions/upload-artifact@v3
+        with:
+          name: sql-chunks
+          path: sql-chunks/
+          retention-days: 7
+
+      - name: Create release with chunks (on manual trigger)
+        if: github.event_name == 'workflow_dispatch' && inputs.upload_artifacts != false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Create a release with today's date
+          RELEASE_TAG="sql-chunks-$(date +%Y%m%d-%H%M%S)"
+
+          # Create release
+          gh release create "$RELEASE_TAG" \
+            --title "SQL Database Chunks - $(date +%Y-%m-%d)" \
+            --notes "Automated SQL database chunks created on $(date +%Y-%m-%d %H:%M:%S) UTC. Chunk size: ${{ inputs.chunk_size || '50' }}MB" \
+            sql-chunks/*.sql \
+            kuma_dump.sql
