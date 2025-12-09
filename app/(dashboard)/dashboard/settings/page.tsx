@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { AccountSettings } from "@/components/account-settings";
+import { CronSettings } from "@/components/cron-settings";
 
 type Profile = {
   id: string;
@@ -31,11 +32,13 @@ export default async function SettingsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">Account Settings</h1>
+        <h1 className="text-2xl font-bold">Settings</h1>
         <p className="text-neutral-500 dark:text-neutral-400">
-          Manage your account settings and preferences
+          Manage your account and monitoring settings
         </p>
       </div>
+
+      <CronSettings />
 
       <AccountSettings
         user={{

@@ -101,23 +101,25 @@ export function MonitorDetailPanel({
   return (
     <div className="flex flex-col h-full overflow-y-auto">
       {/* Header */}
-      <div className="p-6 border-b border-neutral-800">
-        <div className="flex items-start justify-between gap-4">
-          <div className="min-w-0">
-            <h1 className="text-2xl font-bold truncate">{monitor.name}</h1>
+      <div className="p-4 sm:p-6 border-b border-neutral-800">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <h1 className="text-xl sm:text-2xl font-bold truncate">
+              {monitor.name}
+            </h1>
             {monitor.url && (
               <a
                 href={monitor.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-green-400 hover:text-green-300 text-sm inline-flex items-center gap-1 mt-1"
+                className="text-green-400 hover:text-green-300 text-xs sm:text-sm inline-flex items-center gap-1 mt-1 break-all"
               >
-                {monitor.url}
+                <span className="truncate">{monitor.url}</span>
                 <ExternalLink className="h-3 w-3 flex-shrink-0" />
               </a>
             )}
             {monitor.hostname && !monitor.url && (
-              <p className="text-neutral-400 text-sm mt-1">
+              <p className="text-neutral-400 text-xs sm:text-sm mt-1 truncate">
                 {monitor.hostname}
               </p>
             )}
@@ -125,14 +127,14 @@ export function MonitorDetailPanel({
 
           {/* Paused Badge */}
           {isPaused && (
-            <span className="px-3 py-1 rounded-full bg-amber-500/20 text-amber-400 text-sm font-medium flex-shrink-0">
+            <span className="px-2 sm:px-3 py-1 rounded-full bg-amber-500/20 text-amber-400 text-xs sm:text-sm font-medium flex-shrink-0">
               Paused
             </span>
           )}
         </div>
 
         {/* Action Buttons */}
-        <div className="flex flex-wrap items-center gap-2 mt-4">
+        <div className="flex flex-wrap items-center gap-2 mt-3 sm:mt-4">
           <Button
             variant="outline"
             size="sm"
@@ -192,10 +194,10 @@ export function MonitorDetailPanel({
       </div>
 
       {/* Heartbeat Bar + Status Badge */}
-      <div className="p-6 border-b border-neutral-800">
-        <div className="flex items-center gap-4">
+      <div className="p-4 sm:p-6 border-b border-neutral-800">
+        <div className="flex items-center gap-3 sm:gap-4">
           {/* Heartbeat visualization */}
-          <div className="flex-1 flex gap-[3px] items-center overflow-hidden">
+          <div className="flex-1 flex gap-[2px] sm:gap-[3px] items-center overflow-hidden">
             {heartbeats.length > 0
               ? heartbeats
                   .slice(0, 50)
@@ -204,7 +206,7 @@ export function MonitorDetailPanel({
                     <div
                       key={hb.id || i}
                       className={cn(
-                        "flex-1 h-9 rounded-[3px] min-w-[4px] max-w-[10px] transition-colors cursor-pointer",
+                        "flex-1 h-7 sm:h-9 rounded-[2px] sm:rounded-[3px] min-w-[3px] sm:min-w-[4px] max-w-[8px] sm:max-w-[10px] transition-colors cursor-pointer",
                         hb.status === 1 && "bg-green-500 hover:bg-green-400",
                         hb.status === 0 && "bg-red-500 hover:bg-red-400",
                         hb.status === 2 &&
@@ -218,7 +220,7 @@ export function MonitorDetailPanel({
                   .map((_, i) => (
                     <div
                       key={i}
-                      className="flex-1 h-9 rounded-[3px] min-w-[4px] max-w-[10px] bg-neutral-700"
+                      className="flex-1 h-7 sm:h-9 rounded-[2px] sm:rounded-[3px] min-w-[3px] sm:min-w-[4px] max-w-[8px] sm:max-w-[10px] bg-neutral-700"
                     />
                   ))}
           </div>
@@ -226,7 +228,7 @@ export function MonitorDetailPanel({
           {/* Status Badge */}
           <div
             className={cn(
-              "px-5 py-2.5 rounded-lg text-lg font-bold shrink-0",
+              "px-3 sm:px-5 py-2 sm:py-2.5 rounded-lg text-sm sm:text-lg font-bold shrink-0",
               isPaused && "bg-amber-500 text-white",
               !isPaused && isUp && "bg-green-500 text-white",
               !isPaused && isDown && "bg-red-500 text-white",
@@ -239,14 +241,14 @@ export function MonitorDetailPanel({
             {isPaused ? "Paused" : isUp ? "Up" : isDown ? "Down" : "Pending"}
           </div>
         </div>
-        <p className="text-sm text-neutral-500 mt-3 flex items-center gap-1.5">
-          <Clock className="h-3.5 w-3.5" />
+        <p className="text-xs sm:text-sm text-neutral-500 mt-2 sm:mt-3 flex items-center gap-1.5">
+          <Clock className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
           Check every {monitor.interval} seconds.
         </p>
       </div>
 
       {/* Stats Grid - responsive */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 border-b border-neutral-800">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 border-b border-neutral-800">
         <StatBox
           label="Response"
           sublabel="(Current)"
@@ -278,7 +280,7 @@ export function MonitorDetailPanel({
       </div>
 
       {/* Response Time Chart */}
-      <div className="flex-1 p-6 min-h-[250px]">
+      <div className="flex-1 p-4 sm:p-6 min-h-[200px] sm:min-h-[250px]">
         <h3 className="text-sm font-medium text-neutral-400 mb-4">
           Response Time (ms)
         </h3>
@@ -325,19 +327,21 @@ function StatBox({
   return (
     <div
       className={cn(
-        "py-5 px-4 text-center border-b border-neutral-800 sm:border-b-0 sm:border-r last:border-r-0",
+        "py-3 sm:py-5 px-2 sm:px-4 text-center border-b border-neutral-800 sm:border-r last:border-r-0",
         className,
       )}
     >
-      <div className="text-sm text-neutral-400 mb-1">
+      <div className="text-xs sm:text-sm text-neutral-400 mb-0.5 sm:mb-1">
         {label}
         {sublabel && (
-          <span className="block text-xs text-neutral-500">{sublabel}</span>
+          <span className="block text-[10px] sm:text-xs text-neutral-500">
+            {sublabel}
+          </span>
         )}
       </div>
       <div
         className={cn(
-          "text-lg font-semibold",
+          "text-base sm:text-lg font-semibold truncate",
           highlight &&
             "text-green-400 underline decoration-green-400/30 underline-offset-2 cursor-pointer hover:text-green-300",
           muted && "text-neutral-600",
