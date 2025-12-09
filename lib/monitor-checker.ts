@@ -1,5 +1,5 @@
 import { createServiceClient } from "@/lib/supabase/service";
-import { notifyUser } from "@/lib/notifications";
+import { notifyMonitor } from "@/lib/notifications";
 import { isValidMonitorUrl } from "@/lib/security";
 
 // Status constants (matching Uptime Kuma)
@@ -400,7 +400,7 @@ async function handleStatusChange(
 
     // Send DOWN notification
     try {
-      await notifyUser(monitor.user_id, {
+      await notifyMonitor(monitor.id, monitor.user_id, {
         title: `🔴 ${monitor.name} is DOWN`,
         message: msg,
         monitorName: monitor.name,
@@ -429,7 +429,7 @@ async function handleStatusChange(
 
     // Send UP notification
     try {
-      await notifyUser(monitor.user_id, {
+      await notifyMonitor(monitor.id, monitor.user_id, {
         title: `✅ ${monitor.name} is UP`,
         message: "Service has recovered",
         monitorName: monitor.name,
@@ -517,8 +517,4 @@ export async function processMonitorCheck(monitor: Monitor): Promise<void> {
       result.msg,
     );
   }
-
-  console.log(
-    `[${monitor.name}] ${effectiveStatus === HEARTBEAT_STATUS.UP ? "UP" : effectiveStatus === HEARTBEAT_STATUS.DOWN ? "DOWN" : "PENDING"} - ${result.msg} (${result.ping}ms, down_count: ${downCount})`,
-  );
 }

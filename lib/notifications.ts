@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/service";
 
 export interface TelegramConfig {
   bot_token: string;
@@ -374,7 +375,99 @@ export async function sendNotification(
   }
 }
 
-// Send notification to all active channels for a user
+// Send notification to channels linked to a specific monitor (uses service client for cron jobs)
+export async function notifyMonitor(
+  monitorId: string,
+  userId: string,
+  payload: NotificationPayload,
+): Promise<{ sent: number; failed: number; errors: string[] }> {
+  // Use service client to bypass RLS (called from cron job without user session)
+  const supabase = createServiceClient();
+  type NotificationChannel = {
+    id: string;
+    user_id: string;
+    type: NotificationType;
+    name: string;
+    config: NotificationConfig;
+    active: boolean;
+  };
+
+  // First, get channels linked to this specific monitor
+  const { data: linkedChannels, error: linkError } = await supabase
+    .from("monitor_notifications")
+    .select("channel_id")
+    .eq("monitor_id", monitorId);
+
+  if (linkError) {
+    console.error(`[notifyMonitor] Error fetching linked channels:`, linkError);
+  }
+
+  const linkedIds = ((linkedChannels || []) as { channel_id: string }[]).map(
+    (l) => l.channel_id,
+  );
+
+  let channels: NotificationChannel[] = [];
+
+  if (linkedIds.length > 0) {
+    // Use only the linked channels
+    const { data: channelsData, error: channelError } = await supabase
+      .from("notification_channels")
+      .select("*")
+      .in("id", linkedIds)
+      .eq("active", true);
+
+    if (channelError) {
+      console.error(`[notifyMonitor] Error fetching channels:`, channelError);
+    }
+    channels = (channelsData || []) as NotificationChannel[];
+  } else {
+    // Fallback: use default channels if no specific links exist
+    const { data: channelsData, error: defaultError } = await supabase
+      .from("notification_channels")
+      .select("*")
+      .eq("user_id", userId)
+      .eq("active", true)
+      .eq("is_default", true);
+
+    if (defaultError) {
+      console.error(
+        `[notifyMonitor] Error fetching default channels:`,
+        defaultError,
+      );
+    }
+    channels = (channelsData || []) as NotificationChannel[];
+  }
+
+  if (channels.length === 0) {
+    return { sent: 0, failed: 0, errors: [] };
+  }
+
+  const results = await Promise.all(
+    channels.map(async (channel) => {
+      const result = await sendNotification(
+        channel.type,
+        channel.config,
+        payload,
+      );
+      if (!result.success) {
+        console.error(
+          `[notifyMonitor] Failed to send to ${channel.name}: ${result.error}`,
+        );
+      }
+      return { channel: channel.name, ...result };
+    }),
+  );
+
+  const sent = results.filter((r) => r.success).length;
+  const failed = results.filter((r) => !r.success).length;
+  const errors = results
+    .filter((r) => !r.success)
+    .map((r) => `${r.channel}: ${r.error}`);
+
+  return { sent, failed, errors };
+}
+
+// Send notification to all active channels for a user (legacy, used for testing)
 export async function notifyUser(
   userId: string,
   payload: NotificationPayload,
