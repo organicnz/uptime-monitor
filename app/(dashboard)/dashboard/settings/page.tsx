@@ -30,15 +30,13 @@ export default async function SettingsPage() {
   const profile = data as Profile | null;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-2xl">
       <div>
         <h1 className="text-2xl font-bold">Settings</h1>
         <p className="text-neutral-500 dark:text-neutral-400">
           Manage your account and monitoring settings
         </p>
       </div>
-
-      <CronSettings />
 
       <AccountSettings
         user={{
@@ -50,6 +48,8 @@ export default async function SettingsPage() {
           provider: user.app_metadata?.provider || "email",
         }}
       />
+
+      <CronSettings />
     </div>
   );
 }

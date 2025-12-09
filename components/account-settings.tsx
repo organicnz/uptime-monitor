@@ -87,7 +87,7 @@ export function AccountSettings({ user }: Props) {
   };
 
   return (
-    <div className="space-y-6 max-w-2xl">
+    <div className="space-y-6">
       {/* Profile Section */}
       <Card>
         <CardHeader>
