@@ -30,6 +30,9 @@
 .trunk/out/
 .trunk/notifications/
 
+# Kiro MCP config (contains secrets)
+.kiro/settings/mcp.json
+
 # debug
 npm-debug.log*
 yarn-debug.log*
