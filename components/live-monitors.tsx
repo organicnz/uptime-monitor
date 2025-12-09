@@ -140,7 +140,7 @@ export function LiveMonitorsList({ monitors }: LiveMonitorsListProps) {
             >
               <Card
                 className={cn(
-                  "glass-card transition-all duration-300 h-full",
+                  "bg-neutral-900/40 backdrop-blur-xl border-white/5 hover:bg-neutral-900/60 transition-all duration-300 h-full",
                   statusDisplay.borderColor,
                   isUp && "status-glow-up",
                   isDown && "status-glow-down",

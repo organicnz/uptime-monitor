@@ -41,9 +41,9 @@ export default async function DashboardLayout({
   ];
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
-      <header className="sticky top-0 z-50 border-b border-border/50 bg-background/80 backdrop-blur-xl">
+      <header className="sticky top-0 z-50 border-b border-border/50 bg-background/80 backdrop-blur-xl flex-shrink-0">
         <div className="container mx-auto px-4 lg:px-6">
           <div className="flex h-16 items-center justify-between">
             {/* Logo & Nav */}
@@ -108,7 +108,7 @@ export default async function DashboardLayout({
       </header>
 
       {/* Main content */}
-      <main className="container mx-auto px-4 lg:px-6 py-8">{children}</main>
+      <main className="flex-1">{children}</main>
     </div>
   );
 }

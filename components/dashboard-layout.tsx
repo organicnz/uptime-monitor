@@ -75,7 +75,7 @@ export function DashboardLayout({ monitors }: DashboardLayoutProps) {
   // Empty state
   if (monitors.length === 0) {
     return (
-      <div className="flex items-center justify-center h-[calc(100vh-8rem)]">
+      <div className="flex items-center justify-center h-[calc(100vh-4rem)]">
         <div className="text-center">
           <div className="p-4 bg-green-500/10 rounded-2xl mb-4 inline-block">
             <Activity className="h-12 w-12 text-green-400" />
@@ -101,9 +101,9 @@ export function DashboardLayout({ monitors }: DashboardLayoutProps) {
   };
 
   return (
-    <div className="h-[calc(100vh-8rem)] -mx-4 lg:-mx-6 -my-8 flex flex-col overflow-hidden">
+    <div className="h-[calc(100vh-4rem)] flex flex-col overflow-hidden">
       {/* View Toggle Header */}
-      <div className="flex items-center justify-between px-3 sm:px-4 lg:px-6 py-2 border-b border-neutral-800 bg-neutral-900/50">
+      <div className="flex items-center justify-between px-3 sm:px-4 lg:px-6 py-2 glass-header">
         <div className="flex items-center gap-1">
           {/* Sidebar toggle for detail view */}
           {viewMode === "detail" && (
@@ -208,7 +208,7 @@ export function DashboardLayout({ monitors }: DashboardLayoutProps) {
           {/* Sidebar - Desktop: collapsible, Mobile: slide-over */}
           <div
             className={cn(
-              "flex-shrink-0 border-r border-neutral-800 bg-neutral-900 transition-all duration-300",
+              "flex-shrink-0 glass-sidebar transition-all duration-300",
               // Desktop behavior
               "hidden md:block",
               sidebarOpen ? "w-72 lg:w-80" : "w-0 border-r-0 overflow-hidden",
@@ -224,11 +224,11 @@ export function DashboardLayout({ monitors }: DashboardLayoutProps) {
           {/* Mobile Sidebar - Slide over */}
           <div
             className={cn(
-              "fixed inset-y-0 left-0 z-50 w-80 max-w-[85vw] bg-neutral-900 border-r border-neutral-800 transform transition-transform duration-300 ease-in-out md:hidden",
+              "fixed inset-y-0 left-0 z-50 w-80 max-w-[85vw] glass-sidebar transform transition-transform duration-300 ease-in-out md:hidden",
               mobileSidebarOpen ? "translate-x-0" : "-translate-x-full",
             )}
           >
-            <div className="flex items-center justify-between p-3 border-b border-neutral-800">
+            <div className="flex items-center justify-between p-3 border-b border-white/5">
               <span className="font-medium">Monitors</span>
               <Button
                 variant="ghost"
@@ -322,7 +322,7 @@ function StatsCard({
   valueColor?: string;
 }) {
   return (
-    <Card className="bg-neutral-900/50 border-neutral-800">
+    <Card className="glass-stats rounded-xl">
       <CardContent className="p-3 sm:pt-5 sm:pb-4 sm:px-4">
         <div className="flex items-center justify-between gap-2">
           <div className="min-w-0">
@@ -335,7 +335,7 @@ function StatsCard({
           </div>
           <div
             className={cn(
-              "p-2 sm:p-2.5 rounded-lg sm:rounded-xl flex-shrink-0",
+              "p-2 sm:p-2.5 rounded-lg sm:rounded-xl flex-shrink-0 backdrop-blur-sm",
               iconBg,
             )}
           >

@@ -11,6 +11,13 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { createClient } from "@/lib/supabase/client";
 import {
   ArrowLeft,
@@ -26,8 +33,21 @@ import {
   Save,
   Power,
   PowerOff,
+  Clock,
 } from "lucide-react";
 import Link from "next/link";
+import { toast } from "sonner";
+
+const CRON_INTERVAL_OPTIONS = [
+  { value: "1", label: "Every 1 minute", dailyMessages: 1440 },
+  { value: "2", label: "Every 2 minutes", dailyMessages: 720 },
+  { value: "3", label: "Every 3 minutes", dailyMessages: 480 },
+  { value: "5", label: "Every 5 minutes", dailyMessages: 288 },
+  { value: "10", label: "Every 10 minutes", dailyMessages: 144 },
+  { value: "15", label: "Every 15 minutes", dailyMessages: 96 },
+  { value: "30", label: "Every 30 minutes", dailyMessages: 48 },
+  { value: "60", label: "Every 1 hour", dailyMessages: 24 },
+];
 
 const monitorTypes = [
   {
@@ -92,6 +112,15 @@ export default function EditMonitorPage(props: {
     active: true,
   });
 
+  // QStash schedule state
+  const [cronSchedule, setCronSchedule] = useState<{
+    id: string;
+    intervalMinutes: number;
+    isPaused: boolean;
+  } | null>(null);
+  const [cronLoading, setCronLoading] = useState(true);
+  const [cronSaving, setCronSaving] = useState(false);
+
   const selectedType = monitorTypes.find((t) => t.id === formData.type);
 
   useEffect(() => {
@@ -148,8 +177,64 @@ export default function EditMonitorPage(props: {
       }
     };
 
+    const loadCronSchedule = async () => {
+      try {
+        const res = await fetch("/api/settings/schedule");
+        const data = await res.json();
+        if (data.schedule) {
+          setCronSchedule({
+            id: data.schedule.id,
+            intervalMinutes: data.schedule.intervalMinutes,
+            isPaused: data.schedule.isPaused,
+          });
+        }
+      } catch (err) {
+        console.error("Error loading cron schedule:", err);
+      } finally {
+        setCronLoading(false);
+      }
+    };
+
     loadMonitor();
+    loadCronSchedule();
   }, [params.id]);
+
+  const handleCronIntervalChange = async (value: string) => {
+    if (!cronSchedule) return;
+
+    setCronSaving(true);
+    try {
+      const res = await fetch("/api/settings/schedule", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          scheduleId: cronSchedule.id,
+          intervalMinutes: parseInt(value, 10),
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to update schedule");
+      }
+
+      setCronSchedule({
+        ...cronSchedule,
+        id: data.newScheduleId || cronSchedule.id,
+        intervalMinutes: parseInt(value, 10),
+      });
+      toast.success(
+        `Global check interval updated to every ${value} minute${value === "1" ? "" : "s"}`,
+      );
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Failed to update schedule",
+      );
+    } finally {
+      setCronSaving(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -483,7 +568,7 @@ export default function EditMonitorPage(props: {
           <CardHeader>
             <CardTitle className="text-white">Advanced Settings</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-6">
             <div className="grid grid-cols-3 gap-4">
               <div>
                 <Label htmlFor="interval" className="text-neutral-300">
@@ -542,6 +627,57 @@ export default function EditMonitorPage(props: {
                   className="mt-1.5 block w-full rounded-lg border border-neutral-700 bg-neutral-800 px-4 py-2.5 text-white focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
                 />
               </div>
+            </div>
+
+            {/* Global Cron Schedule */}
+            <div className="pt-4 border-t border-neutral-800">
+              <div className="flex items-center gap-2 mb-3">
+                <Clock className="h-4 w-4 text-neutral-400" />
+                <Label className="text-neutral-300 font-medium">
+                  Global Check Interval
+                </Label>
+              </div>
+              <p className="text-xs text-neutral-500 mb-3">
+                How often QStash triggers monitor checks (applies to all
+                monitors)
+              </p>
+              {cronLoading ? (
+                <div className="flex items-center gap-2 text-neutral-400 text-sm">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Loading schedule...
+                </div>
+              ) : cronSchedule ? (
+                <div className="flex items-center gap-3">
+                  <Select
+                    value={String(cronSchedule.intervalMinutes)}
+                    onValueChange={handleCronIntervalChange}
+                    disabled={cronSaving}
+                  >
+                    <SelectTrigger className="w-[200px] bg-neutral-800 border-neutral-700">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {CRON_INTERVAL_OPTIONS.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {cronSaving && (
+                    <Loader2 className="h-4 w-4 animate-spin text-green-400" />
+                  )}
+                  {cronSchedule.isPaused && (
+                    <span className="text-xs text-yellow-400 bg-yellow-500/20 px-2 py-1 rounded">
+                      Paused
+                    </span>
+                  )}
+                </div>
+              ) : (
+                <p className="text-sm text-neutral-500">
+                  No QStash schedule configured
+                </p>
+              )}
             </div>
           </CardContent>
         </Card>

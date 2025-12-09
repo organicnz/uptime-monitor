@@ -99,9 +99,9 @@ export function MonitorDetailPanel({
   };
 
   return (
-    <div className="flex flex-col h-full overflow-y-auto">
+    <div className="flex flex-col h-full overflow-y-auto bg-neutral-950/30">
       {/* Header */}
-      <div className="p-4 sm:p-6 border-b border-neutral-800">
+      <div className="p-4 sm:p-6 border-b border-white/5 bg-neutral-900/40 backdrop-blur-sm">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
             <h1 className="text-xl sm:text-2xl font-bold truncate">
@@ -194,7 +194,7 @@ export function MonitorDetailPanel({
       </div>
 
       {/* Heartbeat Bar + Status Badge */}
-      <div className="p-4 sm:p-6 border-b border-neutral-800">
+      <div className="p-4 sm:p-6 border-b border-white/5 bg-neutral-900/20">
         <div className="flex items-center gap-3 sm:gap-4">
           {/* Heartbeat visualization */}
           <div className="flex-1 flex gap-[2px] sm:gap-[3px] items-center overflow-hidden">
@@ -248,7 +248,7 @@ export function MonitorDetailPanel({
       </div>
 
       {/* Stats Grid - responsive */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 border-b border-neutral-800">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 border-b border-white/5 bg-neutral-900/30 backdrop-blur-sm">
         <StatBox
           label="Response"
           sublabel="(Current)"
@@ -288,7 +288,7 @@ export function MonitorDetailPanel({
       </div>
 
       {/* Footer */}
-      <div className="px-6 py-3 border-t border-neutral-800 text-xs text-neutral-500 flex items-center justify-between">
+      <div className="px-6 py-3 border-t border-white/5 bg-neutral-900/30 backdrop-blur-sm text-xs text-neutral-500 flex items-center justify-between">
         <span>Created {new Date(monitor.created_at).toLocaleDateString()}</span>
         <span
           className={cn(
@@ -327,7 +327,7 @@ function StatBox({
   return (
     <div
       className={cn(
-        "py-3 sm:py-5 px-2 sm:px-4 text-center border-b border-neutral-800 sm:border-r last:border-r-0",
+        "py-3 sm:py-5 px-2 sm:px-4 text-center border-b border-white/5 sm:border-r last:border-r-0",
         className,
       )}
     >

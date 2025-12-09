@@ -72,12 +72,12 @@ export function MonitorSidebar({
   }, [filteredMonitors, selectedId, onSelect]);
 
   return (
-    <div className="flex flex-col h-full bg-neutral-900/50">
+    <div className="flex flex-col h-full bg-neutral-900/40 backdrop-blur-sm">
       {/* Add Monitor Button */}
-      <div className="p-3 border-b border-neutral-800">
+      <div className="p-3 border-b border-white/5">
         <Link href="/dashboard/monitors/new">
           <Button
-            className="w-full gap-2 bg-green-600 hover:bg-green-700"
+            className="w-full gap-2 bg-green-600/90 hover:bg-green-600 backdrop-blur-sm"
             size="sm"
           >
             <Plus className="h-4 w-4" />
@@ -87,20 +87,20 @@ export function MonitorSidebar({
       </div>
 
       {/* Search */}
-      <div className="p-3 border-b border-neutral-800">
+      <div className="p-3 border-b border-white/5">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-neutral-500" />
           <Input
             placeholder="Search..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-9 h-9 bg-neutral-800/50 border-neutral-700 text-sm"
+            className="pl-9 h-9 bg-white/5 border-white/10 text-sm backdrop-blur-sm"
           />
         </div>
       </div>
 
       {/* Connection indicator + count */}
-      <div className="px-3 py-1.5 border-b border-neutral-800 flex items-center justify-between text-xs">
+      <div className="px-3 py-1.5 border-b border-white/5 flex items-center justify-between text-xs">
         <div className="flex items-center gap-2">
           <span
             className={cn(
@@ -134,10 +134,10 @@ export function MonitorSidebar({
               key={monitor.id}
               onClick={() => onSelect(monitor.id)}
               className={cn(
-                "w-full flex items-center gap-2 px-3 py-2.5 text-left transition-colors border-l-2",
+                "w-full flex items-center gap-2 px-3 py-2.5 text-left transition-all duration-200 border-l-2",
                 isSelected
-                  ? "bg-neutral-800/70 border-l-green-500"
-                  : "border-l-transparent hover:bg-neutral-800/40",
+                  ? "bg-white/10 border-l-green-500 backdrop-blur-sm"
+                  : "border-l-transparent hover:bg-white/5",
               )}
             >
               {/* Uptime Badge */}
