@@ -167,7 +167,7 @@ export default function NewNotificationPage() {
   };
 
   return (
-    <div className="space-y-8">
+    <div className="max-w-3xl mx-auto space-y-8">
       <div className="flex items-center gap-4">
         <Link href="/dashboard/notifications">
           <Button variant="outline" size="sm">

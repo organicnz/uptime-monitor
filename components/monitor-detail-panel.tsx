@@ -99,7 +99,7 @@ export function MonitorDetailPanel({
   };
 
   return (
-    <div className="flex flex-col h-full overflow-y-auto bg-neutral-950/30">
+    <div className="flex flex-col overflow-y-auto bg-neutral-950/30">
       {/* Header */}
       <div className="p-4 sm:p-6 border-b border-white/5 bg-neutral-900/40 backdrop-blur-sm">
         <div className="flex items-start justify-between gap-3">
@@ -280,8 +280,8 @@ export function MonitorDetailPanel({
       </div>
 
       {/* Response Time Chart */}
-      <div className="flex-1 p-4 sm:p-6 min-h-[200px] sm:min-h-[250px]">
-        <h3 className="text-sm font-medium text-neutral-400 mb-4">
+      <div className="px-4 sm:px-6 py-3">
+        <h3 className="text-xs font-medium text-neutral-400 mb-1">
           Response Time (ms)
         </h3>
         <ResponseChart heartbeats={stats.validPings} maxPing={stats.maxPing} />
@@ -362,7 +362,7 @@ function ResponseChart({
 }) {
   if (heartbeats.length < 2) {
     return (
-      <div className="h-full min-h-[180px] flex items-center justify-center text-neutral-500 text-sm">
+      <div className="h-[60px] flex items-center justify-center text-neutral-500 text-sm">
         Not enough data for chart
       </div>
     );
@@ -372,7 +372,7 @@ function ResponseChart({
   const chartMax = Math.max(maxPing * 1.1, 100);
 
   return (
-    <div className="h-full min-h-[180px] flex flex-col">
+    <div className="h-[60px] flex flex-col">
       <div className="flex-1 relative">
         {/* Y-axis */}
         <div className="absolute left-0 top-0 bottom-6 w-10 flex flex-col justify-between text-xs text-neutral-600 pr-2 text-right">
