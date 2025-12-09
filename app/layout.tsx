@@ -15,6 +15,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://uptime-monitor-next.vercel.app"),
   title: "Uptime Monitor",
   description:
     "Self-hosted uptime monitoring with Telegram, Discord & Slack notifications",
