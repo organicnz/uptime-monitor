@@ -14,6 +14,9 @@ import {
   CheckCircle2,
   XCircle,
   AlertCircle,
+  PanelLeftClose,
+  PanelLeft,
+  ChevronLeft,
 } from "lucide-react";
 import Link from "next/link";
 import { useRealtimeMonitors } from "@/hooks/use-realtime-monitors";
@@ -38,6 +41,8 @@ type ViewMode = "detail" | "grid";
 
 export function DashboardLayout({ monitors }: DashboardLayoutProps) {
   const [viewMode, setViewMode] = useState<ViewMode>("detail");
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(() =>
     monitors.length > 0 ? monitors[0].id : null,
   );
@@ -90,11 +95,44 @@ export function DashboardLayout({ monitors }: DashboardLayoutProps) {
     );
   }
 
+  const handleSelectMonitor = (id: string) => {
+    setSelectedId(id);
+    setMobileSidebarOpen(false);
+  };
+
   return (
     <div className="h-[calc(100vh-8rem)] -mx-4 lg:-mx-6 -my-8 flex flex-col overflow-hidden">
       {/* View Toggle Header */}
-      <div className="flex items-center justify-between px-4 lg:px-6 py-2 border-b border-neutral-800 bg-neutral-900/50">
+      <div className="flex items-center justify-between px-3 sm:px-4 lg:px-6 py-2 border-b border-neutral-800 bg-neutral-900/50">
         <div className="flex items-center gap-1">
+          {/* Sidebar toggle for detail view */}
+          {viewMode === "detail" && (
+            <>
+              {/* Desktop sidebar toggle */}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setSidebarOpen(!sidebarOpen)}
+                className="hidden md:flex h-8 w-8 p-0 text-neutral-400 hover:text-white"
+                title={sidebarOpen ? "Hide sidebar" : "Show sidebar"}
+              >
+                {sidebarOpen ? (
+                  <PanelLeftClose className="h-4 w-4" />
+                ) : (
+                  <PanelLeft className="h-4 w-4" />
+                )}
+              </Button>
+              {/* Mobile sidebar toggle */}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setMobileSidebarOpen(!mobileSidebarOpen)}
+                className="md:hidden h-8 w-8 p-0 text-neutral-400 hover:text-white"
+              >
+                <PanelLeft className="h-4 w-4" />
+              </Button>
+            </>
+          )}
           <Button
             variant="ghost"
             size="sm"
@@ -126,27 +164,27 @@ export function DashboardLayout({ monitors }: DashboardLayoutProps) {
         </div>
 
         {/* Quick stats in header */}
-        <div className="hidden md:flex items-center gap-4 text-sm">
-          <span className="flex items-center gap-1.5 text-green-400">
-            <CheckCircle2 className="h-4 w-4" />
+        <div className="hidden sm:flex items-center gap-2 sm:gap-4 text-xs sm:text-sm">
+          <span className="flex items-center gap-1 sm:gap-1.5 text-green-400">
+            <CheckCircle2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             {upCount} Up
           </span>
           {downCount > 0 && (
-            <span className="flex items-center gap-1.5 text-red-400">
-              <XCircle className="h-4 w-4" />
+            <span className="flex items-center gap-1 sm:gap-1.5 text-red-400">
+              <XCircle className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
               {downCount} Down
             </span>
           )}
           {pendingCount > 0 && (
-            <span className="flex items-center gap-1.5 text-neutral-400">
-              <AlertCircle className="h-4 w-4" />
+            <span className="flex items-center gap-1 sm:gap-1.5 text-neutral-400">
+              <AlertCircle className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
               {pendingCount} Pending
             </span>
           )}
         </div>
 
-        {/* Only show Add button in grid view (sidebar has it in detail view) */}
-        {viewMode === "grid" && (
+        {/* Add button - show in grid view or when sidebar is hidden in detail view */}
+        {(viewMode === "grid" || (viewMode === "detail" && !sidebarOpen)) && (
           <Link href="/dashboard/monitors/new">
             <Button size="sm" className="gap-2 h-8">
               <Plus className="h-4 w-4" />
@@ -158,9 +196,24 @@ export function DashboardLayout({ monitors }: DashboardLayoutProps) {
 
       {/* Content */}
       {viewMode === "detail" ? (
-        <div className="flex flex-1 overflow-hidden">
-          {/* Sidebar */}
-          <div className="w-72 lg:w-80 flex-shrink-0 border-r border-neutral-800">
+        <div className="flex flex-1 overflow-hidden relative">
+          {/* Mobile Sidebar Overlay */}
+          {mobileSidebarOpen && (
+            <div
+              className="fixed inset-0 bg-black/60 z-40 md:hidden"
+              onClick={() => setMobileSidebarOpen(false)}
+            />
+          )}
+
+          {/* Sidebar - Desktop: collapsible, Mobile: slide-over */}
+          <div
+            className={cn(
+              "flex-shrink-0 border-r border-neutral-800 bg-neutral-900 transition-all duration-300",
+              // Desktop behavior
+              "hidden md:block",
+              sidebarOpen ? "w-72 lg:w-80" : "w-0 border-r-0 overflow-hidden",
+            )}
+          >
             <MonitorSidebar
               monitors={monitors}
               selectedId={selectedId || undefined}
@@ -168,8 +221,35 @@ export function DashboardLayout({ monitors }: DashboardLayoutProps) {
             />
           </div>
 
+          {/* Mobile Sidebar - Slide over */}
+          <div
+            className={cn(
+              "fixed inset-y-0 left-0 z-50 w-80 max-w-[85vw] bg-neutral-900 border-r border-neutral-800 transform transition-transform duration-300 ease-in-out md:hidden",
+              mobileSidebarOpen ? "translate-x-0" : "-translate-x-full",
+            )}
+          >
+            <div className="flex items-center justify-between p-3 border-b border-neutral-800">
+              <span className="font-medium">Monitors</span>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setMobileSidebarOpen(false)}
+                className="h-8 w-8 p-0"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+            </div>
+            <div className="h-[calc(100%-49px)]">
+              <MonitorSidebar
+                monitors={monitors}
+                selectedId={selectedId || undefined}
+                onSelect={handleSelectMonitor}
+              />
+            </div>
+          </div>
+
           {/* Detail Panel */}
-          <div className="flex-1 overflow-hidden">
+          <div className="flex-1 overflow-hidden min-w-0">
             {selectedMonitor ? (
               <MonitorDetailPanel
                 key={selectedMonitor.id}
@@ -183,9 +263,9 @@ export function DashboardLayout({ monitors }: DashboardLayoutProps) {
           </div>
         </div>
       ) : (
-        <div className="flex-1 overflow-auto p-4 lg:p-6 space-y-6">
+        <div className="flex-1 overflow-auto p-3 sm:p-4 lg:p-6 space-y-4 sm:space-y-6">
           {/* Stats Cards */}
-          <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-3 sm:gap-4 grid-cols-2 md:grid-cols-4">
             <StatsCard
               label="Total Monitors"
               value={monitors.length}
@@ -243,14 +323,23 @@ function StatsCard({
 }) {
   return (
     <Card className="bg-neutral-900/50 border-neutral-800">
-      <CardContent className="pt-5 pb-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm text-neutral-400">{label}</p>
-            <p className={cn("text-2xl font-bold", valueColor)}>{value}</p>
+      <CardContent className="p-3 sm:pt-5 sm:pb-4 sm:px-4">
+        <div className="flex items-center justify-between gap-2">
+          <div className="min-w-0">
+            <p className="text-xs sm:text-sm text-neutral-400 truncate">
+              {label}
+            </p>
+            <p className={cn("text-xl sm:text-2xl font-bold", valueColor)}>
+              {value}
+            </p>
           </div>
-          <div className={cn("p-2.5 rounded-xl", iconBg)}>
-            <Icon className={cn("h-5 w-5", iconColor)} />
+          <div
+            className={cn(
+              "p-2 sm:p-2.5 rounded-lg sm:rounded-xl flex-shrink-0",
+              iconBg,
+            )}
+          >
+            <Icon className={cn("h-4 w-4 sm:h-5 sm:w-5", iconColor)} />
           </div>
         </div>
       </CardContent>
