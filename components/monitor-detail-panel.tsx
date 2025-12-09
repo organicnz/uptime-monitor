@@ -2,17 +2,9 @@
 
 import { useRealtimeMonitor } from "@/hooks/use-realtime-monitors";
 import { Button } from "@/components/ui/button";
-import {
-  Pause,
-  Play,
-  Pencil,
-  Trash2,
-  ExternalLink,
-  Clock,
-  Calendar,
-} from "lucide-react";
+import { Pause, Play, Pencil, Trash2, ExternalLink, Clock } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import {
@@ -56,29 +48,37 @@ export function MonitorDetailPanel({
   const isUp = currentStatus?.status === "up";
   const isDown = currentStatus?.status === "down";
 
-  const validPings = heartbeats.filter((h) => h.ping !== null && h.ping > 0);
-  const currentPing = currentStatus?.ping || 0;
-  const avgPing =
-    validPings.length > 0
-      ? Math.round(
-          validPings.reduce((sum, h) => sum + (h.ping || 0), 0) /
-            validPings.length,
-        )
-      : 0;
+  // Calculate stats - use a stable timestamp for 24h calculation
+  const [statsTimestamp] = useState(() => Date.now());
+  const stats = useMemo(() => {
+    const validPings = heartbeats.filter((h) => h.ping !== null && h.ping > 0);
+    const currentPing = currentStatus?.ping || 0;
+    const avgPing =
+      validPings.length > 0
+        ? Math.round(
+            validPings.reduce((sum, h) => sum + (h.ping || 0), 0) /
+              validPings.length,
+          )
+        : 0;
 
-  const last24h = heartbeats.filter((h) => {
-    const time = new Date(h.time);
-    const now = new Date();
-    return now.getTime() - time.getTime() < 24 * 60 * 60 * 1000;
-  });
-  const uptime24h =
-    last24h.length > 0
-      ? (
-          (last24h.filter((h) => h.status === 1).length / last24h.length) *
-          100
-        ).toFixed(1)
-      : "100.0";
-  const uptime30d = uptime24h;
+    const last24h = heartbeats.filter(
+      (h) => statsTimestamp - new Date(h.time).getTime() < 24 * 60 * 60 * 1000,
+    );
+    const uptime24h =
+      last24h.length > 0
+        ? (
+            (last24h.filter((h) => h.status === 1).length / last24h.length) *
+            100
+          ).toFixed(1)
+        : "100.0";
+
+    const maxPing =
+      validPings.length > 0
+        ? Math.max(...validPings.map((h) => h.ping || 0), 100)
+        : 100;
+
+    return { currentPing, avgPing, uptime24h, maxPing, validPings };
+  }, [heartbeats, currentStatus, statsTimestamp]);
 
   const toggleActive = async () => {
     const newState = !monitor.active;
@@ -97,55 +97,46 @@ export function MonitorDetailPanel({
     router.refresh();
   };
 
-  const maxPing =
-    validPings.length > 0
-      ? Math.max(...validPings.map((h) => h.ping || 0), 100)
-      : 100;
-
   return (
-    <div className="flex flex-col h-full overflow-y-auto bg-neutral-900/30">
+    <div className="flex flex-col h-full overflow-y-auto">
       {/* Header */}
       <div className="p-6 border-b border-neutral-800">
-        <h1 className="text-2xl font-bold mb-1">{monitor.name}</h1>
+        <h1 className="text-2xl font-bold">{monitor.name}</h1>
         {monitor.url && (
           <a
             href={monitor.url}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-green-400 hover:underline text-sm flex items-center gap-1"
+            className="text-green-400 hover:text-green-300 text-sm inline-flex items-center gap-1 mt-1"
           >
             {monitor.url}
             <ExternalLink className="h-3 w-3" />
           </a>
         )}
-        {monitor.hostname && (
-          <p className="text-neutral-400 text-sm">{monitor.hostname}</p>
+        {monitor.hostname && !monitor.url && (
+          <p className="text-neutral-400 text-sm mt-1">{monitor.hostname}</p>
         )}
 
+        {/* Action Buttons */}
         <div className="flex items-center gap-2 mt-4">
           <Button
             variant="outline"
             size="sm"
             onClick={toggleActive}
-            className="gap-2 border-neutral-700 hover:bg-neutral-800"
+            className="gap-1.5 border-neutral-700 hover:bg-neutral-800"
           >
             {monitor.active ? (
-              <>
-                <Pause className="h-4 w-4" />
-                Pause
-              </>
+              <Pause className="h-4 w-4" />
             ) : (
-              <>
-                <Play className="h-4 w-4" />
-                Resume
-              </>
+              <Play className="h-4 w-4" />
             )}
+            {monitor.active ? "Pause" : "Resume"}
           </Button>
           <Link href={`/dashboard/monitors/${monitor.id}/edit`}>
             <Button
               variant="outline"
               size="sm"
-              className="gap-2 border-neutral-700 hover:bg-neutral-800"
+              className="gap-1.5 border-neutral-700 hover:bg-neutral-800"
             >
               <Pencil className="h-4 w-4" />
               Edit
@@ -153,22 +144,31 @@ export function MonitorDetailPanel({
           </Link>
           <AlertDialog>
             <AlertDialogTrigger asChild>
-              <Button variant="destructive" size="sm" className="gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5 border-red-900/50 text-red-400 hover:bg-red-950/50 hover:text-red-300"
+              >
                 <Trash2 className="h-4 w-4" />
                 Delete
               </Button>
             </AlertDialogTrigger>
-            <AlertDialogContent>
+            <AlertDialogContent className="bg-neutral-900 border-neutral-800">
               <AlertDialogHeader>
                 <AlertDialogTitle>Delete Monitor</AlertDialogTitle>
-                <AlertDialogDescription>
+                <AlertDialogDescription className="text-neutral-400">
                   This will permanently delete &quot;{monitor.name}&quot; and
                   all its heartbeat data.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction onClick={handleDelete}>
+                <AlertDialogCancel className="border-neutral-700">
+                  Cancel
+                </AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={handleDelete}
+                  className="bg-red-600 hover:bg-red-700"
+                >
                   Delete
                 </AlertDialogAction>
               </AlertDialogFooter>
@@ -177,38 +177,42 @@ export function MonitorDetailPanel({
         </div>
       </div>
 
-      {/* Heartbeat Bar + Status */}
+      {/* Heartbeat Bar + Status Badge */}
       <div className="p-6 border-b border-neutral-800">
         <div className="flex items-center gap-4">
-          <div className="flex-1 flex gap-[2px] items-center">
+          {/* Heartbeat visualization - 60 bars like Uptime Kuma */}
+          <div className="flex-1 flex gap-[3px] items-center">
             {heartbeats.length > 0
               ? heartbeats
-                  .slice(0, 60)
+                  .slice(0, 50)
                   .reverse()
                   .map((hb, i) => (
                     <div
                       key={hb.id || i}
                       className={cn(
-                        "flex-1 h-8 rounded-sm min-w-[4px] max-w-[8px]",
-                        hb.status === 1 && "bg-green-500",
-                        hb.status === 0 && "bg-red-500",
-                        hb.status === 2 && "bg-neutral-600",
+                        "flex-1 h-9 rounded-[3px] min-w-[5px] max-w-[10px] transition-colors",
+                        hb.status === 1 && "bg-green-500 hover:bg-green-400",
+                        hb.status === 0 && "bg-red-500 hover:bg-red-400",
+                        hb.status === 2 &&
+                          "bg-neutral-600 hover:bg-neutral-500",
                       )}
-                      title={`${new Date(hb.time).toLocaleString()} - ${hb.ping}ms`}
+                      title={`${new Date(hb.time).toLocaleString()}\n${hb.ping ? `${hb.ping}ms` : "N/A"}`}
                     />
                   ))
-              : Array(60)
+              : Array(50)
                   .fill(0)
                   .map((_, i) => (
                     <div
                       key={i}
-                      className="flex-1 h-8 rounded-sm min-w-[4px] max-w-[8px] bg-neutral-700"
+                      className="flex-1 h-9 rounded-[3px] min-w-[5px] max-w-[10px] bg-neutral-700"
                     />
                   ))}
           </div>
+
+          {/* Status Badge */}
           <div
             className={cn(
-              "px-4 py-2 rounded-lg text-lg font-bold",
+              "px-5 py-2.5 rounded-lg text-lg font-bold shrink-0",
               isUp && "bg-green-500 text-white",
               isDown && "bg-red-500 text-white",
               !isUp && !isDown && "bg-neutral-700 text-neutral-300",
@@ -217,149 +221,50 @@ export function MonitorDetailPanel({
             {isUp ? "Up" : isDown ? "Down" : "Pending"}
           </div>
         </div>
-        <p className="text-sm text-neutral-400 mt-2 flex items-center gap-1">
+        <p className="text-sm text-neutral-500 mt-3 flex items-center gap-1.5">
           <Clock className="h-3.5 w-3.5" />
           Check every {monitor.interval} seconds.
         </p>
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 p-6 border-b border-neutral-800">
+      {/* Stats Grid - matching Uptime Kuma layout */}
+      <div className="grid grid-cols-5 divide-x divide-neutral-800 border-b border-neutral-800">
         <StatBox
           label="Response"
           sublabel="(Current)"
-          value={`${currentPing} ms`}
+          value={`${stats.currentPing} ms`}
           highlight
         />
         <StatBox
           label="Avg. Response"
           sublabel="(24-hour)"
-          value={`${avgPing} ms`}
+          value={`${stats.avgPing} ms`}
         />
-        <StatBox label="Uptime" sublabel="(24-hour)" value={`${uptime24h}%`} />
-        <StatBox label="Uptime" sublabel="(30-day)" value={`${uptime30d}%`} />
+        <StatBox
+          label="Uptime"
+          sublabel="(24-hour)"
+          value={`${stats.uptime24h}%`}
+        />
+        <StatBox
+          label="Uptime"
+          sublabel="(30-day)"
+          value={`${stats.uptime24h}%`}
+        />
         <StatBox label="Cert Exp." sublabel="" value="—" muted />
       </div>
 
       {/* Response Time Chart */}
-      <div className="p-6 flex-1">
-        <h3 className="text-sm font-medium text-neutral-400 mb-4">
-          Response Time (ms)
-        </h3>
-        <div className="h-48 relative">
-          <div className="absolute left-0 top-0 bottom-6 w-12 flex flex-col justify-between text-xs text-neutral-500">
-            <span>{maxPing}</span>
-            <span>{Math.round(maxPing * 0.5)}</span>
-            <span>0</span>
-          </div>
-          <div className="ml-14 h-full pr-4">
-            <svg
-              className="w-full h-[calc(100%-24px)]"
-              preserveAspectRatio="none"
-            >
-              <line
-                x1="0"
-                y1="0%"
-                x2="100%"
-                y2="0%"
-                stroke="currentColor"
-                className="text-neutral-700"
-                strokeWidth="1"
-              />
-              <line
-                x1="0"
-                y1="50%"
-                x2="100%"
-                y2="50%"
-                stroke="currentColor"
-                className="text-neutral-800"
-                strokeWidth="1"
-                strokeDasharray="4"
-              />
-              <line
-                x1="0"
-                y1="100%"
-                x2="100%"
-                y2="100%"
-                stroke="currentColor"
-                className="text-neutral-700"
-                strokeWidth="1"
-              />
-              {validPings.length > 1 && (
-                <>
-                  <path
-                    d={`M 0 ${100 - ((validPings[validPings.length - 1]?.ping || 0) / maxPing) * 100}% ${validPings
-                      .slice()
-                      .reverse()
-                      .map(
-                        (h, i) =>
-                          `L ${(i / (validPings.length - 1)) * 100}% ${100 - ((h.ping || 0) / maxPing) * 100}%`,
-                      )
-                      .join(" ")} L 100% 100% L 0 100% Z`}
-                    fill="url(#gradient)"
-                    opacity="0.3"
-                  />
-                  <path
-                    d={`M 0 ${100 - ((validPings[validPings.length - 1]?.ping || 0) / maxPing) * 100}% ${validPings
-                      .slice()
-                      .reverse()
-                      .map(
-                        (h, i) =>
-                          `L ${(i / (validPings.length - 1)) * 100}% ${100 - ((h.ping || 0) / maxPing) * 100}%`,
-                      )
-                      .join(" ")}`}
-                    fill="none"
-                    stroke="#22c55e"
-                    strokeWidth="2"
-                  />
-                  <defs>
-                    <linearGradient id="gradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#22c55e" />
-                      <stop offset="100%" stopColor="#22c55e" stopOpacity="0" />
-                    </linearGradient>
-                  </defs>
-                </>
-              )}
-            </svg>
-            <div className="flex justify-between text-xs text-neutral-500 mt-1">
-              {heartbeats.length > 0 ? (
-                <>
-                  <span>
-                    {new Date(
-                      heartbeats[heartbeats.length - 1]?.time,
-                    ).toLocaleTimeString([], {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                  </span>
-                  <span>
-                    {new Date(heartbeats[0]?.time).toLocaleTimeString([], {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                  </span>
-                </>
-              ) : (
-                <>
-                  <span>—</span>
-                  <span>—</span>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
+      <div className="flex-1 p-6">
+        <ResponseChart heartbeats={stats.validPings} maxPing={stats.maxPing} />
       </div>
 
       {/* Footer */}
-      <div className="p-4 border-t border-neutral-800 text-xs text-neutral-500 flex items-center gap-4">
-        <span className="flex items-center gap-1">
-          <Calendar className="h-3.5 w-3.5" />
-          Created {new Date(monitor.created_at).toLocaleDateString()}
-        </span>
+      <div className="px-6 py-3 border-t border-neutral-800 text-xs text-neutral-500 flex items-center justify-between">
+        <span>Created {new Date(monitor.created_at).toLocaleDateString()}</span>
         <span
           className={cn(
-            "flex items-center gap-1",
-            isConnected ? "text-green-400" : "text-neutral-500",
+            "flex items-center gap-1.5",
+            isConnected ? "text-green-400" : "",
           )}
         >
           <span
@@ -383,14 +288,14 @@ function StatBox({
   muted,
 }: {
   label: string;
-  sublabel: string;
+  sublabel?: string;
   value: string;
   highlight?: boolean;
   muted?: boolean;
 }) {
   return (
-    <div className="text-center">
-      <div className="text-sm text-neutral-400">
+    <div className="py-5 px-4 text-center">
+      <div className="text-sm text-neutral-400 mb-1">
         {label}
         {sublabel && (
           <span className="block text-xs text-neutral-500">{sublabel}</span>
@@ -398,13 +303,131 @@ function StatBox({
       </div>
       <div
         className={cn(
-          "text-lg font-semibold mt-1",
+          "text-lg font-semibold",
           highlight &&
-            "text-green-400 underline cursor-pointer hover:text-green-300",
-          muted && "text-neutral-500",
+            "text-green-400 underline decoration-green-400/30 underline-offset-2 cursor-pointer hover:text-green-300",
+          muted && "text-neutral-600",
         )}
       >
         {value}
+      </div>
+    </div>
+  );
+}
+
+function ResponseChart({
+  heartbeats,
+  maxPing,
+}: {
+  heartbeats: { ping: number | null; time: string }[];
+  maxPing: number;
+}) {
+  if (heartbeats.length < 2) {
+    return (
+      <div className="h-full flex items-center justify-center text-neutral-500 text-sm">
+        Not enough data for chart
+      </div>
+    );
+  }
+
+  const points = heartbeats.slice(0, 100).reverse();
+  const chartMax = Math.max(maxPing * 1.1, 100);
+
+  return (
+    <div className="h-full flex flex-col">
+      <div className="flex-1 relative">
+        {/* Y-axis */}
+        <div className="absolute left-0 top-0 bottom-6 w-10 flex flex-col justify-between text-xs text-neutral-600 pr-2 text-right">
+          <span>{Math.round(chartMax)}</span>
+          <span>{Math.round(chartMax / 2)}</span>
+          <span>0</span>
+        </div>
+
+        {/* Chart */}
+        <div className="ml-12 h-full">
+          <svg
+            className="w-full h-[calc(100%-24px)]"
+            preserveAspectRatio="none"
+            viewBox="0 0 100 100"
+          >
+            {/* Grid */}
+            <line
+              x1="0"
+              y1="0"
+              x2="100"
+              y2="0"
+              stroke="#404040"
+              strokeWidth="0.5"
+            />
+            <line
+              x1="0"
+              y1="50"
+              x2="100"
+              y2="50"
+              stroke="#333"
+              strokeWidth="0.5"
+              strokeDasharray="2"
+            />
+            <line
+              x1="0"
+              y1="100"
+              x2="100"
+              y2="100"
+              stroke="#404040"
+              strokeWidth="0.5"
+            />
+
+            {/* Area fill */}
+            <path
+              d={`M 0 100 ${points
+                .map((p, i) => {
+                  const x = (i / (points.length - 1)) * 100;
+                  const y = 100 - ((p.ping || 0) / chartMax) * 100;
+                  return `L ${x} ${y}`;
+                })
+                .join(" ")} L 100 100 Z`}
+              fill="url(#areaGradient)"
+            />
+
+            {/* Line */}
+            <path
+              d={`M ${points
+                .map((p, i) => {
+                  const x = (i / (points.length - 1)) * 100;
+                  const y = 100 - ((p.ping || 0) / chartMax) * 100;
+                  return `${i === 0 ? "" : "L "}${x} ${y}`;
+                })
+                .join(" ")}`}
+              fill="none"
+              stroke="#22c55e"
+              strokeWidth="1.5"
+              vectorEffect="non-scaling-stroke"
+            />
+
+            <defs>
+              <linearGradient id="areaGradient" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#22c55e" stopOpacity="0.3" />
+                <stop offset="100%" stopColor="#22c55e" stopOpacity="0.05" />
+              </linearGradient>
+            </defs>
+          </svg>
+
+          {/* X-axis labels */}
+          <div className="flex justify-between text-xs text-neutral-600 mt-1">
+            <span>
+              {new Date(points[0]?.time).toLocaleTimeString([], {
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
+            </span>
+            <span>
+              {new Date(points[points.length - 1]?.time).toLocaleTimeString(
+                [],
+                { hour: "2-digit", minute: "2-digit" },
+              )}
+            </span>
+          </div>
+        </div>
       </div>
     </div>
   );
