@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
@@ -12,46 +12,78 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, MessageCircle, Mail, Webhook, Loader2 } from "lucide-react";
+import { ArrowLeft, Mail, Webhook, Loader2 } from "lucide-react";
 import Link from "next/link";
+import {
+  TelegramIcon,
+  DiscordIcon,
+  SlackIcon,
+  TeamsIcon,
+} from "@/components/icons";
 
-type ChannelType = "telegram" | "discord" | "slack" | "webhook" | "email";
+type ChannelType =
+  | "telegram"
+  | "discord"
+  | "slack"
+  | "webhook"
+  | "email"
+  | "teams";
 
 const channelTypes: {
   type: ChannelType;
   name: string;
-  icon: typeof MessageCircle;
+  icon: React.ComponentType<{ className?: string }>;
   description: string;
+  color: string;
+  bg: string;
 }[] = [
   {
     type: "telegram",
     name: "Telegram",
-    icon: MessageCircle,
+    icon: TelegramIcon,
     description: "Receive alerts via Telegram bot",
+    color: "text-blue-500",
+    bg: "bg-blue-500/10",
   },
   {
     type: "discord",
     name: "Discord",
-    icon: MessageCircle,
+    icon: DiscordIcon,
     description: "Post alerts to a Discord channel",
+    color: "text-indigo-500",
+    bg: "bg-indigo-500/10",
   },
   {
     type: "slack",
     name: "Slack",
-    icon: MessageCircle,
+    icon: SlackIcon,
     description: "Post alerts to a Slack channel",
+    color: "text-amber-500",
+    bg: "bg-amber-500/10",
+  },
+  {
+    type: "teams",
+    name: "Microsoft Teams",
+    icon: TeamsIcon,
+    description: "Post alerts to a Teams channel",
+    color: "text-violet-500",
+    bg: "bg-violet-500/10",
   },
   {
     type: "webhook",
     name: "Webhook",
     icon: Webhook,
     description: "Send alerts to a custom webhook URL",
+    color: "text-muted-foreground",
+    bg: "bg-muted",
   },
   {
     type: "email",
     name: "Email",
     icon: Mail,
     description: "Receive alerts via email (coming soon)",
+    color: "text-emerald-500",
+    bg: "bg-emerald-500/10",
   },
 ];
 
@@ -84,6 +116,7 @@ export default function NewNotificationPage() {
         case "telegram":
           config = { bot_token: formData.bot_token, chat_id: formData.chat_id };
           break;
+        case "teams":
         case "discord":
         case "slack":
           config = { webhook_url: formData.webhook_url };
@@ -131,6 +164,7 @@ export default function NewNotificationPage() {
         case "telegram":
           config = { bot_token: formData.bot_token, chat_id: formData.chat_id };
           break;
+        case "teams":
         case "discord":
         case "slack":
           config = { webhook_url: formData.webhook_url };
@@ -187,23 +221,33 @@ export default function NewNotificationPage() {
         {/* Step 1: Select Type */}
         {!selectedType && (
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {channelTypes.map(({ type, name, icon: Icon, description }) => (
-              <Card
-                key={type}
-                className={`cursor-pointer transition-all hover:border-blue-500 hover:shadow-md ${
-                  type === "email" ? "opacity-50 cursor-not-allowed" : ""
-                }`}
-                onClick={() => type !== "email" && setSelectedType(type)}
-              >
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Icon className="h-5 w-5" />
-                    {name}
-                  </CardTitle>
-                  <CardDescription>{description}</CardDescription>
-                </CardHeader>
-              </Card>
-            ))}
+            {channelTypes.map(
+              ({ type, name, icon: Icon, description, color, bg }) => (
+                <Card
+                  key={type}
+                  className={`cursor-pointer transition-all hover:shadow-lg group ${
+                    type === "email"
+                      ? "opacity-60 cursor-not-allowed grayscale"
+                      : "hover:border-primary/50"
+                  } ${selectedType === type ? "ring-2 ring-primary border-primary bg-primary/5" : "glass-card"}`}
+                  onClick={() => type !== "email" && setSelectedType(type)}
+                >
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-3">
+                      <div
+                        className={`p-2.5 rounded-lg ${bg} transition-transform group-hover:scale-110`}
+                      >
+                        <Icon className={`h-6 w-6 ${color}`} />
+                      </div>
+                      {name}
+                    </CardTitle>
+                    <CardDescription className="pt-1">
+                      {description}
+                    </CardDescription>
+                  </CardHeader>
+                </Card>
+              ),
+            )}
           </div>
         )}
 
@@ -273,6 +317,7 @@ export default function NewNotificationPage() {
 
                 {(selectedType === "discord" ||
                   selectedType === "slack" ||
+                  selectedType === "teams" ||
                   selectedType === "webhook") && (
                   <div className="space-y-2">
                     <Label htmlFor="webhook_url">Webhook URL</Label>
