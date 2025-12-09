@@ -29,12 +29,17 @@ import {
   Radio,
   Wifi,
   WifiOff,
+  Copy,
+  Loader2,
 } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { formatDistanceToNow } from "date-fns";
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
+import { duplicateMonitor } from "@/lib/actions/monitors";
+import { toast } from "sonner";
 
 type Monitor = {
   id: string;
@@ -118,7 +123,9 @@ export function MonitorDetailClient({
   initialHeartbeats,
   activeIncidents,
 }: MonitorDetailClientProps) {
+  const router = useRouter();
   const [monitor, setMonitor] = useState(initialMonitor);
+  const [isDuplicating, startDuplicateTransition] = useTransition();
   const { heartbeats: realtimeHeartbeats, isConnected } = useRealtimeMonitor(
     monitor.id,
   );
@@ -174,6 +181,27 @@ export function MonitorDetailClient({
     if (!error) {
       setMonitor((prev) => ({ ...prev, active: newState }));
     }
+  };
+
+  const handleDuplicate = () => {
+    startDuplicateTransition(async () => {
+      const result = await duplicateMonitor(monitor.id);
+      if (result.success) {
+        toast.success(`Created "${result.name}"`, {
+          description:
+            "The duplicate is paused. Review settings before activating.",
+          action: {
+            label: "View",
+            onClick: () => router.push(`/dashboard/monitors/${result.id}`),
+          },
+        });
+        router.push(`/dashboard/monitors/${result.id}`);
+      } else {
+        toast.error("Failed to duplicate", {
+          description: result.error,
+        });
+      }
+    });
   };
 
   const TypeIcon = typeIcons[monitor.type] || Globe;
@@ -277,6 +305,19 @@ export function MonitorDetailClient({
                     <Pause className="h-4 w-4" />
                   ) : (
                     <Play className="h-4 w-4" />
+                  )}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={handleDuplicate}
+                  disabled={isDuplicating}
+                  title="Duplicate monitor"
+                >
+                  {isDuplicating ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Copy className="h-4 w-4" />
                   )}
                 </Button>
                 <Link href={`/dashboard/monitors/${monitor.id}/edit`}>
