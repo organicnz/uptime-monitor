@@ -34,6 +34,10 @@ import {
   Power,
   PowerOff,
   Clock,
+  Bell,
+  MessageCircle,
+  Mail,
+  Webhook,
 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -121,6 +125,17 @@ export default function EditMonitorPage(props: {
   const [cronLoading, setCronLoading] = useState(true);
   const [cronSaving, setCronSaving] = useState(false);
 
+  // Notification channels state
+  type NotificationChannel = {
+    id: string;
+    name: string;
+    type: string;
+    active: boolean;
+  };
+  const [channels, setChannels] = useState<NotificationChannel[]>([]);
+  const [selectedChannels, setSelectedChannels] = useState<string[]>([]);
+  const [channelsLoading, setChannelsLoading] = useState(true);
+
   const selectedType = monitorTypes.find((t) => t.id === formData.type);
 
   useEffect(() => {
@@ -195,8 +210,38 @@ export default function EditMonitorPage(props: {
       }
     };
 
+    const loadNotificationChannels = async () => {
+      try {
+        const supabase = createClient();
+
+        // Load all user's notification channels
+        const { data: channelsData } = await supabase
+          .from("notification_channels")
+          .select("id, name, type, active")
+          .order("name");
+
+        setChannels((channelsData || []) as NotificationChannel[]);
+
+        // Load currently linked channels for this monitor
+        const { data: linkedData } = await supabase
+          .from("monitor_notifications")
+          .select("channel_id")
+          .eq("monitor_id", params.id);
+
+        const linkedIds = ((linkedData || []) as { channel_id: string }[]).map(
+          (l) => l.channel_id,
+        );
+        setSelectedChannels(linkedIds);
+      } catch (err) {
+        console.error("Error loading notification channels:", err);
+      } finally {
+        setChannelsLoading(false);
+      }
+    };
+
     loadMonitor();
     loadCronSchedule();
+    loadNotificationChannels();
   }, [params.id]);
 
   const handleCronIntervalChange = async (value: string) => {
@@ -278,6 +323,24 @@ export default function EditMonitorPage(props: {
         .eq("id", params.id);
 
       if (updateError) throw updateError;
+
+      // Update notification channel links
+      // First, delete existing links
+      await supabase
+        .from("monitor_notifications")
+        .delete()
+        .eq("monitor_id", params.id);
+
+      // Then insert new links
+      if (selectedChannels.length > 0) {
+        const links = selectedChannels.map((channelId) => ({
+          monitor_id: params.id,
+          channel_id: channelId,
+        }));
+        await supabase
+          .from("monitor_notifications")
+          .insert(links as unknown as never);
+      }
 
       setSuccess(true);
       setTimeout(() => {
@@ -679,6 +742,135 @@ export default function EditMonitorPage(props: {
                 </p>
               )}
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Notification Channels */}
+        <Card className="bg-neutral-900/50 border-neutral-800">
+          <CardHeader>
+            <CardTitle className="text-white flex items-center gap-2">
+              <Bell className="h-5 w-5 text-blue-400" />
+              Notification Channels
+            </CardTitle>
+            <CardDescription>
+              Select which channels should receive alerts for this monitor
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {channelsLoading ? (
+              <div className="flex items-center gap-2 text-neutral-400 text-sm">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Loading channels...
+              </div>
+            ) : channels.length === 0 ? (
+              <div className="text-center py-6">
+                <Bell className="h-8 w-8 text-neutral-600 mx-auto mb-2" />
+                <p className="text-neutral-400 text-sm mb-3">
+                  No notification channels configured
+                </p>
+                <Link href="/dashboard/notifications/new">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="border-neutral-700"
+                  >
+                    Add Channel
+                  </Button>
+                </Link>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {channels.map((channel) => {
+                  const isSelected = selectedChannels.includes(channel.id);
+                  const iconConfig: Record<
+                    string,
+                    { icon: typeof Bell; color: string; bg: string }
+                  > = {
+                    telegram: {
+                      icon: MessageCircle,
+                      color: "text-blue-400",
+                      bg: "bg-blue-500/20",
+                    },
+                    discord: {
+                      icon: MessageCircle,
+                      color: "text-indigo-400",
+                      bg: "bg-indigo-500/20",
+                    },
+                    slack: {
+                      icon: MessageCircle,
+                      color: "text-amber-400",
+                      bg: "bg-amber-500/20",
+                    },
+                    teams: {
+                      icon: MessageCircle,
+                      color: "text-violet-400",
+                      bg: "bg-violet-500/20",
+                    },
+                    email: {
+                      icon: Mail,
+                      color: "text-emerald-400",
+                      bg: "bg-emerald-500/20",
+                    },
+                    webhook: {
+                      icon: Webhook,
+                      color: "text-neutral-400",
+                      bg: "bg-neutral-500/20",
+                    },
+                    pushover: {
+                      icon: Bell,
+                      color: "text-cyan-400",
+                      bg: "bg-cyan-500/20",
+                    },
+                  };
+                  const config = iconConfig[channel.type] || iconConfig.webhook;
+                  const Icon = config.icon;
+
+                  return (
+                    <button
+                      key={channel.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedChannels((prev) =>
+                          isSelected
+                            ? prev.filter((id) => id !== channel.id)
+                            : [...prev, channel.id],
+                        );
+                      }}
+                      className={`w-full flex items-center gap-3 p-3 rounded-lg border transition-all ${
+                        isSelected
+                          ? "border-green-500 bg-green-500/10"
+                          : "border-neutral-700 bg-neutral-800/50 hover:border-neutral-600"
+                      }`}
+                    >
+                      <div className={`p-2 rounded-lg ${config.bg}`}>
+                        <Icon className={`h-4 w-4 ${config.color}`} />
+                      </div>
+                      <div className="flex-1 text-left">
+                        <p
+                          className={`font-medium ${isSelected ? "text-green-400" : "text-white"}`}
+                        >
+                          {channel.name}
+                        </p>
+                        <p className="text-xs text-neutral-500 capitalize">
+                          {channel.type}
+                        </p>
+                      </div>
+                      <div
+                        className={`h-5 w-5 rounded border-2 flex items-center justify-center ${
+                          isSelected
+                            ? "border-green-500 bg-green-500"
+                            : "border-neutral-600"
+                        }`}
+                      >
+                        {isSelected && (
+                          <CheckCircle2 className="h-3 w-3 text-white" />
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </CardContent>
         </Card>
 
