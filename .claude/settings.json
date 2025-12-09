@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run *)",
+      "Bash(npx *)",
+      "Read(*)",
+      "Write(.claude/**)",
+      "Write(app/**)",
+      "Write(components/**)",
+      "Write(lib/**)",
+      "Write(types/**)",
+      "Write(supabase/**)"
+    ],
+    "deny": ["Bash(rm -rf *)", "Write(.env*)"]
+  }
+}
