@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import {
   listSchedules,
-  updateScheduleCron,
+  updateSchedule,
   pauseSchedule,
   resumeSchedule,
   intervalToCron,
@@ -44,6 +44,9 @@ export async function GET() {
         destination: monitorSchedule.destination,
         isPaused: monitorSchedule.isPaused,
         createdAt: monitorSchedule.createdAt,
+        retries: monitorSchedule.retries,
+        failureCallback: monitorSchedule.failureCallback,
+        timezone: monitorSchedule.scheduleTimezone,
       },
     });
   } catch (error) {
@@ -127,7 +130,14 @@ export async function PATCH(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { scheduleId, intervalMinutes, action } = body;
+    const {
+      scheduleId,
+      intervalMinutes,
+      action,
+      retries,
+      failureCallback,
+      timezone,
+    } = body;
 
     if (!scheduleId) {
       return NextResponse.json(
@@ -147,30 +157,58 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ success: true, action: "resumed" });
     }
 
-    // Handle interval update
-    if (intervalMinutes) {
+    // Build update config
+    const updateConfig: {
+      cron?: string;
+      retries?: number;
+      failureCallback?: string;
+      scheduleTimezone?: string;
+    } = {};
+
+    if (intervalMinutes !== undefined) {
       if (intervalMinutes < 1) {
         return NextResponse.json(
           { error: "Invalid interval. Minimum is 1 minute." },
           { status: 400 },
         );
       }
-
-      const cron = intervalToCron(intervalMinutes);
-      const result = await updateScheduleCron(scheduleId, cron);
-
-      return NextResponse.json({
-        success: true,
-        newScheduleId: result.scheduleId,
-        cron,
-        intervalMinutes,
-      });
+      updateConfig.cron = intervalToCron(intervalMinutes);
     }
 
-    return NextResponse.json(
-      { error: "No valid action or interval provided" },
-      { status: 400 },
-    );
+    if (retries !== undefined) {
+      if (retries < 0 || retries > 5) {
+        return NextResponse.json(
+          { error: "Retries must be between 0 and 5." },
+          { status: 400 },
+        );
+      }
+      updateConfig.retries = retries;
+    }
+
+    if (failureCallback !== undefined) {
+      updateConfig.failureCallback = failureCallback || undefined;
+    }
+
+    if (timezone !== undefined) {
+      updateConfig.scheduleTimezone = timezone || undefined;
+    }
+
+    // Check if we have anything to update
+    if (Object.keys(updateConfig).length === 0) {
+      return NextResponse.json(
+        { error: "No valid update parameters provided" },
+        { status: 400 },
+      );
+    }
+
+    const result = await updateSchedule(scheduleId, updateConfig);
+
+    return NextResponse.json({
+      success: true,
+      newScheduleId: result.scheduleId,
+      ...updateConfig,
+      intervalMinutes: updateConfig.cron ? intervalMinutes : undefined,
+    });
   } catch (error) {
     console.error("Error updating schedule:", error);
     return NextResponse.json(

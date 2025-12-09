@@ -21,22 +21,40 @@ export type Schedule = {
   method: string;
   createdAt: number;
   isPaused: boolean;
+  retries: number;
+  callback?: string;
+  failureCallback?: string;
+  scheduleTimezone?: string;
 };
 
 export type ScheduleListResponse = Schedule[];
+
+export type ScheduleConfig = {
+  cron?: string;
+  retries?: number;
+  failureCallback?: string;
+  scheduleTimezone?: string;
+};
 
 // Get all schedules
 export async function listSchedules(): Promise<Schedule[]> {
   const client = getQStashClient();
   const schedules = await client.schedules.list();
-  return schedules.map((s) => ({
-    scheduleId: s.scheduleId,
-    cron: s.cron || "",
-    destination: s.destination,
-    method: s.method || "POST",
-    createdAt: s.createdAt,
-    isPaused: s.isPaused || false,
-  }));
+  return schedules.map((s) => {
+    const sched = s as Record<string, unknown>;
+    return {
+      scheduleId: s.scheduleId,
+      cron: s.cron || "",
+      destination: s.destination,
+      method: s.method || "POST",
+      createdAt: s.createdAt,
+      isPaused: s.isPaused || false,
+      retries: s.retries ?? 3,
+      callback: s.callback,
+      failureCallback: s.failureCallback,
+      scheduleTimezone: (sched.scheduleTimezone as string) || undefined,
+    };
+  });
 }
 
 // Get a specific schedule
@@ -46,6 +64,7 @@ export async function getSchedule(
   const client = getQStashClient();
   try {
     const s = await client.schedules.get(scheduleId);
+    const sched = s as Record<string, unknown>;
     return {
       scheduleId: s.scheduleId,
       cron: s.cron || "",
@@ -53,6 +72,10 @@ export async function getSchedule(
       method: s.method || "POST",
       createdAt: s.createdAt,
       isPaused: s.isPaused || false,
+      retries: s.retries ?? 3,
+      callback: s.callback,
+      failureCallback: s.failureCallback,
+      scheduleTimezone: (sched.scheduleTimezone as string) || undefined,
     };
   } catch {
     return null;
@@ -72,26 +95,49 @@ export async function createSchedule(params: {
   return { scheduleId: result.scheduleId };
 }
 
-// Update schedule (delete and recreate since QStash doesn't have update)
-export async function updateScheduleCron(
+// Update schedule (delete and recreate since QStash doesn't have direct update)
+export async function updateSchedule(
   scheduleId: string,
-  newCron: string,
+  config: ScheduleConfig,
 ): Promise<{ scheduleId: string }> {
   const client = getQStashClient();
 
   // Get existing schedule
   const existing = await client.schedules.get(scheduleId);
+  const existingSched = existing as Record<string, unknown>;
 
   // Delete old schedule
   await client.schedules.delete(scheduleId);
 
-  // Create new schedule with updated cron
-  const result = await client.schedules.create({
+  // Build create options
+  const createOptions: Record<string, unknown> = {
     destination: existing.destination,
-    cron: newCron,
-  });
+    cron: config.cron || existing.cron || "* * * * *",
+    retries: config.retries ?? existing.retries ?? 3,
+    failureCallback: config.failureCallback || existing.failureCallback,
+  };
+
+  // Add timezone if provided
+  const tz =
+    config.scheduleTimezone || (existingSched.scheduleTimezone as string);
+  if (tz) {
+    createOptions.scheduleTimezone = tz;
+  }
+
+  // Create new schedule with updated config
+  const result = await client.schedules.create(
+    createOptions as Parameters<typeof client.schedules.create>[0],
+  );
 
   return { scheduleId: result.scheduleId };
+}
+
+// Legacy function for backward compatibility
+export async function updateScheduleCron(
+  scheduleId: string,
+  newCron: string,
+): Promise<{ scheduleId: string }> {
+  return updateSchedule(scheduleId, { cron: newCron });
 }
 
 // Delete a schedule
