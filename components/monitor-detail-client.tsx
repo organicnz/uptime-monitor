@@ -406,29 +406,33 @@ export function MonitorDetailClient({
       </div>
 
       <Card className="glass-card">
-        <CardHeader className="pb-2">
-          <CardTitle className="flex items-center gap-2 text-base">
-            <Activity className="h-4 w-4 text-primary" />
-            Response Time
-          </CardTitle>
-          <CardDescription className="text-xs">Last 50 checks</CardDescription>
+        <CardHeader className="pb-2 pt-4">
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2 text-sm font-medium">
+              <Activity className="h-4 w-4 text-primary" />
+              Response Time
+            </CardTitle>
+            <CardDescription className="text-xs">
+              Last 50 checks
+            </CardDescription>
+          </div>
         </CardHeader>
-        <CardContent className="pt-2">
-          <div className="h-20 flex items-end gap-0.5">
+        <CardContent className="pt-0 pb-4">
+          <div className="h-12 flex items-end gap-px">
             {displayHeartbeats
               .slice(0, 50)
               .reverse()
               .map((hb, i) => {
-                const maxHeight = 72;
+                const maxHeight = 44;
                 const height = hb.ping
                   ? Math.max(
-                      4,
+                      3,
                       Math.min(
                         maxHeight,
                         (hb.ping / (maxPing || 800)) * maxHeight,
                       ),
                     )
-                  : 4;
+                  : 3;
                 const isUp = hb.status === 1;
                 const isDown = hb.status === 0;
                 const isSlow = hb.ping && hb.ping > avgPing * 1.5;
@@ -439,7 +443,7 @@ export function MonitorDetailClient({
                   >
                     <div
                       className={cn(
-                        "w-full rounded-t transition-all hover:opacity-80",
+                        "w-full rounded-sm transition-all hover:opacity-80",
                         isUp
                           ? isSlow
                             ? "bg-amber-500"
@@ -450,7 +454,7 @@ export function MonitorDetailClient({
                       )}
                       style={{ height: `${height}px` }}
                     />
-                    <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity bg-popover text-popover-foreground text-xs px-2 py-1 rounded-lg shadow-lg whitespace-nowrap z-10 pointer-events-none border">
+                    <div className="absolute bottom-full mb-1 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity bg-popover text-popover-foreground text-xs px-2 py-1 rounded shadow-lg whitespace-nowrap z-10 pointer-events-none border">
                       {hb.ping ? `${hb.ping}ms` : "N/A"}
                       <br />
                       {new Date(hb.time).toLocaleTimeString()}
@@ -461,11 +465,11 @@ export function MonitorDetailClient({
             {displayHeartbeats.length === 0 &&
               Array.from({ length: 50 }).map((_, i) => (
                 <div key={i} className="flex-1 flex flex-col justify-end">
-                  <div className="w-full h-4 bg-muted rounded-t animate-pulse" />
+                  <div className="w-full h-3 bg-muted rounded-sm animate-pulse" />
                 </div>
               ))}
           </div>
-          <div className="flex justify-between mt-2 text-xs text-muted-foreground">
+          <div className="flex justify-between mt-1 text-xs text-muted-foreground">
             <span>Oldest</span>
             <span>Latest</span>
           </div>

@@ -200,12 +200,11 @@ export default function EditNotificationPage(props: {
 
   const handleTest = async () => {
     try {
-      const response = await fetch(
-        `/api/notifications/channels/${params.id}/test`,
-        {
-          method: "POST",
-        },
-      );
+      const response = await fetch("/api/notifications/test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ channelId: params.id }),
+      });
       const data = await response.json();
 
       if (data.success) {
