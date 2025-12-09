@@ -40,7 +40,7 @@ const RETRY_OPTIONS = [
 ];
 
 const TIMEZONE_OPTIONS = [
-  { value: "", label: "UTC (default)" },
+  { value: "UTC", label: "UTC (default)" },
   { value: "Pacific/Auckland", label: "Pacific/Auckland (NZST)" },
   { value: "Australia/Sydney", label: "Australia/Sydney (AEST)" },
   { value: "Asia/Tokyo", label: "Asia/Tokyo (JST)" },
@@ -80,7 +80,7 @@ export function CronSettings() {
   const [saving, setSaving] = useState(false);
   const [selectedInterval, setSelectedInterval] = useState("2");
   const [selectedRetries, setSelectedRetries] = useState("3");
-  const [selectedTimezone, setSelectedTimezone] = useState("");
+  const [selectedTimezone, setSelectedTimezone] = useState("UTC");
   const [failureCallback, setFailureCallback] = useState("");
   const [error, setError] = useState<string | null>(null);
 
@@ -99,7 +99,7 @@ export function CronSettings() {
         setSchedule(data.schedule);
         setSelectedInterval(String(data.schedule.intervalMinutes));
         setSelectedRetries(String(data.schedule.retries ?? 3));
-        setSelectedTimezone(data.schedule.timezone || "");
+        setSelectedTimezone(data.schedule.timezone || "UTC");
         setFailureCallback(data.schedule.failureCallback || "");
       }
     } catch (err) {
