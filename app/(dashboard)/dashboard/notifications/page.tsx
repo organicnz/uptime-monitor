@@ -9,14 +9,13 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Bell, Plus, Mail, Webhook, ExternalLink } from "lucide-react";
 import {
-  Bell,
-  Plus,
-  MessageCircle,
-  Mail,
-  Webhook,
-  ExternalLink,
-} from "lucide-react";
+  TelegramIcon,
+  DiscordIcon,
+  SlackIcon,
+  TeamsIcon,
+} from "@/components/icons";
 import { TestNotificationButton } from "@/components/test-notification-button";
 
 type NotificationChannel = {
@@ -36,7 +35,7 @@ type NotificationChannel = {
 
 const typeConfig = {
   telegram: {
-    icon: MessageCircle,
+    icon: TelegramIcon,
     color: "text-blue-500",
     bg: "bg-blue-500/10",
     label: "Telegram",
@@ -48,19 +47,19 @@ const typeConfig = {
     label: "Email",
   },
   discord: {
-    icon: MessageCircle,
+    icon: DiscordIcon,
     color: "text-indigo-500",
     bg: "bg-indigo-500/10",
     label: "Discord",
   },
   slack: {
-    icon: MessageCircle,
+    icon: SlackIcon,
     color: "text-amber-500",
     bg: "bg-amber-500/10",
     label: "Slack",
   },
   teams: {
-    icon: MessageCircle,
+    icon: TeamsIcon,
     color: "text-violet-500",
     bg: "bg-violet-500/10",
     label: "Teams",
@@ -122,7 +121,7 @@ export default async function NotificationsPage() {
         <Card className="glass-card border-blue-500/30 bg-blue-500/5">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-blue-500">
-              <MessageCircle className="h-5 w-5" />
+              <TelegramIcon className="h-6 w-6" />
               Telegram Setup Guide
             </CardTitle>
             <CardDescription>
@@ -175,31 +174,28 @@ export default async function NotificationsPage() {
 
         {/* Channels List */}
         {channels.length > 0 ? (
-          <div className="grid gap-4">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {channels.map((channel) => {
               const config = typeConfig[channel.type] || typeConfig.webhook;
               const Icon = config.icon;
 
               return (
-                <Card key={channel.id} className="glass-card">
-                  <CardContent className="flex items-center justify-between py-5">
-                    <div className="flex items-center gap-4">
-                      <div className={`p-3 rounded-xl ${config.bg}`}>
-                        <Icon className={`h-5 w-5 ${config.color}`} />
+                <Card
+                  key={channel.id}
+                  className="glass-card hover:shadow-md transition-shadow"
+                >
+                  <CardContent className="flex flex-col gap-4 p-5">
+                    <div className="flex items-start justify-between">
+                      <div
+                        className={`p-3 rounded-xl ${config.bg} transition-colors`}
+                      >
+                        <Icon className={`h-6 w-6 ${config.color}`} />
                       </div>
-                      <div>
-                        <p className="font-semibold">{channel.name}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {config.label}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3">
                       <span
-                        className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium ${
+                        className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium border ${
                           channel.active
-                            ? "bg-emerald-500/10 text-emerald-500"
-                            : "bg-muted text-muted-foreground"
+                            ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
+                            : "bg-muted text-muted-foreground border-border"
                         }`}
                       >
                         {channel.active && (
@@ -207,11 +203,22 @@ export default async function NotificationsPage() {
                         )}
                         {channel.active ? "Active" : "Paused"}
                       </span>
+                    </div>
+
+                    <div>
+                      <h3 className="font-semibold text-lg">{channel.name}</h3>
+                      <p className="text-sm text-muted-foreground">
+                        {config.label}
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2 mt-auto pt-2">
                       <TestNotificationButton channelId={channel.id} />
                       <Link
                         href={`/dashboard/notifications/${channel.id}/edit`}
+                        className="flex-1"
                       >
-                        <Button variant="outline" size="sm">
+                        <Button variant="outline" size="sm" className="w-full">
                           Edit
                         </Button>
                       </Link>
