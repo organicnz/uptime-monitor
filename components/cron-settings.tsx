@@ -17,8 +17,39 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Clock, Pause, Play, RefreshCw, AlertCircle } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import {
+  Clock,
+  Pause,
+  Play,
+  RefreshCw,
+  AlertCircle,
+  RotateCcw,
+  Globe,
+  AlertTriangle,
+} from "lucide-react";
 import { toast } from "sonner";
+
+const RETRY_OPTIONS = [
+  { value: "0", label: "No retries" },
+  { value: "1", label: "1 retry" },
+  { value: "2", label: "2 retries" },
+  { value: "3", label: "3 retries (default)" },
+  { value: "4", label: "4 retries" },
+  { value: "5", label: "5 retries (max)" },
+];
+
+const TIMEZONE_OPTIONS = [
+  { value: "", label: "UTC (default)" },
+  { value: "Pacific/Auckland", label: "Pacific/Auckland (NZST)" },
+  { value: "Australia/Sydney", label: "Australia/Sydney (AEST)" },
+  { value: "Asia/Tokyo", label: "Asia/Tokyo (JST)" },
+  { value: "Asia/Singapore", label: "Asia/Singapore (SGT)" },
+  { value: "Europe/London", label: "Europe/London (GMT/BST)" },
+  { value: "Europe/Paris", label: "Europe/Paris (CET)" },
+  { value: "America/New_York", label: "America/New_York (EST)" },
+  { value: "America/Los_Angeles", label: "America/Los_Angeles (PST)" },
+];
 
 type Schedule = {
   id: string;
@@ -27,6 +58,9 @@ type Schedule = {
   destination: string;
   isPaused: boolean;
   createdAt: number;
+  retries: number;
+  failureCallback?: string;
+  timezone?: string;
 };
 
 const INTERVAL_OPTIONS = [
@@ -45,6 +79,9 @@ export function CronSettings() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [selectedInterval, setSelectedInterval] = useState("2");
+  const [selectedRetries, setSelectedRetries] = useState("3");
+  const [selectedTimezone, setSelectedTimezone] = useState("");
+  const [failureCallback, setFailureCallback] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   const fetchSchedule = async () => {
@@ -61,6 +98,9 @@ export function CronSettings() {
       if (data.schedule) {
         setSchedule(data.schedule);
         setSelectedInterval(String(data.schedule.intervalMinutes));
+        setSelectedRetries(String(data.schedule.retries ?? 3));
+        setSelectedTimezone(data.schedule.timezone || "");
+        setFailureCallback(data.schedule.failureCallback || "");
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load schedule");
@@ -136,6 +176,95 @@ export function CronSettings() {
     } catch (err) {
       toast.error(
         err instanceof Error ? err.message : `Failed to ${action} schedule`,
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleRetriesChange = async (value: string) => {
+    if (!schedule) return;
+
+    setSaving(true);
+    try {
+      const res = await fetch("/api/settings/schedule", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          scheduleId: schedule.id,
+          retries: parseInt(value, 10),
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to update retries");
+
+      setSelectedRetries(value);
+      toast.success(`Retries updated to ${value}`);
+      await fetchSchedule();
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Failed to update retries",
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleTimezoneChange = async (value: string) => {
+    if (!schedule) return;
+
+    setSaving(true);
+    try {
+      const res = await fetch("/api/settings/schedule", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          scheduleId: schedule.id,
+          timezone: value,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to update timezone");
+
+      setSelectedTimezone(value);
+      toast.success(`Timezone updated to ${value || "UTC"}`);
+      await fetchSchedule();
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Failed to update timezone",
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleFailureCallbackSave = async () => {
+    if (!schedule) return;
+
+    setSaving(true);
+    try {
+      const res = await fetch("/api/settings/schedule", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          scheduleId: schedule.id,
+          failureCallback: failureCallback,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok)
+        throw new Error(data.error || "Failed to update failure callback");
+
+      toast.success("Failure callback updated");
+      await fetchSchedule();
+    } catch (err) {
+      toast.error(
+        err instanceof Error
+          ? err.message
+          : "Failed to update failure callback",
       );
     } finally {
       setSaving(false);
@@ -252,6 +381,99 @@ export function CronSettings() {
           )}
         </div>
 
+        {/* Retries */}
+        <div className="space-y-2">
+          <Label className="flex items-center gap-2">
+            <RotateCcw className="h-4 w-4 text-neutral-400" />
+            Retries
+          </Label>
+          <Select
+            value={selectedRetries}
+            onValueChange={handleRetriesChange}
+            disabled={saving}
+          >
+            <SelectTrigger className="w-full bg-neutral-800 border-neutral-700">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {RETRY_OPTIONS.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-neutral-500">
+            Number of retry attempts if the request fails
+          </p>
+        </div>
+
+        {/* Timezone */}
+        <div className="space-y-2">
+          <Label className="flex items-center gap-2">
+            <Globe className="h-4 w-4 text-neutral-400" />
+            Schedule Timezone
+          </Label>
+          <Select
+            value={selectedTimezone}
+            onValueChange={handleTimezoneChange}
+            disabled={saving}
+          >
+            <SelectTrigger className="w-full bg-neutral-800 border-neutral-700">
+              <SelectValue placeholder="UTC (default)" />
+            </SelectTrigger>
+            <SelectContent>
+              {TIMEZONE_OPTIONS.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-neutral-500">
+            Timezone for interpreting the cron schedule
+          </p>
+        </div>
+
+        {/* Failure Callback */}
+        <div className="space-y-2">
+          <Label className="flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4 text-neutral-400" />
+            Failure Callback URL
+          </Label>
+          <div className="flex gap-2">
+            <Input
+              type="url"
+              placeholder="https://your-webhook.com/failure"
+              value={failureCallback}
+              onChange={(e) => setFailureCallback(e.target.value)}
+              className="bg-neutral-800 border-neutral-700"
+              disabled={saving}
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleFailureCallbackSave}
+              disabled={
+                saving || failureCallback === (schedule.failureCallback || "")
+              }
+              className="shrink-0"
+            >
+              Save
+            </Button>
+          </div>
+          <p className="text-xs text-neutral-500">
+            URL to call when all retries are exhausted. Use your app&apos;s
+            built-in endpoint:
+          </p>
+          <code className="text-xs bg-neutral-800 px-2 py-1 rounded text-green-400 block overflow-x-auto">
+            {typeof window !== "undefined"
+              ? `${window.location.origin}/api/cron/failure-callback`
+              : "/api/cron/failure-callback"}
+          </code>
+        </div>
+
+        {/* Status */}
         <div className="flex items-center justify-between p-3 bg-neutral-800/50 rounded-lg">
           <div>
             <p className="text-sm font-medium">
