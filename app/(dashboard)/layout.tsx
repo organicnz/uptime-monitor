@@ -6,7 +6,6 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import {
   Activity,
   LayoutDashboard,
-  Monitor,
   Bell,
   Globe,
   Menu,
@@ -36,7 +35,6 @@ export default async function DashboardLayout({
 
   const navItems = [
     { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-    { href: "/dashboard/monitors", label: "Monitors", icon: Monitor },
     { href: "/dashboard/status-pages", label: "Status Pages", icon: Globe },
     { href: "/dashboard/notifications", label: "Notifications", icon: Bell },
     { href: "/dashboard/settings", label: "Settings", icon: Settings },

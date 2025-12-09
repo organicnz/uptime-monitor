@@ -47,6 +47,7 @@ export function MonitorDetailPanel({
 
   const isUp = currentStatus?.status === "up";
   const isDown = currentStatus?.status === "down";
+  const isPaused = !monitor.active;
 
   // Calculate stats - use a stable timestamp for 24h calculation
   const [statsTimestamp] = useState(() => Date.now());
@@ -101,24 +102,37 @@ export function MonitorDetailPanel({
     <div className="flex flex-col h-full overflow-y-auto">
       {/* Header */}
       <div className="p-6 border-b border-neutral-800">
-        <h1 className="text-2xl font-bold">{monitor.name}</h1>
-        {monitor.url && (
-          <a
-            href={monitor.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-green-400 hover:text-green-300 text-sm inline-flex items-center gap-1 mt-1"
-          >
-            {monitor.url}
-            <ExternalLink className="h-3 w-3" />
-          </a>
-        )}
-        {monitor.hostname && !monitor.url && (
-          <p className="text-neutral-400 text-sm mt-1">{monitor.hostname}</p>
-        )}
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <h1 className="text-2xl font-bold truncate">{monitor.name}</h1>
+            {monitor.url && (
+              <a
+                href={monitor.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-green-400 hover:text-green-300 text-sm inline-flex items-center gap-1 mt-1"
+              >
+                {monitor.url}
+                <ExternalLink className="h-3 w-3 flex-shrink-0" />
+              </a>
+            )}
+            {monitor.hostname && !monitor.url && (
+              <p className="text-neutral-400 text-sm mt-1">
+                {monitor.hostname}
+              </p>
+            )}
+          </div>
+
+          {/* Paused Badge */}
+          {isPaused && (
+            <span className="px-3 py-1 rounded-full bg-amber-500/20 text-amber-400 text-sm font-medium flex-shrink-0">
+              Paused
+            </span>
+          )}
+        </div>
 
         {/* Action Buttons */}
-        <div className="flex items-center gap-2 mt-4">
+        <div className="flex flex-wrap items-center gap-2 mt-4">
           <Button
             variant="outline"
             size="sm"
@@ -180,8 +194,8 @@ export function MonitorDetailPanel({
       {/* Heartbeat Bar + Status Badge */}
       <div className="p-6 border-b border-neutral-800">
         <div className="flex items-center gap-4">
-          {/* Heartbeat visualization - 60 bars like Uptime Kuma */}
-          <div className="flex-1 flex gap-[3px] items-center">
+          {/* Heartbeat visualization */}
+          <div className="flex-1 flex gap-[3px] items-center overflow-hidden">
             {heartbeats.length > 0
               ? heartbeats
                   .slice(0, 50)
@@ -190,7 +204,7 @@ export function MonitorDetailPanel({
                     <div
                       key={hb.id || i}
                       className={cn(
-                        "flex-1 h-9 rounded-[3px] min-w-[5px] max-w-[10px] transition-colors",
+                        "flex-1 h-9 rounded-[3px] min-w-[4px] max-w-[10px] transition-colors cursor-pointer",
                         hb.status === 1 && "bg-green-500 hover:bg-green-400",
                         hb.status === 0 && "bg-red-500 hover:bg-red-400",
                         hb.status === 2 &&
@@ -204,7 +218,7 @@ export function MonitorDetailPanel({
                   .map((_, i) => (
                     <div
                       key={i}
-                      className="flex-1 h-9 rounded-[3px] min-w-[5px] max-w-[10px] bg-neutral-700"
+                      className="flex-1 h-9 rounded-[3px] min-w-[4px] max-w-[10px] bg-neutral-700"
                     />
                   ))}
           </div>
@@ -213,12 +227,16 @@ export function MonitorDetailPanel({
           <div
             className={cn(
               "px-5 py-2.5 rounded-lg text-lg font-bold shrink-0",
-              isUp && "bg-green-500 text-white",
-              isDown && "bg-red-500 text-white",
-              !isUp && !isDown && "bg-neutral-700 text-neutral-300",
+              isPaused && "bg-amber-500 text-white",
+              !isPaused && isUp && "bg-green-500 text-white",
+              !isPaused && isDown && "bg-red-500 text-white",
+              !isPaused &&
+                !isUp &&
+                !isDown &&
+                "bg-neutral-700 text-neutral-300",
             )}
           >
-            {isUp ? "Up" : isDown ? "Down" : "Pending"}
+            {isPaused ? "Paused" : isUp ? "Up" : isDown ? "Down" : "Pending"}
           </div>
         </div>
         <p className="text-sm text-neutral-500 mt-3 flex items-center gap-1.5">
@@ -227,8 +245,8 @@ export function MonitorDetailPanel({
         </p>
       </div>
 
-      {/* Stats Grid - matching Uptime Kuma layout */}
-      <div className="grid grid-cols-5 divide-x divide-neutral-800 border-b border-neutral-800">
+      {/* Stats Grid - responsive */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 border-b border-neutral-800">
         <StatBox
           label="Response"
           sublabel="(Current)"
@@ -250,11 +268,20 @@ export function MonitorDetailPanel({
           sublabel="(30-day)"
           value={`${stats.uptime24h}%`}
         />
-        <StatBox label="Cert Exp." sublabel="" value="—" muted />
+        <StatBox
+          label="Cert Exp."
+          sublabel=""
+          value="—"
+          muted
+          className="col-span-2 sm:col-span-1"
+        />
       </div>
 
       {/* Response Time Chart */}
-      <div className="flex-1 p-6">
+      <div className="flex-1 p-6 min-h-[250px]">
+        <h3 className="text-sm font-medium text-neutral-400 mb-4">
+          Response Time (ms)
+        </h3>
         <ResponseChart heartbeats={stats.validPings} maxPing={stats.maxPing} />
       </div>
 
@@ -286,15 +313,22 @@ function StatBox({
   value,
   highlight,
   muted,
+  className,
 }: {
   label: string;
   sublabel?: string;
   value: string;
   highlight?: boolean;
   muted?: boolean;
+  className?: string;
 }) {
   return (
-    <div className="py-5 px-4 text-center">
+    <div
+      className={cn(
+        "py-5 px-4 text-center border-b border-neutral-800 sm:border-b-0 sm:border-r last:border-r-0",
+        className,
+      )}
+    >
       <div className="text-sm text-neutral-400 mb-1">
         {label}
         {sublabel && (
@@ -324,7 +358,7 @@ function ResponseChart({
 }) {
   if (heartbeats.length < 2) {
     return (
-      <div className="h-full flex items-center justify-center text-neutral-500 text-sm">
+      <div className="h-full min-h-[180px] flex items-center justify-center text-neutral-500 text-sm">
         Not enough data for chart
       </div>
     );
@@ -334,7 +368,7 @@ function ResponseChart({
   const chartMax = Math.max(maxPing * 1.1, 100);
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-full min-h-[180px] flex flex-col">
       <div className="flex-1 relative">
         {/* Y-axis */}
         <div className="absolute left-0 top-0 bottom-6 w-10 flex flex-col justify-between text-xs text-neutral-600 pr-2 text-right">

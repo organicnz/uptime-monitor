@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useRealtimeMonitors } from "@/hooks/use-realtime-monitors";
+import { cn } from "@/lib/utils";
 
 type Monitor = {
   id: string;
@@ -41,11 +42,9 @@ export function DashboardLayout({ monitors }: DashboardLayoutProps) {
     monitors.length > 0 ? monitors[0].id : null,
   );
 
-  // Get realtime statuses for stats calculation
   const monitorIds = monitors.map((m) => m.id);
   const { statuses } = useRealtimeMonitors(monitorIds);
 
-  // Calculate stats from realtime data
   const upCount = monitors.filter(
     (m) => statuses.get(m.id)?.status === "up",
   ).length;
@@ -54,7 +53,7 @@ export function DashboardLayout({ monitors }: DashboardLayoutProps) {
   ).length;
   const pendingCount = monitors.length - upCount - downCount;
 
-  // Update selection if monitors change and current selection is invalid
+  // Validate selection
   const getValidSelection = (currentId: string | null) => {
     if (monitors.length === 0) return null;
     if (currentId && monitors.find((m) => m.id === currentId)) return currentId;
@@ -81,7 +80,10 @@ export function DashboardLayout({ monitors }: DashboardLayoutProps) {
             Create your first monitor to start tracking uptime and performance.
           </p>
           <Link href="/dashboard/monitors/new">
-            <Button>Add New Monitor</Button>
+            <Button className="gap-2">
+              <Plus className="h-4 w-4" />
+              Add New Monitor
+            </Button>
           </Link>
         </div>
       </div>
@@ -91,40 +93,74 @@ export function DashboardLayout({ monitors }: DashboardLayoutProps) {
   return (
     <div className="h-[calc(100vh-8rem)] -mx-4 lg:-mx-6 -my-8 flex flex-col overflow-hidden">
       {/* View Toggle Header */}
-      <div className="flex items-center justify-between px-4 lg:px-6 py-3 border-b border-neutral-800 bg-background/50 backdrop-blur-sm">
-        <div className="flex items-center gap-2">
+      <div className="flex items-center justify-between px-4 lg:px-6 py-2 border-b border-neutral-800 bg-neutral-900/50">
+        <div className="flex items-center gap-1">
           <Button
-            variant={viewMode === "detail" ? "default" : "ghost"}
+            variant="ghost"
             size="sm"
             onClick={() => setViewMode("detail")}
-            className="gap-2"
+            className={cn(
+              "gap-2 h-8",
+              viewMode === "detail"
+                ? "bg-neutral-800 text-white"
+                : "text-neutral-400 hover:text-white",
+            )}
           >
             <LayoutList className="h-4 w-4" />
-            <span className="hidden sm:inline">Detail View</span>
+            <span className="hidden sm:inline">Detail</span>
           </Button>
           <Button
-            variant={viewMode === "grid" ? "default" : "ghost"}
+            variant="ghost"
             size="sm"
             onClick={() => setViewMode("grid")}
-            className="gap-2"
+            className={cn(
+              "gap-2 h-8",
+              viewMode === "grid"
+                ? "bg-neutral-800 text-white"
+                : "text-neutral-400 hover:text-white",
+            )}
           >
             <LayoutGrid className="h-4 w-4" />
-            <span className="hidden sm:inline">Grid View</span>
+            <span className="hidden sm:inline">Grid</span>
           </Button>
         </div>
-        <Link href="/dashboard/monitors/new">
-          <Button size="sm" className="gap-2">
-            <Plus className="h-4 w-4" />
-            <span className="hidden sm:inline">Add Monitor</span>
-          </Button>
-        </Link>
+
+        {/* Quick stats in header */}
+        <div className="hidden md:flex items-center gap-4 text-sm">
+          <span className="flex items-center gap-1.5 text-green-400">
+            <CheckCircle2 className="h-4 w-4" />
+            {upCount} Up
+          </span>
+          {downCount > 0 && (
+            <span className="flex items-center gap-1.5 text-red-400">
+              <XCircle className="h-4 w-4" />
+              {downCount} Down
+            </span>
+          )}
+          {pendingCount > 0 && (
+            <span className="flex items-center gap-1.5 text-neutral-400">
+              <AlertCircle className="h-4 w-4" />
+              {pendingCount} Pending
+            </span>
+          )}
+        </div>
+
+        {/* Only show Add button in grid view (sidebar has it in detail view) */}
+        {viewMode === "grid" && (
+          <Link href="/dashboard/monitors/new">
+            <Button size="sm" className="gap-2 h-8">
+              <Plus className="h-4 w-4" />
+              <span className="hidden sm:inline">Add Monitor</span>
+            </Button>
+          </Link>
+        )}
       </div>
 
       {/* Content */}
       {viewMode === "detail" ? (
         <div className="flex flex-1 overflow-hidden">
           {/* Sidebar */}
-          <div className="w-80 flex-shrink-0 border-r border-neutral-800">
+          <div className="w-72 lg:w-80 flex-shrink-0 border-r border-neutral-800">
             <MonitorSidebar
               monitors={monitors}
               selectedId={selectedId || undefined}
@@ -149,36 +185,36 @@ export function DashboardLayout({ monitors }: DashboardLayoutProps) {
       ) : (
         <div className="flex-1 overflow-auto p-4 lg:p-6 space-y-6">
           {/* Stats Cards */}
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
             <StatsCard
               label="Total Monitors"
               value={monitors.length}
               icon={Activity}
-              iconColor="text-blue-500"
+              iconColor="text-blue-400"
               iconBg="bg-blue-500/10"
             />
             <StatsCard
               label="Operational"
               value={upCount}
               icon={CheckCircle2}
-              iconColor="text-emerald-500"
-              iconBg="bg-emerald-500/10"
-              valueColor="text-emerald-500"
+              iconColor="text-green-400"
+              iconBg="bg-green-500/10"
+              valueColor="text-green-400"
             />
             <StatsCard
               label="Down"
               value={downCount}
               icon={XCircle}
-              iconColor="text-red-500"
+              iconColor="text-red-400"
               iconBg="bg-red-500/10"
-              valueColor={downCount > 0 ? "text-red-500" : undefined}
+              valueColor={downCount > 0 ? "text-red-400" : undefined}
             />
             <StatsCard
               label="Pending"
               value={pendingCount}
               icon={AlertCircle}
-              iconColor="text-muted-foreground"
-              iconBg="bg-muted"
+              iconColor="text-neutral-400"
+              iconBg="bg-neutral-500/10"
             />
           </div>
 
@@ -206,15 +242,15 @@ function StatsCard({
   valueColor?: string;
 }) {
   return (
-    <Card className="glass-card">
-      <CardContent className="pt-6">
+    <Card className="bg-neutral-900/50 border-neutral-800">
+      <CardContent className="pt-5 pb-4">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm text-muted-foreground">{label}</p>
-            <p className={`text-3xl font-bold ${valueColor || ""}`}>{value}</p>
+            <p className="text-sm text-neutral-400">{label}</p>
+            <p className={cn("text-2xl font-bold", valueColor)}>{value}</p>
           </div>
-          <div className={`p-3 rounded-xl ${iconBg}`}>
-            <Icon className={`h-6 w-6 ${iconColor}`} />
+          <div className={cn("p-2.5 rounded-xl", iconBg)}>
+            <Icon className={cn("h-5 w-5", iconColor)} />
           </div>
         </div>
       </CardContent>
