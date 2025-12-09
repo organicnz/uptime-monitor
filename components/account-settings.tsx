@@ -30,6 +30,7 @@ import {
 } from "@/lib/actions/auth";
 import { toast } from "sonner";
 import { User, Mail, Lock, Trash2, Github, Chrome } from "lucide-react";
+import { MFASettings } from "./mfa-settings";
 
 type Props = {
   user: {
@@ -193,6 +194,9 @@ export function AccountSettings({ user }: Props) {
           </CardContent>
         </Card>
       )}
+
+      {/* Two-Factor Authentication */}
+      <MFASettings />
 
       {/* Connected Accounts */}
       {isOAuthUser && (

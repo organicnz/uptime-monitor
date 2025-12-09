@@ -44,15 +44,62 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // Redirect logged-in users away from auth pages
-  if (
-    user &&
-    (request.nextUrl.pathname === "/login" ||
-      request.nextUrl.pathname === "/signup")
-  ) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/dashboard";
-    return NextResponse.redirect(url);
+  // Check MFA requirements for authenticated users accessing dashboard
+  if (user && request.nextUrl.pathname.startsWith("/dashboard")) {
+    const { data: aalData } =
+      await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+
+    // If user has MFA enrolled but hasn't verified this session, redirect to MFA
+    if (
+      aalData &&
+      aalData.nextLevel === "aal2" &&
+      aalData.currentLevel !== "aal2"
+    ) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/mfa";
+      return NextResponse.redirect(url);
+    }
+  }
+
+  // Redirect logged-in users away from auth pages (except MFA page if needed)
+  if (user) {
+    const authPages = ["/login", "/signup"];
+    if (authPages.includes(request.nextUrl.pathname)) {
+      // Check if user needs MFA verification
+      const { data: aalData } =
+        await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+
+      if (
+        aalData &&
+        aalData.nextLevel === "aal2" &&
+        aalData.currentLevel !== "aal2"
+      ) {
+        const url = request.nextUrl.clone();
+        url.pathname = "/mfa";
+        return NextResponse.redirect(url);
+      }
+
+      const url = request.nextUrl.clone();
+      url.pathname = "/dashboard";
+      return NextResponse.redirect(url);
+    }
+  }
+
+  // Allow MFA page only for users who need to verify
+  if (user && request.nextUrl.pathname === "/mfa") {
+    const { data: aalData } =
+      await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+
+    // If user doesn't need MFA or already verified, redirect to dashboard
+    if (
+      !aalData ||
+      aalData.nextLevel === "aal1" ||
+      aalData.currentLevel === "aal2"
+    ) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/dashboard";
+      return NextResponse.redirect(url);
+    }
   }
 
   // IMPORTANT: You *must* return the supabaseResponse object as it is. If you're

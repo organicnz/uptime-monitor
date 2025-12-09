@@ -32,9 +32,9 @@ export default function Home() {
                 Sign In
               </Button>
             </Link>
-            <Link href="/signup">
+            <Link href="/login">
               <Button size="sm" className="shadow-lg shadow-primary/20">
-                Get Started
+                Dashboard
               </Button>
             </Link>
           </div>
@@ -75,12 +75,12 @@ export default function Home() {
 
           {/* CTAs */}
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-            <Link href="/signup">
+            <Link href="/login">
               <Button
                 size="lg"
                 className="text-lg px-8 h-13 rounded-full shadow-xl shadow-primary/30 hover:shadow-primary/40 transition-all hover:scale-105"
               >
-                Start Monitoring for Free
+                Go to Dashboard
                 <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
             </Link>
@@ -187,12 +187,12 @@ export default function Home() {
             Join thousands of developers who trust Uptime Monitor to keep their
             services running smoothly.
           </p>
-          <Link href="/signup">
+          <Link href="/login">
             <Button
               size="lg"
               className="text-lg px-8 h-13 rounded-full shadow-xl shadow-primary/30"
             >
-              Get Started for Free
+              Go to Dashboard
               <ArrowRight className="ml-2 h-5 w-5" />
             </Button>
           </Link>

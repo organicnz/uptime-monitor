@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { Receiver } from "@upstash/qstash";
 import { createServiceClient } from "@/lib/supabase/service";
 import { processMonitorCheck } from "@/lib/monitor-checker";
+import { secureCompare } from "@/lib/security";
 
 // Config
 const CONCURRENCY_LIMIT = 10;
@@ -74,13 +75,16 @@ async function verifyQStashSignature(request: NextRequest): Promise<boolean> {
 }
 
 // Verify Bearer token (for GitHub Actions / manual triggers)
+// Uses constant-time comparison to prevent timing attacks
 function verifyBearerToken(request: NextRequest): boolean {
   const authHeader = request.headers.get("authorization");
   const expectedToken = process.env.CRON_SECRET;
-  if (!authHeader || !expectedToken) return false;
 
-  const receivedToken = authHeader.replace("Bearer ", "");
-  return receivedToken === expectedToken;
+  if (!authHeader || !expectedToken) return false;
+  if (!authHeader.startsWith("Bearer ")) return false;
+
+  const receivedToken = authHeader.slice(7); // Remove "Bearer " prefix
+  return secureCompare(receivedToken, expectedToken);
 }
 
 // Authenticate request and return source

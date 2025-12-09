@@ -1,5 +1,6 @@
 import { createServiceClient } from "@/lib/supabase/service";
 import { notifyUser } from "@/lib/notifications";
+import { isValidMonitorUrl } from "@/lib/security";
 
 // Status constants (matching Uptime Kuma)
 export const HEARTBEAT_STATUS = {
@@ -79,6 +80,16 @@ function createTimeoutController(timeoutSeconds: number) {
 async function checkHttp(monitor: Monitor): Promise<CheckResult> {
   const startTime = Date.now();
   const timeout = monitor.timeout || DEFAULT_TIMEOUT_SECONDS;
+
+  // SSRF protection - validate URL before making request
+  if (!monitor.url || !isValidMonitorUrl(monitor.url)) {
+    return {
+      status: HEARTBEAT_STATUS.DOWN,
+      ping: null,
+      msg: "Invalid or blocked URL (private IPs not allowed)",
+    };
+  }
+
   const { controller, clear } = createTimeoutController(timeout);
 
   try {
@@ -87,7 +98,7 @@ async function checkHttp(monitor: Monitor): Promise<CheckResult> {
       ...(monitor.headers || {}),
     };
 
-    const response = await fetch(monitor.url!, {
+    const response = await fetch(monitor.url, {
       method: monitor.method || "GET",
       headers,
       body: monitor.body || undefined,
