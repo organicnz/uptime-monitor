@@ -1,7 +1,22 @@
 import { updateSession } from "@/lib/supabase/middleware";
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
 export async function proxy(request: NextRequest) {
+  // CVE-2025-29927 (React2Shell) protection
+  // Block requests with spoofed x-middleware-subrequest header
+  if (request.headers.has("x-middleware-subrequest")) {
+    return new NextResponse(null, { status: 403 });
+  }
+
+  // CVE-2025-66478 / CVE-2025-55182 protection
+  // Block requests with spoofed x-middleware-prefetch header
+  if (request.headers.has("x-middleware-prefetch")) {
+    const prefetchValue = request.headers.get("x-middleware-prefetch");
+    if (prefetchValue && prefetchValue !== "1") {
+      return new NextResponse(null, { status: 403 });
+    }
+  }
+
   return await updateSession(request);
 }
 
