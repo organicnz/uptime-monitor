@@ -7,6 +7,7 @@ import {
   resumeSchedule,
   intervalToCron,
   cronToInterval,
+  cronToTimezone,
   createSchedule,
 } from "@/lib/qstash";
 
@@ -46,7 +47,7 @@ export async function GET() {
         createdAt: monitorSchedule.createdAt,
         retries: monitorSchedule.retries,
         failureCallback: monitorSchedule.failureCallback,
-        timezone: monitorSchedule.scheduleTimezone,
+        timezone: cronToTimezone(monitorSchedule.cron),
       },
     });
   } catch (error) {
@@ -162,17 +163,30 @@ export async function PATCH(request: NextRequest) {
       cron?: string;
       retries?: number;
       failureCallback?: string;
-      scheduleTimezone?: string;
     } = {};
 
-    if (intervalMinutes !== undefined) {
-      if (intervalMinutes < 1) {
+    // Get current schedule to preserve existing values
+    const schedules = await listSchedules();
+    const currentSchedule = schedules.find((s) => s.scheduleId === scheduleId);
+
+    // Handle interval and/or timezone changes - both affect the cron string
+    if (intervalMinutes !== undefined || timezone !== undefined) {
+      if (intervalMinutes !== undefined && intervalMinutes < 1) {
         return NextResponse.json(
           { error: "Invalid interval. Minimum is 1 minute." },
           { status: 400 },
         );
       }
-      updateConfig.cron = intervalToCron(intervalMinutes);
+
+      // Use new values or fall back to current
+      const newInterval =
+        intervalMinutes ??
+        (currentSchedule ? cronToInterval(currentSchedule.cron) : 1);
+      const newTimezone =
+        timezone ??
+        (currentSchedule ? cronToTimezone(currentSchedule.cron) : "UTC");
+
+      updateConfig.cron = intervalToCron(newInterval, newTimezone);
     }
 
     if (retries !== undefined) {
@@ -187,10 +201,6 @@ export async function PATCH(request: NextRequest) {
 
     if (failureCallback !== undefined) {
       updateConfig.failureCallback = failureCallback || undefined;
-    }
-
-    if (timezone !== undefined) {
-      updateConfig.scheduleTimezone = timezone || undefined;
     }
 
     // Check if we have anything to update
