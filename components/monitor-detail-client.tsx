@@ -406,29 +406,29 @@ export function MonitorDetailClient({
       </div>
 
       <Card className="glass-card">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Activity className="h-5 w-5 text-primary" />
+        <CardHeader className="pb-2">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Activity className="h-4 w-4 text-primary" />
             Response Time
           </CardTitle>
-          <CardDescription>Last 50 checks</CardDescription>
+          <CardDescription className="text-xs">Last 50 checks</CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="h-40 flex items-end gap-0.5">
+        <CardContent className="pt-2">
+          <div className="h-20 flex items-end gap-0.5">
             {displayHeartbeats
               .slice(0, 50)
               .reverse()
               .map((hb, i) => {
-                const maxHeight = 140;
+                const maxHeight = 72;
                 const height = hb.ping
                   ? Math.max(
-                      8,
+                      4,
                       Math.min(
                         maxHeight,
                         (hb.ping / (maxPing || 800)) * maxHeight,
                       ),
                     )
-                  : 8;
+                  : 4;
                 const isUp = hb.status === 1;
                 const isDown = hb.status === 0;
                 const isSlow = hb.ping && hb.ping > avgPing * 1.5;
@@ -461,7 +461,7 @@ export function MonitorDetailClient({
             {displayHeartbeats.length === 0 &&
               Array.from({ length: 50 }).map((_, i) => (
                 <div key={i} className="flex-1 flex flex-col justify-end">
-                  <div className="w-full h-8 bg-muted rounded-t animate-pulse" />
+                  <div className="w-full h-4 bg-muted rounded-t animate-pulse" />
                 </div>
               ))}
           </div>
