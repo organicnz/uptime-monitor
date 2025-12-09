@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Activity, ArrowLeft, Loader2, Info } from "lucide-react";
 import { OAuthButtons } from "@/components/oauth-buttons";
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const signupsDisabled = searchParams.get("message") === "signups-disabled";
@@ -39,6 +39,130 @@ export default function LoginPage() {
     }
   };
 
+  return (
+    <div className="w-full max-w-sm space-y-8">
+      {/* Mobile Logo */}
+      <div className="lg:hidden flex items-center justify-center gap-2.5 mb-8">
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-green-600">
+          <Activity className="h-5 w-5 text-white" />
+        </div>
+        <span className="font-bold text-xl tracking-tight">
+          Uptime<span className="text-primary">Monitor</span>
+        </span>
+      </div>
+
+      <div className="space-y-2">
+        <Link
+          href="/"
+          className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Back to website
+        </Link>
+        <h1 className="text-3xl font-bold tracking-tight">Welcome back</h1>
+        <p className="text-muted-foreground">
+          Enter your email to sign in to your account
+        </p>
+      </div>
+
+      <OAuthButtons />
+
+      <div className="relative">
+        <div className="absolute inset-0 flex items-center">
+          <span className="w-full border-t border-border" />
+        </div>
+        <div className="relative flex justify-center text-xs uppercase">
+          <span className="bg-background px-2 text-muted-foreground">
+            Or continue with email
+          </span>
+        </div>
+      </div>
+
+      <form onSubmit={handleLogin} className="space-y-6">
+        {signupsDisabled && (
+          <div className="bg-blue-500/10 border border-blue-500/30 text-blue-400 px-4 py-3 rounded-xl text-sm flex items-start gap-2">
+            <Info className="h-4 w-4 mt-0.5 shrink-0" />
+            <span>
+              New signups are currently disabled. This is a private instance.
+            </span>
+          </div>
+        )}
+        {error && (
+          <div className="bg-destructive/10 border border-destructive/30 text-destructive px-4 py-3 rounded-xl text-sm">
+            {error}
+          </div>
+        )}
+
+        <div className="space-y-2">
+          <Label htmlFor="email">Email</Label>
+          <Input
+            id="email"
+            type="email"
+            placeholder="name@example.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            disabled={loading}
+            className="h-11"
+          />
+        </div>
+
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <Label htmlFor="password">Password</Label>
+            <Link
+              href="/forgot-password"
+              className="text-sm font-medium text-primary hover:text-primary/80 transition-colors"
+            >
+              Forgot password?
+            </Link>
+          </div>
+          <Input
+            id="password"
+            type="password"
+            placeholder="••••••••"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            disabled={loading}
+            className="h-11"
+          />
+        </div>
+
+        <Button
+          type="submit"
+          className="w-full h-11 shadow-lg shadow-primary/20"
+          size="lg"
+          disabled={loading}
+        >
+          {loading ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Signing in...
+            </>
+          ) : (
+            "Sign in"
+          )}
+        </Button>
+      </form>
+
+      <p className="text-center text-sm text-muted-foreground">
+        This is a private instance. Signups are disabled.
+      </p>
+    </div>
+  );
+}
+
+function LoadingFallback() {
+  return (
+    <div className="w-full max-w-sm space-y-8 flex flex-col items-center justify-center">
+      <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      <p className="text-muted-foreground">Loading...</p>
+    </div>
+  );
+}
+
+export default function LoginPage() {
   return (
     <div className="min-h-screen grid lg:grid-cols-2">
       {/* Left: Branding Panel */}
@@ -85,117 +209,9 @@ export default function LoginPage() {
 
       {/* Right: Login Form */}
       <div className="flex items-center justify-center p-8 bg-background">
-        <div className="w-full max-w-sm space-y-8">
-          {/* Mobile Logo */}
-          <div className="lg:hidden flex items-center justify-center gap-2.5 mb-8">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-green-600">
-              <Activity className="h-5 w-5 text-white" />
-            </div>
-            <span className="font-bold text-xl tracking-tight">
-              Uptime<span className="text-primary">Monitor</span>
-            </span>
-          </div>
-
-          <div className="space-y-2">
-            <Link
-              href="/"
-              className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Back to website
-            </Link>
-            <h1 className="text-3xl font-bold tracking-tight">Welcome back</h1>
-            <p className="text-muted-foreground">
-              Enter your email to sign in to your account
-            </p>
-          </div>
-
-          <OAuthButtons />
-
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t border-border" />
-            </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-background px-2 text-muted-foreground">
-                Or continue with email
-              </span>
-            </div>
-          </div>
-
-          <form onSubmit={handleLogin} className="space-y-6">
-            {signupsDisabled && (
-              <div className="bg-blue-500/10 border border-blue-500/30 text-blue-400 px-4 py-3 rounded-xl text-sm flex items-start gap-2">
-                <Info className="h-4 w-4 mt-0.5 shrink-0" />
-                <span>
-                  New signups are currently disabled. This is a private
-                  instance.
-                </span>
-              </div>
-            )}
-            {error && (
-              <div className="bg-destructive/10 border border-destructive/30 text-destructive px-4 py-3 rounded-xl text-sm">
-                {error}
-              </div>
-            )}
-
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="name@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                disabled={loading}
-                className="h-11"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="password">Password</Label>
-                <Link
-                  href="/forgot-password"
-                  className="text-sm font-medium text-primary hover:text-primary/80 transition-colors"
-                >
-                  Forgot password?
-                </Link>
-              </div>
-              <Input
-                id="password"
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                disabled={loading}
-                className="h-11"
-              />
-            </div>
-
-            <Button
-              type="submit"
-              className="w-full h-11 shadow-lg shadow-primary/20"
-              size="lg"
-              disabled={loading}
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Signing in...
-                </>
-              ) : (
-                "Sign in"
-              )}
-            </Button>
-          </form>
-
-          <p className="text-center text-sm text-muted-foreground">
-            This is a private instance. Signups are disabled.
-          </p>
-        </div>
+        <Suspense fallback={<LoadingFallback />}>
+          <LoginForm />
+        </Suspense>
       </div>
     </div>
   );
