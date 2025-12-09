@@ -158,19 +158,37 @@ export async function resumeSchedule(scheduleId: string): Promise<void> {
   await client.schedules.resume({ schedule: scheduleId });
 }
 
-// Helper to convert interval minutes to cron expression
-export function intervalToCron(minutes: number): string {
-  if (minutes < 1) return "* * * * *";
-  if (minutes === 1) return "* * * * *";
-  if (minutes < 60) return `*/${minutes} * * * *`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `0 */${hours} * * *`;
-  return `0 0 * * *`; // Daily
+// Helper to convert interval minutes to cron expression with optional timezone
+export function intervalToCron(minutes: number, timezone?: string): string {
+  let cronExpr: string;
+  if (minutes < 1) cronExpr = "* * * * *";
+  else if (minutes === 1) cronExpr = "* * * * *";
+  else if (minutes < 60) cronExpr = `*/${minutes} * * * *`;
+  else {
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) cronExpr = `0 */${hours} * * *`;
+    else cronExpr = `0 0 * * *`; // Daily
+  }
+
+  // Add timezone prefix if provided and not UTC
+  if (timezone && timezone !== "UTC") {
+    return `CRON_TZ=${timezone} ${cronExpr}`;
+  }
+  return cronExpr;
 }
 
 // Helper to parse cron to approximate interval in minutes
 export function cronToInterval(cron: string): number {
-  const parts = cron.split(" ");
+  // Remove CRON_TZ prefix if present
+  let cronExpr = cron;
+  if (cronExpr.startsWith("CRON_TZ=")) {
+    const spaceIndex = cronExpr.indexOf(" ");
+    if (spaceIndex > 0) {
+      cronExpr = cronExpr.slice(spaceIndex + 1);
+    }
+  }
+
+  const parts = cronExpr.split(" ");
   if (parts.length !== 5) return 1;
 
   const [minute] = parts;
@@ -184,4 +202,15 @@ export function cronToInterval(cron: string): number {
   if (minute === "*") return 1;
 
   return 1;
+}
+
+// Helper to extract timezone from cron expression
+export function cronToTimezone(cron: string): string {
+  if (cron.startsWith("CRON_TZ=")) {
+    const spaceIndex = cron.indexOf(" ");
+    if (spaceIndex > 0) {
+      return cron.slice(8, spaceIndex); // Extract timezone after "CRON_TZ="
+    }
+  }
+  return "UTC";
 }
