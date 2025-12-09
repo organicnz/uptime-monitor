@@ -1,9 +1,6 @@
 "use client";
 
-import { useState } from "react";
-import Link from "next/link";
 import { useRealtimeMonitor } from "@/hooks/use-realtime-monitors";
-import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -22,6 +19,7 @@ import {
   Settings,
   Globe,
   Zap,
+  Shield,
   Server,
   ExternalLink,
   Pause,
@@ -32,7 +30,10 @@ import {
   Wifi,
   WifiOff,
 } from "lucide-react";
+import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
+import { useState } from "react";
+import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 
 type Monitor = {
@@ -73,7 +74,7 @@ type Incident = {
   resolved_at: string | null;
 };
 
-type Props = {
+type MonitorDetailClientProps = {
   monitor: Monitor;
   initialHeartbeats: Heartbeat[];
   activeIncidents: Incident[];
@@ -98,14 +99,14 @@ const statusConfig = {
     icon: AlertTriangle,
     color: "text-muted-foreground",
     bg: "bg-muted",
-    border: "border",
+    border: "border-border",
     label: "Pending",
   },
 };
 
 const typeIcons: Record<string, typeof Globe> = {
   http: Globe,
-  https: Globe,
+  https: Shield,
   tcp: Server,
   ping: Zap,
   keyword: Search,
@@ -116,8 +117,7 @@ export function MonitorDetailClient({
   monitor: initialMonitor,
   initialHeartbeats,
   activeIncidents,
-}: Props) {
-  const supabase = createClient();
+}: MonitorDetailClientProps) {
   const [monitor, setMonitor] = useState(initialMonitor);
   const { heartbeats: realtimeHeartbeats, isConnected } = useRealtimeMonitor(
     monitor.id,
@@ -137,7 +137,7 @@ export function MonitorDetailClient({
             100
           ).toFixed(2),
         }
-      : { total: 0, up: 0, percentage: "0.00" };
+      : { total: 0, up: 0, percentage: "100.00" };
 
   const validPings = displayHeartbeats.filter(
     (h) => h.ping !== null && h.ping > 0,
@@ -149,14 +149,13 @@ export function MonitorDetailClient({
             validPings.length,
         )
       : 0;
-
   const minPing =
     validPings.length > 0 ? Math.min(...validPings.map((h) => h.ping || 0)) : 0;
   const maxPing =
     validPings.length > 0 ? Math.max(...validPings.map((h) => h.ping || 0)) : 0;
 
   const latestHeartbeat = displayHeartbeats[0];
-  const currentStatus: "up" | "down" | "pending" = latestHeartbeat
+  const currentStatus = latestHeartbeat
     ? latestHeartbeat.status === 1
       ? "up"
       : latestHeartbeat.status === 0
@@ -164,13 +163,14 @@ export function MonitorDetailClient({
         : "pending"
     : "pending";
 
+  const supabase = createClient();
+
   const toggleActive = async () => {
     const newState = !monitor.active;
     const { error } = await supabase
       .from("monitors")
       .update({ active: newState } as never)
       .eq("id", monitor.id);
-
     if (!error) {
       setMonitor((prev) => ({ ...prev, active: newState }));
     }
@@ -181,36 +181,37 @@ export function MonitorDetailClient({
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div>
         <div className="flex items-center justify-between mb-4">
           <Link
             href="/dashboard/monitors"
-            className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground"
+            className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground transition-colors"
           >
             <ArrowLeft className="h-4 w-4 mr-1" />
             Back to Monitors
           </Link>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 text-xs">
             {isConnected ? (
-              <span className="flex items-center gap-1.5 text-emerald-500 text-sm">
-                <Wifi className="h-4 w-4" />
+              <span className="flex items-center gap-1.5 text-emerald-500">
+                <Wifi className="h-3.5 w-3.5" />
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
                 Live
               </span>
             ) : (
-              <span className="flex items-center gap-1.5 text-muted-foreground text-sm">
-                <WifiOff className="h-4 w-4" />
+              <span className="flex items-center gap-1.5 text-muted-foreground">
+                <WifiOff className="h-3.5 w-3.5" />
                 Connecting...
               </span>
             )}
           </div>
         </div>
 
-        {/* Status Banner */}
         <Card
           className={cn(
-            "bg-neutral-900/50 border-neutral-800 overflow-hidden transition-all duration-500",
+            "glass-card overflow-hidden transition-all duration-500",
             statusConfig[currentStatus].border,
+            currentStatus === "up" && "status-glow-up",
+            currentStatus === "down" && "status-glow-down",
           )}
         >
           <CardContent className="p-6">
@@ -225,6 +226,9 @@ export function MonitorDetailClient({
                   <StatusIcon
                     className={cn("h-8 w-8", statusConfig[currentStatus].color)}
                   />
+                  {currentStatus === "up" && (
+                    <span className="absolute top-2 right-2 h-3 w-3 bg-emerald-500 rounded-full animate-pulse" />
+                  )}
                 </div>
                 <div>
                   <h1 className="text-2xl sm:text-3xl font-bold mb-1">
@@ -247,7 +251,7 @@ export function MonitorDetailClient({
                           href={monitor.url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="flex items-center gap-1 hover:text-foreground"
+                          className="flex items-center gap-1 hover:text-primary transition-colors"
                         >
                           {new URL(monitor.url).hostname}
                           <ExternalLink className="h-3 w-3" />
@@ -257,11 +261,10 @@ export function MonitorDetailClient({
                   </div>
                 </div>
               </div>
-
               <div className="flex items-center gap-2">
                 <span
                   className={cn(
-                    "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium",
+                    "inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-semibold",
                     statusConfig[currentStatus].bg,
                     statusConfig[currentStatus].color,
                   )}
@@ -269,12 +272,7 @@ export function MonitorDetailClient({
                   <StatusIcon className="h-4 w-4" />
                   {statusConfig[currentStatus].label}
                 </span>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={toggleActive}
-                  className="border-neutral-800"
-                >
+                <Button variant="outline" size="icon" onClick={toggleActive}>
                   {monitor.active ? (
                     <Pause className="h-4 w-4" />
                   ) : (
@@ -282,12 +280,9 @@ export function MonitorDetailClient({
                   )}
                 </Button>
                 <Link href={`/dashboard/monitors/${monitor.id}/edit`}>
-                  <Button
-                    variant="outline"
-                    className="gap-2 border-neutral-800"
-                  >
+                  <Button variant="outline" size="sm" className="gap-2">
                     <Settings className="h-4 w-4" />
-                    <span className="hidden sm:inline">Edit</span>
+                    <span className="hidden sm:inline">Settings</span>
                   </Button>
                 </Link>
               </div>
@@ -296,11 +291,10 @@ export function MonitorDetailClient({
         </Card>
       </div>
 
-      {/* Active Incidents */}
       {activeIncidents.length > 0 && (
-        <Card className="bg-neutral-900/50 border-red-500/30">
+        <Card className="border-destructive/50 bg-destructive/5 status-glow-down">
           <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-red-500">
+            <CardTitle className="flex items-center gap-2 text-destructive">
               <AlertTriangle className="h-5 w-5" />
               Active Incident
             </CardTitle>
@@ -309,7 +303,7 @@ export function MonitorDetailClient({
             {activeIncidents.map((incident) => (
               <div key={incident.id}>
                 <p className="font-medium">{incident.title}</p>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-sm text-muted-foreground mt-1">
                   Started{" "}
                   {formatDistanceToNow(new Date(incident.started_at), {
                     addSuffix: true,
@@ -321,57 +315,97 @@ export function MonitorDetailClient({
         </Card>
       )}
 
-      {/* Stats Grid */}
-      <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
-        <StatsCard
-          label="Uptime"
-          value={`${uptimeStats.percentage}%`}
-          subtitle={`${uptimeStats.up}/${uptimeStats.total} checks`}
-          icon={TrendingUp}
-          iconColor="text-emerald-500"
-          iconBg="bg-emerald-500/10"
-          valueColor="text-emerald-500"
-        />
-        <StatsCard
-          label="Avg Response"
-          value={avgPing}
-          suffix="ms"
-          subtitle={`${minPing}ms - ${maxPing}ms`}
-          icon={Zap}
-          iconColor="text-blue-500"
-          iconBg="bg-blue-500/10"
-        />
-        <StatsCard
-          label="Incidents"
-          value={activeIncidents.length}
-          subtitle="Active now"
-          icon={AlertTriangle}
-          iconColor={
-            activeIncidents.length > 0
-              ? "text-red-500"
-              : "text-muted-foreground"
-          }
-          iconBg={activeIncidents.length > 0 ? "bg-red-500/10" : "bg-muted"}
-        />
-        <StatsCard
-          label="Last Check"
-          value={
-            latestHeartbeat
-              ? formatDistanceToNow(new Date(latestHeartbeat.time), {
-                  addSuffix: true,
-                })
-              : "Never"
-          }
-          subtitle={latestHeartbeat?.msg || "No data"}
-          icon={Clock}
-          iconColor="text-purple-500"
-          iconBg="bg-purple-500/10"
-          smallValue
-        />
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <Card className="glass-card">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Uptime</p>
+                <p className="text-3xl font-bold text-emerald-500">
+                  {uptimeStats.percentage}%
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {uptimeStats.up}/{uptimeStats.total} checks
+                </p>
+              </div>
+              <div className="p-3 rounded-xl bg-emerald-500/10">
+                <TrendingUp className="h-6 w-6 text-emerald-500" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="glass-card">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Avg Response</p>
+                <p className="text-3xl font-bold">
+                  {avgPing}
+                  <span className="text-lg text-muted-foreground">ms</span>
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {minPing}ms - {maxPing}ms
+                </p>
+              </div>
+              <div className="p-3 rounded-xl bg-blue-500/10">
+                <Zap className="h-6 w-6 text-blue-500" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="glass-card">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Incidents</p>
+                <p className="text-3xl font-bold">{activeIncidents.length}</p>
+                <p className="text-xs text-muted-foreground mt-1">Active now</p>
+              </div>
+              <div
+                className={cn(
+                  "p-3 rounded-xl",
+                  activeIncidents.length > 0 ? "bg-red-500/10" : "bg-muted",
+                )}
+              >
+                <AlertTriangle
+                  className={cn(
+                    "h-6 w-6",
+                    activeIncidents.length > 0
+                      ? "text-red-500"
+                      : "text-muted-foreground",
+                  )}
+                />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="glass-card">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Last Check</p>
+                <p className="text-xl font-bold">
+                  {latestHeartbeat
+                    ? formatDistanceToNow(new Date(latestHeartbeat.time), {
+                        addSuffix: true,
+                      })
+                    : "Never"}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {latestHeartbeat?.ping
+                    ? `${latestHeartbeat.ping}ms`
+                    : "No data"}
+                </p>
+              </div>
+              <div className="p-3 rounded-xl bg-purple-500/10">
+                <Clock className="h-6 w-6 text-purple-500" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
-      {/* Response Time Chart */}
-      <Card className="bg-neutral-900/50 border-neutral-800">
+      <Card className="glass-card">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Activity className="h-5 w-5 text-primary" />
@@ -389,18 +423,23 @@ export function MonitorDetailClient({
                 const height = hb.ping
                   ? Math.max(
                       8,
-                      Math.min((hb.ping / 1000) * maxHeight, maxHeight),
+                      Math.min(
+                        maxHeight,
+                        (hb.ping / (maxPing || 800)) * maxHeight,
+                      ),
                     )
                   : 8;
                 const isUp = hb.status === 1;
                 const isDown = hb.status === 0;
                 const isSlow = hb.ping && hb.ping > avgPing * 1.5;
-
                 return (
-                  <div key={hb.id || i} className="flex-1 group relative">
+                  <div
+                    key={hb.id || i}
+                    className="flex-1 flex flex-col justify-end group relative"
+                  >
                     <div
                       className={cn(
-                        "w-full rounded-t transition-opacity hover:opacity-80",
+                        "w-full rounded-t transition-all hover:opacity-80",
                         isUp
                           ? isSlow
                             ? "bg-amber-500"
@@ -411,32 +450,36 @@ export function MonitorDetailClient({
                       )}
                       style={{ height: `${height}px` }}
                     />
+                    <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity bg-popover text-popover-foreground text-xs px-2 py-1 rounded-lg shadow-lg whitespace-nowrap z-10 pointer-events-none border">
+                      {hb.ping ? `${hb.ping}ms` : "N/A"}
+                      <br />
+                      {new Date(hb.time).toLocaleTimeString()}
+                    </div>
                   </div>
                 );
               })}
             {displayHeartbeats.length === 0 &&
               Array.from({ length: 50 }).map((_, i) => (
                 <div key={i} className="flex-1 flex flex-col justify-end">
-                  <div className="w-full h-8 bg-muted rounded-t" />
+                  <div className="w-full h-8 bg-muted rounded-t animate-pulse" />
                 </div>
               ))}
           </div>
-          <div className="flex justify-between text-xs text-muted-foreground mt-2">
+          <div className="flex justify-between mt-2 text-xs text-muted-foreground">
             <span>Oldest</span>
             <span>Latest</span>
           </div>
         </CardContent>
       </Card>
 
-      {/* Recent Checks */}
-      <Card className="bg-neutral-900/50 border-neutral-800">
+      <Card className="glass-card">
         <CardHeader>
           <CardTitle>Recent Checks</CardTitle>
           <CardDescription>Latest heartbeat data</CardDescription>
         </CardHeader>
         <CardContent>
           {displayHeartbeats.length > 0 ? (
-            <div className="space-y-2">
+            <div className="space-y-2 max-h-96 overflow-y-auto">
               {displayHeartbeats.slice(0, 20).map((heartbeat) => {
                 const status =
                   heartbeat.status === 1
@@ -445,11 +488,10 @@ export function MonitorDetailClient({
                       ? "down"
                       : "pending";
                 const Icon = statusConfig[status].icon;
-
                 return (
                   <div
                     key={heartbeat.id}
-                    className="flex items-center justify-between p-3 rounded-lg bg-neutral-800/30"
+                    className="flex items-center justify-between p-3 rounded-xl bg-muted/30 hover:bg-muted/50 transition-colors"
                   >
                     <div className="flex items-center gap-3">
                       <div
@@ -464,7 +506,7 @@ export function MonitorDetailClient({
                       </div>
                       <div>
                         <p className="text-sm font-medium">
-                          {heartbeat.msg || statusConfig[status].label}
+                          {heartbeat.msg || (status === "up" ? "OK" : "Failed")}
                         </p>
                         <p className="text-xs text-muted-foreground">
                           {formatDistanceToNow(new Date(heartbeat.time), {
@@ -484,41 +526,61 @@ export function MonitorDetailClient({
             </div>
           ) : (
             <div className="text-center py-12">
-              <Activity className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <p className="text-muted-foreground">No heartbeat data yet</p>
+              <Activity className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+              <p className="text-muted-foreground">No checks yet</p>
             </div>
           )}
         </CardContent>
       </Card>
 
-      {/* Configuration */}
-      <Card className="bg-neutral-900/50 border-neutral-800">
+      <Card className="glass-card">
         <CardHeader>
           <CardTitle>Configuration</CardTitle>
           <CardDescription>Monitor settings</CardDescription>
         </CardHeader>
         <CardContent>
-          <dl className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <ConfigItem label="Type" value={monitor.type.toUpperCase()} />
+          <dl className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="p-3 rounded-xl bg-muted/30">
+              <dt className="text-xs text-muted-foreground mb-1">Type</dt>
+              <dd className="text-sm font-medium">
+                {monitor.type.toUpperCase()}
+              </dd>
+            </div>
             {monitor.url && (
-              <ConfigItem label="URL" value={monitor.url} span={2} />
+              <div className="p-3 rounded-xl bg-muted/30 col-span-2">
+                <dt className="text-xs text-muted-foreground mb-1">URL</dt>
+                <dd className="text-sm font-medium truncate">{monitor.url}</dd>
+              </div>
             )}
             {monitor.hostname && (
-              <ConfigItem label="Hostname" value={monitor.hostname} />
+              <div className="p-3 rounded-xl bg-muted/30">
+                <dt className="text-xs text-muted-foreground mb-1">Hostname</dt>
+                <dd className="text-sm font-medium">{monitor.hostname}</dd>
+              </div>
             )}
             {monitor.port && (
-              <ConfigItem label="Port" value={String(monitor.port)} />
+              <div className="p-3 rounded-xl bg-muted/30">
+                <dt className="text-xs text-muted-foreground mb-1">Port</dt>
+                <dd className="text-sm font-medium">{monitor.port}</dd>
+              </div>
             )}
-            <ConfigItem label="Interval" value={`${monitor.interval}s`} />
-            <ConfigItem label="Timeout" value={`${monitor.timeout}s`} />
-            <ConfigItem label="Retries" value={String(monitor.max_retries)} />
-            <ConfigItem
-              label="Created"
-              value={new Date(monitor.created_at).toLocaleDateString()}
-            />
+            <div className="p-3 rounded-xl bg-muted/30">
+              <dt className="text-xs text-muted-foreground mb-1">Timeout</dt>
+              <dd className="text-sm font-medium">{monitor.timeout}s</dd>
+            </div>
+            <div className="p-3 rounded-xl bg-muted/30">
+              <dt className="text-xs text-muted-foreground mb-1">Retries</dt>
+              <dd className="text-sm font-medium">{monitor.max_retries}</dd>
+            </div>
+            <div className="p-3 rounded-xl bg-muted/30">
+              <dt className="text-xs text-muted-foreground mb-1">Created</dt>
+              <dd className="text-sm font-medium">
+                {new Date(monitor.created_at).toLocaleDateString()}
+              </dd>
+            </div>
           </dl>
           {monitor.description && (
-            <div className="mt-4 pt-4 border-t border-neutral-800">
+            <div className="mt-4 p-3 rounded-xl bg-muted/30">
               <dt className="text-xs text-muted-foreground mb-1">
                 Description
               </dt>
@@ -527,75 +589,6 @@ export function MonitorDetailClient({
           )}
         </CardContent>
       </Card>
-    </div>
-  );
-}
-
-function StatsCard({
-  label,
-  value,
-  suffix,
-  subtitle,
-  icon: Icon,
-  iconColor,
-  iconBg,
-  valueColor,
-  smallValue,
-}: {
-  label: string;
-  value: string | number;
-  suffix?: string;
-  subtitle: string;
-  icon: typeof Activity;
-  iconColor: string;
-  iconBg: string;
-  valueColor?: string;
-  smallValue?: boolean;
-}) {
-  return (
-    <Card className="bg-neutral-900/50 border-neutral-800">
-      <CardContent className="pt-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm text-muted-foreground mb-1">{label}</p>
-            <p
-              className={cn(
-                "font-bold",
-                smallValue ? "text-xl" : "text-3xl",
-                valueColor,
-              )}
-            >
-              {value}
-              {suffix && (
-                <span className="text-lg text-muted-foreground ml-0.5">
-                  {suffix}
-                </span>
-              )}
-            </p>
-            <p className="text-xs text-muted-foreground mt-1">{subtitle}</p>
-          </div>
-          <div className={cn("p-3 rounded-xl", iconBg)}>
-            <Icon className={cn("h-6 w-6", iconColor)} />
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-function ConfigItem({
-  label,
-  value,
-  span = 1,
-}: {
-  label: string;
-  value: string;
-  span?: number;
-}) {
-  return (
-    <div className={span === 2 ? "col-span-2" : ""}>
-      <dt className="text-xs text-muted-foreground mb-1">{label}</dt>
-      <dd className="text-sm font-medium truncate">{value}</dd>
     </div>
   );
 }

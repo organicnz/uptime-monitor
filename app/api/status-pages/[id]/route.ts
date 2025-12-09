@@ -1,5 +1,34 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { z } from "zod";
+
+// UUID validation regex
+const uuidRegex =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// Input validation schema
+const updateStatusPageSchema = z.object({
+  title: z
+    .string()
+    .min(1, "Title is required")
+    .max(100, "Title must be less than 100 characters")
+    .trim(),
+  slug: z
+    .string()
+    .min(1, "Slug is required")
+    .max(50, "Slug must be less than 50 characters")
+    .regex(
+      /^[a-z0-9-]+$/,
+      "Slug can only contain lowercase letters, numbers, and hyphens",
+    ),
+  description: z
+    .string()
+    .max(500, "Description must be less than 500 characters")
+    .optional()
+    .nullable(),
+  is_public: z.boolean().optional(),
+  monitor_ids: z.array(z.string().uuid()).optional().default([]),
+});
 
 export async function PUT(
   request: NextRequest,
@@ -7,6 +36,15 @@ export async function PUT(
 ) {
   try {
     const { id } = await params;
+
+    // Validate ID format
+    if (!uuidRegex.test(id)) {
+      return NextResponse.json(
+        { error: "Invalid status page ID" },
+        { status: 400 },
+      );
+    }
+
     const supabase = await createClient();
     const {
       data: { user },
@@ -16,15 +54,24 @@ export async function PUT(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const body = await request.json();
-    const { title, slug, description, is_public, monitor_ids } = body;
+    // Parse and validate input
+    let body;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+    }
 
-    if (!title || !slug) {
+    const validationResult = updateStatusPageSchema.safeParse(body);
+    if (!validationResult.success) {
       return NextResponse.json(
-        { error: "Title and slug are required" },
+        { error: validationResult.error.issues[0].message },
         { status: 400 },
       );
     }
+
+    const { title, slug, description, is_public, monitor_ids } =
+      validationResult.data;
 
     // 1. Update status page
     const { error: pageError } = await supabase
@@ -96,6 +143,15 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
+
+    // Validate ID format
+    if (!uuidRegex.test(id)) {
+      return NextResponse.json(
+        { error: "Invalid status page ID" },
+        { status: 400 },
+      );
+    }
+
     const supabase = await createClient();
     const {
       data: { user },
@@ -104,10 +160,6 @@ export async function DELETE(
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-
-    // Delete status page (cascade should handle monitors if configured, but let's see schema)
-    // status_page_monitors typically references status_pages.
-    // If no cascade, we manually delete. But let's assume cascade or just try deleting page.
 
     const { error } = await supabase
       .from("status_pages")

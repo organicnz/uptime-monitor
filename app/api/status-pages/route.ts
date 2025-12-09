@@ -1,5 +1,30 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { z } from "zod";
+
+// Input validation schema
+const createStatusPageSchema = z.object({
+  title: z
+    .string()
+    .min(1, "Title is required")
+    .max(100, "Title must be less than 100 characters")
+    .trim(),
+  slug: z
+    .string()
+    .min(1, "Slug is required")
+    .max(50, "Slug must be less than 50 characters")
+    .regex(
+      /^[a-z0-9-]+$/,
+      "Slug can only contain lowercase letters, numbers, and hyphens",
+    ),
+  description: z
+    .string()
+    .max(500, "Description must be less than 500 characters")
+    .optional()
+    .nullable(),
+  is_public: z.boolean().optional().default(true),
+  monitor_ids: z.array(z.string().uuid()).optional().default([]),
+});
 
 export async function POST(request: NextRequest) {
   try {
@@ -12,17 +37,26 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const body = await request.json();
-    const { title, slug, description, is_public, monitor_ids } = body;
+    // Parse and validate input
+    let body;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+    }
 
-    if (!title || !slug) {
+    const validationResult = createStatusPageSchema.safeParse(body);
+    if (!validationResult.success) {
       return NextResponse.json(
-        { error: "Title and slug are required" },
+        { error: validationResult.error.issues[0].message },
         { status: 400 },
       );
     }
 
-    // specific slug validation could go here
+    const { title, slug, description, is_public, monitor_ids } =
+      validationResult.data;
+
+    // Sanitize slug
     const cleanSlug = slug.toLowerCase().replace(/[^a-z0-9-]/g, "-");
 
     // Define type locally

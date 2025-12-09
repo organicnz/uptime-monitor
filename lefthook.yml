@@ -1,43 +1,144 @@
-# Lefthook Configuration - Production Ready
+# Lefthook Configuration - Enterprise Ready
 # Run `npx lefthook install` to set up hooks
+#
+# Features:
+# - Parallel execution for speed
+# - Staged files only (incremental checks)
+# - Skip options for CI/emergency
+# - Conventional commits enforcement
+# - Security checks
+# - Branch naming conventions
 
+# Global settings
+min_version: 1.5.0
+colors: true
+no_tty: false
+
+# Skip hooks in CI or with LEFTHOOK_SKIP=1
+skip_output:
+  - meta
+  - empty_summary
+
+# Pre-commit: Fast checks on staged files only
 pre-commit:
   parallel: true
+  piped: false
+
   commands:
+    # TypeScript type checking (staged files only)
     typecheck:
+      priority: 1
       glob: "*.{ts,tsx}"
-      run: npx tsc --noEmit
+      run: npx tsc --noEmit --skipLibCheck
+      fail_text: "❌ TypeScript errors found. Fix type issues before committing."
 
+    # ESLint with auto-fix disabled (check only)
     lint:
+      priority: 1
       glob: "*.{js,jsx,ts,tsx}"
-      run: npx eslint {staged_files} --max-warnings 0
+      run: npx eslint {staged_files} --max-warnings 0 --no-fix
+      fail_text: "❌ ESLint errors found. Run 'npm run lint -- --fix' to auto-fix."
 
-    format-check:
-      glob: "*.{js,jsx,ts,tsx,json,css,md}"
+    # Prettier format check
+    format:
+      priority: 2
+      glob: "*.{js,jsx,ts,tsx,json,css,md,yml,yaml}"
       run: npx prettier --check {staged_files}
+      fail_text: "❌ Formatting issues found. Run 'npx prettier --write .' to fix."
 
-pre-push:
-  commands:
-    build:
-      run: npm run build
+    # Check for debug statements
+    no-debug:
+      priority: 3
+      glob: "*.{ts,tsx,js,jsx}"
+      run: bash scripts/lefthook/no-debug.sh {staged_files}
+      fail_text: "❌ Debug statements found. Remove console.log, debugger, etc."
 
-    # Optional: Run tests before push
-    # test:
-    #   run: npm test
+    # Check for secrets/credentials
+    secrets-check:
+      priority: 3
+      glob: "*.{ts,tsx,js,jsx,json,env*}"
+      run: bash scripts/lefthook/secrets-check.sh {staged_files}
+      fail_text: "❌ Potential secrets detected. Never commit credentials!"
 
-# Commit message linting
+    # Validate JSON files
+    json-validate:
+      priority: 2
+      glob: "*.json"
+      exclude: "package-lock.json"
+      run: bash scripts/lefthook/json-validate.sh {staged_files}
+      fail_text: "❌ Invalid JSON syntax detected."
+
+    # Check file size (prevent large files)
+    file-size:
+      priority: 4
+      run: bash scripts/lefthook/file-size-check.sh {staged_files}
+      fail_text: "❌ File too large. Max 500KB for source files."
+
+# Commit message validation
 commit-msg:
   commands:
-    # Enforce conventional commits format
-    message-format:
-      run: |
-        if ! grep -qE '^(feat|fix|docs|style|refactor|perf|test|chore|build|ci|revert)(\(.+\))?: .{1,}$' {1}; then
-          echo "❌ Commit message must follow conventional commits format:"
-          echo "   type(scope?): subject"
-          echo ""  
-          echo "Types: feat, fix, docs, style, refactor, perf, test, chore, build, ci, revert"
-          echo ""
-          echo "Example: feat: add monitor status badges"
-          echo "Example: fix(auth): resolve login redirect issue"
-          exit 1
-        fi
+    # Conventional commits format
+    conventional:
+      run: bash scripts/lefthook/commit-msg.sh {1}
+      fail_text: |
+        ❌ Invalid commit message format!
+
+        Use conventional commits: type(scope?): subject
+
+        Types: feat, fix, docs, style, refactor, perf, test, chore, build, ci, revert
+
+        Examples:
+          feat: add monitor status badges
+          fix(auth): resolve login redirect issue
+          docs: update API documentation
+
+    # Commit message length check
+    length:
+      run: bash scripts/lefthook/commit-msg-length.sh {1}
+      fail_text: "❌ Commit subject too long. Keep under 72 characters."
+
+# Pre-push: Full validation before pushing
+pre-push:
+  parallel: false
+  piped: true
+
+  commands:
+    # Full TypeScript check
+    typecheck-full:
+      priority: 1
+      run: npx tsc --noEmit
+      fail_text: "❌ TypeScript errors. Fix before pushing."
+
+    # Production build test
+    build:
+      priority: 2
+      run: npm run build
+      fail_text: "❌ Build failed. Fix errors before pushing."
+
+    # Branch naming convention
+    branch-name:
+      priority: 0
+      run: bash scripts/lefthook/branch-name.sh
+      fail_text: |
+        ❌ Invalid branch name!
+
+        Use: type/description or type/TICKET-123-description
+
+        Types: feature, fix, hotfix, release, chore, docs
+
+        Examples:
+          feature/add-monitor-groups
+          fix/PROJ-123-login-redirect
+          hotfix/critical-auth-bug
+
+# Post-checkout: Setup reminders
+post-checkout:
+  commands:
+    deps-check:
+      run: bash scripts/lefthook/deps-check.sh {1} {2}
+
+# Post-merge: Dependency updates reminder
+post-merge:
+  commands:
+    deps-reminder:
+      run: bash scripts/lefthook/deps-reminder.sh
