@@ -10,9 +10,15 @@ import {
   AlertCircle,
   Clock,
   ArrowUpRight,
+  Globe,
+  Server,
+  Zap,
+  Search,
+  Radio,
 } from "lucide-react";
 import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
+import { cn } from "@/lib/utils";
 
 type Monitor = {
   id: string;
@@ -24,9 +30,18 @@ type Monitor = {
   active: boolean;
 };
 
-interface LiveMonitorsListProps {
+type LiveMonitorsListProps = {
   monitors: Monitor[];
-}
+};
+
+const typeIcons: Record<string, typeof Globe> = {
+  http: Globe,
+  https: Globe,
+  tcp: Server,
+  ping: Zap,
+  keyword: Search,
+  dns: Radio,
+};
 
 export function LiveMonitorsList({ monitors }: LiveMonitorsListProps) {
   const monitorIds = monitors.map((m) => m.id);
@@ -37,8 +52,9 @@ export function LiveMonitorsList({ monitors }: LiveMonitorsListProps) {
     if (!status) {
       return {
         status: "pending" as const,
-        color: "text-neutral-400",
-        bgColor: "bg-neutral-500/20",
+        color: "text-muted-foreground",
+        bgColor: "bg-muted",
+        borderColor: "border-border",
         icon: AlertCircle,
         label: "Pending",
         ping: null,
@@ -47,20 +63,23 @@ export function LiveMonitorsList({ monitors }: LiveMonitorsListProps) {
 
     const configs = {
       up: {
-        color: "text-green-400",
-        bgColor: "bg-green-500/20",
+        color: "text-emerald-500",
+        bgColor: "bg-emerald-500/10",
+        borderColor: "border-emerald-500/30 hover:border-emerald-500/50",
         icon: CheckCircle2,
-        label: "Up",
+        label: "Operational",
       },
       down: {
-        color: "text-red-400",
-        bgColor: "bg-red-500/20",
+        color: "text-red-500",
+        bgColor: "bg-red-500/10",
+        borderColor: "border-red-500/30 hover:border-red-500/50",
         icon: XCircle,
         label: "Down",
       },
       pending: {
-        color: "text-neutral-400",
-        bgColor: "bg-neutral-500/20",
+        color: "text-muted-foreground",
+        bgColor: "bg-muted",
+        borderColor: "border-border",
         icon: AlertCircle,
         label: "Pending",
       },
@@ -77,77 +96,108 @@ export function LiveMonitorsList({ monitors }: LiveMonitorsListProps) {
 
   return (
     <div className="space-y-4">
+      {/* Connection Status */}
       <div className="flex items-center justify-between text-sm">
         <div className="flex items-center gap-2">
           {isConnected ? (
             <>
-              <Wifi className="h-4 w-4 text-green-400" />
-              <span className="text-green-400">Live updates active</span>
+              <div className="relative">
+                <Wifi className="h-4 w-4 text-emerald-500" />
+                <span className="absolute -top-0.5 -right-0.5 h-2 w-2 bg-emerald-500 rounded-full animate-pulse" />
+              </div>
+              <span className="text-emerald-500 font-medium">
+                Live updates active
+              </span>
             </>
           ) : (
             <>
-              <WifiOff className="h-4 w-4 text-neutral-500" />
-              <span className="text-neutral-500">Connecting...</span>
+              <WifiOff className="h-4 w-4 text-muted-foreground" />
+              <span className="text-muted-foreground">Connecting...</span>
             </>
           )}
         </div>
         {lastUpdate && (
-          <span className="text-neutral-500 text-xs">
-            Last update: {formatDistanceToNow(lastUpdate, { addSuffix: true })}
+          <span className="text-muted-foreground text-xs">
+            Updated {formatDistanceToNow(lastUpdate, { addSuffix: true })}
           </span>
         )}
       </div>
 
-      <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+      {/* Monitors Grid */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {monitors.map((monitor) => {
           const statusDisplay = getStatusDisplay(monitor.id);
           const StatusIcon = statusDisplay.icon;
+          const TypeIcon = typeIcons[monitor.type] || Globe;
+          const isUp = statusDisplay.status === "up";
+          const isDown = statusDisplay.status === "down";
 
           return (
             <Link
               key={monitor.id}
               href={`/dashboard/monitors/${monitor.id}`}
-              className="block"
+              className="block group"
             >
-              <Card className="bg-neutral-900/50 border-neutral-800 hover:border-green-500/50 hover:bg-neutral-800/50 transition-all duration-200 cursor-pointer group h-full">
-                <CardContent className="p-4">
-                  <div className="flex items-start justify-between mb-3">
+              <Card
+                className={cn(
+                  "glass-card transition-all duration-300 h-full",
+                  statusDisplay.borderColor,
+                  isUp && "status-glow-up",
+                  isDown && "status-glow-down",
+                )}
+              >
+                <CardContent className="p-5">
+                  {/* Header */}
+                  <div className="flex items-start justify-between mb-4">
                     <div
-                      className={`relative p-2.5 rounded-xl ${statusDisplay.bgColor}`}
+                      className={cn(
+                        "relative p-2.5 rounded-xl transition-transform group-hover:scale-110",
+                        statusDisplay.bgColor,
+                      )}
                     >
                       <StatusIcon
-                        className={`h-5 w-5 ${statusDisplay.color}`}
+                        className={cn("h-5 w-5", statusDisplay.color)}
                       />
-                      {statusDisplay.status === "up" && (
-                        <span className="absolute -top-0.5 -right-0.5 h-2 w-2 bg-green-400 rounded-full animate-pulse" />
+                      {isUp && (
+                        <span className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 bg-emerald-500 rounded-full animate-pulse" />
                       )}
                     </div>
-                    <ArrowUpRight className="h-4 w-4 text-neutral-600 group-hover:text-green-400 transition-colors" />
+                    <ArrowUpRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
                   </div>
 
-                  <h3 className="font-semibold text-white group-hover:text-green-400 transition-colors truncate mb-1">
+                  {/* Name & URL */}
+                  <h3 className="font-semibold text-foreground group-hover:text-primary transition-colors truncate mb-1">
                     {monitor.name}
                   </h3>
-
-                  <p className="text-sm text-neutral-400 truncate mb-3">
+                  <p className="text-sm text-muted-foreground truncate mb-4">
                     {monitor.url || monitor.hostname || "No endpoint"}
                   </p>
 
-                  <div className="flex items-center justify-between text-xs text-neutral-500">
-                    <div className="flex items-center gap-1">
-                      <Clock className="h-3 w-3" />
-                      <span>{monitor.interval}s</span>
+                  {/* Footer */}
+                  <div className="flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-1 text-muted-foreground">
+                        <TypeIcon className="h-3.5 w-3.5" />
+                        <span className="uppercase">{monitor.type}</span>
+                      </div>
+                      <div className="flex items-center gap-1 text-muted-foreground">
+                        <Clock className="h-3.5 w-3.5" />
+                        <span>{monitor.interval}s</span>
+                      </div>
                     </div>
-                    {statusDisplay.ping && (
-                      <span className="text-green-400 font-medium">
-                        {statusDisplay.ping}ms
-                      </span>
-                    )}
-                    {!monitor.active && (
-                      <span className="px-1.5 py-0.5 rounded text-yellow-400 bg-yellow-500/20">
-                        Paused
-                      </span>
-                    )}
+
+                    <div className="flex items-center gap-2">
+                      {statusDisplay.ping && (
+                        <span className="font-medium text-emerald-500">
+                          {statusDisplay.ping}ms
+                        </span>
+                      )}
+                      {!monitor.active && (
+                        <span className="px-2 py-0.5 rounded-full text-amber-500 bg-amber-500/10 font-medium">
+                          Paused
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </CardContent>
               </Card>

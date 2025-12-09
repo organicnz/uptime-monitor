@@ -10,7 +10,9 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { createClient } from "@/lib/supabase/client";
 import {
   ArrowLeft,
@@ -21,49 +23,56 @@ import {
   Radio,
   CheckCircle2,
   AlertCircle,
+  Loader2,
 } from "lucide-react";
 import Link from "next/link";
+import { cn } from "@/lib/utils";
 
 const monitorTypes = [
   {
     id: "http",
     name: "HTTP(s)",
-    description: "Check if a URL returns a successful response",
+    description: "Check URL response",
     icon: Globe,
-    color: "text-blue-400",
-    bg: "bg-blue-500/20",
+    color: "text-blue-500",
+    bg: "bg-blue-500/10",
+    border: "border-blue-500/30",
   },
   {
     id: "keyword",
     name: "Keyword",
-    description: "Check if a URL contains a specific keyword",
+    description: "Check for keyword",
     icon: Search,
-    color: "text-purple-400",
-    bg: "bg-purple-500/20",
+    color: "text-purple-500",
+    bg: "bg-purple-500/10",
+    border: "border-purple-500/30",
   },
   {
     id: "tcp",
     name: "TCP Port",
-    description: "Check if a TCP port is open",
+    description: "Check port status",
     icon: Server,
-    color: "text-orange-400",
-    bg: "bg-orange-500/20",
+    color: "text-orange-500",
+    bg: "bg-orange-500/10",
+    border: "border-orange-500/30",
   },
   {
     id: "ping",
     name: "Ping",
-    description: "Check if a host responds to ping",
+    description: "ICMP ping check",
     icon: Zap,
-    color: "text-green-400",
-    bg: "bg-green-500/20",
+    color: "text-emerald-500",
+    bg: "bg-emerald-500/10",
+    border: "border-emerald-500/30",
   },
   {
     id: "dns",
     name: "DNS",
-    description: "Check DNS resolution for a hostname",
+    description: "DNS resolution",
     icon: Radio,
-    color: "text-cyan-400",
-    bg: "bg-cyan-500/20",
+    color: "text-cyan-500",
+    bg: "bg-cyan-500/10",
+    border: "border-cyan-500/30",
   },
 ];
 
@@ -155,49 +164,48 @@ export default function NewMonitorPage() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
+    <div className="max-w-3xl mx-auto space-y-6">
       {/* Header */}
       <div>
         <Link
           href="/dashboard/monitors"
-          className="inline-flex items-center text-sm text-neutral-400 hover:text-white transition-colors mb-4"
+          className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground transition-colors mb-4"
         >
           <ArrowLeft className="h-4 w-4 mr-1" />
           Back to Monitors
         </Link>
-        <h1 className="text-3xl font-bold bg-gradient-to-r from-green-400 to-emerald-500 bg-clip-text text-transparent">
-          Create New Monitor
-        </h1>
-        <p className="text-neutral-400 mt-1">
+        <h1 className="text-3xl font-bold gradient-text">Create New Monitor</h1>
+        <p className="text-muted-foreground mt-1">
           Set up monitoring for your services
         </p>
       </div>
 
+      {/* Alerts */}
       {error && (
-        <div className="flex items-center gap-3 bg-red-950/50 border border-red-800 text-red-200 px-4 py-3 rounded-lg">
-          <AlertCircle className="h-5 w-5 text-red-400 flex-shrink-0" />
+        <div className="flex items-center gap-3 bg-destructive/10 border border-destructive/30 text-destructive px-4 py-3 rounded-xl">
+          <AlertCircle className="h-5 w-5 flex-shrink-0" />
           {error}
         </div>
       )}
 
       {success && (
-        <div className="flex items-center gap-3 bg-green-950/50 border border-green-800 text-green-200 px-4 py-3 rounded-lg">
-          <CheckCircle2 className="h-5 w-5 text-green-400 flex-shrink-0" />
+        <div className="flex items-center gap-3 bg-emerald-500/10 border border-emerald-500/30 text-emerald-500 px-4 py-3 rounded-xl">
+          <CheckCircle2 className="h-5 w-5 flex-shrink-0" />
           Monitor created successfully! Redirecting...
         </div>
       )}
 
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Monitor Type Selection */}
-        <Card className="bg-neutral-900/50 border-neutral-800">
+        <Card className="glass-card">
           <CardHeader>
-            <CardTitle className="text-white">Monitor Type</CardTitle>
+            <CardTitle>Monitor Type</CardTitle>
             <CardDescription>
               Choose what kind of check to perform
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
               {monitorTypes.map((type) => {
                 const Icon = type.icon;
                 const isSelected = formData.type === type.id;
@@ -206,21 +214,25 @@ export default function NewMonitorPage() {
                     key={type.id}
                     type="button"
                     onClick={() => updateField("type", type.id)}
-                    className={`p-4 rounded-xl border-2 transition-all text-left ${
+                    className={cn(
+                      "p-4 rounded-xl border-2 transition-all text-left",
                       isSelected
-                        ? "border-green-500 bg-green-500/10"
-                        : "border-neutral-700 bg-neutral-800/50 hover:border-neutral-600"
-                    }`}
+                        ? `${type.border} ${type.bg}`
+                        : "border-border hover:border-border/80 hover:bg-muted/50",
+                    )}
                   >
-                    <div className={`p-2 rounded-lg ${type.bg} w-fit mb-2`}>
-                      <Icon className={`h-5 w-5 ${type.color}`} />
+                    <div className={cn("p-2 rounded-lg w-fit mb-2", type.bg)}>
+                      <Icon className={cn("h-5 w-5", type.color)} />
                     </div>
                     <p
-                      className={`font-medium ${isSelected ? "text-green-400" : "text-white"}`}
+                      className={cn(
+                        "font-medium text-sm",
+                        isSelected ? type.color : "",
+                      )}
                     >
                       {type.name}
                     </p>
-                    <p className="text-xs text-neutral-400 mt-0.5 line-clamp-2">
+                    <p className="text-xs text-muted-foreground mt-0.5">
                       {type.description}
                     </p>
                   </button>
@@ -231,13 +243,13 @@ export default function NewMonitorPage() {
         </Card>
 
         {/* Basic Configuration */}
-        <Card className="bg-neutral-900/50 border-neutral-800">
+        <Card className="glass-card">
           <CardHeader>
-            <CardTitle className="text-white flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2">
               {selectedType && (
-                <div className={`p-1.5 rounded-lg ${selectedType.bg}`}>
+                <div className={cn("p-1.5 rounded-lg", selectedType.bg)}>
                   <selectedType.icon
-                    className={`h-4 w-4 ${selectedType.color}`}
+                    className={cn("h-4 w-4", selectedType.color)}
                   />
                 </div>
               )}
@@ -248,32 +260,28 @@ export default function NewMonitorPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid md:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="name" className="text-neutral-300">
-                  Monitor Name *
-                </Label>
-                <input
+            <div className="grid sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="name">Monitor Name *</Label>
+                <Input
                   id="name"
                   type="text"
                   required
                   value={formData.name}
                   onChange={(e) => updateField("name", e.target.value)}
-                  className="mt-1.5 block w-full rounded-lg border border-neutral-700 bg-neutral-800 px-4 py-2.5 text-white placeholder:text-neutral-500 focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
                   placeholder="My Website"
+                  className="h-11"
                 />
               </div>
 
               {(formData.type === "http" || formData.type === "keyword") && (
-                <div>
-                  <Label htmlFor="method" className="text-neutral-300">
-                    HTTP Method
-                  </Label>
+                <div className="space-y-2">
+                  <Label htmlFor="method">HTTP Method</Label>
                   <select
                     id="method"
                     value={formData.method}
                     onChange={(e) => updateField("method", e.target.value)}
-                    className="mt-1.5 block w-full rounded-lg border border-neutral-700 bg-neutral-800 px-4 py-2.5 text-white focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
+                    className="flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   >
                     <option value="GET">GET</option>
                     <option value="POST">POST</option>
@@ -287,40 +295,35 @@ export default function NewMonitorPage() {
 
             {/* URL field for HTTP/Keyword */}
             {(formData.type === "http" || formData.type === "keyword") && (
-              <div>
-                <Label htmlFor="url" className="text-neutral-300">
-                  URL *
-                </Label>
-                <input
+              <div className="space-y-2">
+                <Label htmlFor="url">URL *</Label>
+                <Input
                   id="url"
                   type="url"
                   required
                   value={formData.url}
                   onChange={(e) => updateField("url", e.target.value)}
-                  className="mt-1.5 block w-full rounded-lg border border-neutral-700 bg-neutral-800 px-4 py-2.5 text-white placeholder:text-neutral-500 focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
                   placeholder="https://example.com"
+                  className="h-11"
                 />
               </div>
             )}
 
             {/* Keyword field */}
             {formData.type === "keyword" && (
-              <div>
-                <Label htmlFor="keyword" className="text-neutral-300">
-                  Keyword to Find *
-                </Label>
-                <input
+              <div className="space-y-2">
+                <Label htmlFor="keyword">Keyword to Find *</Label>
+                <Input
                   id="keyword"
                   type="text"
                   required
                   value={formData.keyword}
                   onChange={(e) => updateField("keyword", e.target.value)}
-                  className="mt-1.5 block w-full rounded-lg border border-neutral-700 bg-neutral-800 px-4 py-2.5 text-white placeholder:text-neutral-500 focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
                   placeholder="Welcome, OK, Success..."
+                  className="h-11"
                 />
-                <p className="mt-1.5 text-xs text-neutral-500">
-                  The monitor will be marked UP only if this keyword is found in
-                  the response
+                <p className="text-xs text-muted-foreground">
+                  The monitor will be marked UP only if this keyword is found
                 </p>
               </div>
             )}
@@ -329,27 +332,25 @@ export default function NewMonitorPage() {
             {(formData.type === "tcp" ||
               formData.type === "ping" ||
               formData.type === "dns") && (
-              <div className="grid md:grid-cols-2 gap-4">
-                <div className={formData.type === "tcp" ? "" : "md:col-span-2"}>
-                  <Label htmlFor="hostname" className="text-neutral-300">
-                    Hostname *
-                  </Label>
-                  <input
-                    id="hostname"
-                    type="text"
-                    required
-                    value={formData.hostname}
-                    onChange={(e) => updateField("hostname", e.target.value)}
-                    className="mt-1.5 block w-full rounded-lg border border-neutral-700 bg-neutral-800 px-4 py-2.5 text-white placeholder:text-neutral-500 focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
-                    placeholder="example.com or 192.168.1.1"
-                  />
+              <div className="grid sm:grid-cols-2 gap-4">
+                <div className={formData.type === "tcp" ? "" : "sm:col-span-2"}>
+                  <div className="space-y-2">
+                    <Label htmlFor="hostname">Hostname *</Label>
+                    <Input
+                      id="hostname"
+                      type="text"
+                      required
+                      value={formData.hostname}
+                      onChange={(e) => updateField("hostname", e.target.value)}
+                      placeholder="example.com or 192.168.1.1"
+                      className="h-11"
+                    />
+                  </div>
                 </div>
                 {formData.type === "tcp" && (
-                  <div>
-                    <Label htmlFor="port" className="text-neutral-300">
-                      Port *
-                    </Label>
-                    <input
+                  <div className="space-y-2">
+                    <Label htmlFor="port">Port *</Label>
+                    <Input
                       id="port"
                       type="number"
                       required
@@ -359,8 +360,8 @@ export default function NewMonitorPage() {
                       onChange={(e) =>
                         updateField("port", parseInt(e.target.value))
                       }
-                      className="mt-1.5 block w-full rounded-lg border border-neutral-700 bg-neutral-800 px-4 py-2.5 text-white placeholder:text-neutral-500 focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
                       placeholder="443"
+                      className="h-11"
                     />
                   </div>
                 )}
@@ -368,36 +369,32 @@ export default function NewMonitorPage() {
             )}
 
             {/* Description */}
-            <div>
-              <Label htmlFor="description" className="text-neutral-300">
-                Description (optional)
-              </Label>
-              <textarea
+            <div className="space-y-2">
+              <Label htmlFor="description">Description (optional)</Label>
+              <Textarea
                 id="description"
                 rows={2}
                 value={formData.description}
                 onChange={(e) => updateField("description", e.target.value)}
-                className="mt-1.5 block w-full rounded-lg border border-neutral-700 bg-neutral-800 px-4 py-2.5 text-white placeholder:text-neutral-500 focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500 resize-none"
                 placeholder="Add notes about this monitor..."
+                className="resize-none"
               />
             </div>
           </CardContent>
         </Card>
 
         {/* Advanced Settings */}
-        <Card className="bg-neutral-900/50 border-neutral-800">
+        <Card className="glass-card">
           <CardHeader>
-            <CardTitle className="text-white">Advanced Settings</CardTitle>
+            <CardTitle>Advanced Settings</CardTitle>
             <CardDescription>Fine-tune check behavior</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-3 gap-4">
-              <div>
-                <Label htmlFor="interval" className="text-neutral-300">
-                  Check Interval
-                </Label>
-                <div className="mt-1.5 relative">
-                  <input
+              <div className="space-y-2">
+                <Label htmlFor="interval">Check Interval</Label>
+                <div className="relative">
+                  <Input
                     id="interval"
                     type="number"
                     min="60"
@@ -406,20 +403,18 @@ export default function NewMonitorPage() {
                     onChange={(e) =>
                       updateField("interval", parseInt(e.target.value))
                     }
-                    className="block w-full rounded-lg border border-neutral-700 bg-neutral-800 px-4 py-2.5 pr-12 text-white focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
+                    className="h-11 pr-12"
                   />
-                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-neutral-500 text-sm">
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">
                     sec
                   </span>
                 </div>
               </div>
 
-              <div>
-                <Label htmlFor="timeout" className="text-neutral-300">
-                  Timeout
-                </Label>
-                <div className="mt-1.5 relative">
-                  <input
+              <div className="space-y-2">
+                <Label htmlFor="timeout">Timeout</Label>
+                <div className="relative">
+                  <Input
                     id="timeout"
                     type="number"
                     min="1"
@@ -428,19 +423,17 @@ export default function NewMonitorPage() {
                     onChange={(e) =>
                       updateField("timeout", parseInt(e.target.value))
                     }
-                    className="block w-full rounded-lg border border-neutral-700 bg-neutral-800 px-4 py-2.5 pr-12 text-white focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
+                    className="h-11 pr-12"
                   />
-                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-neutral-500 text-sm">
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">
                     sec
                   </span>
                 </div>
               </div>
 
-              <div>
-                <Label htmlFor="max_retries" className="text-neutral-300">
-                  Retries
-                </Label>
-                <input
+              <div className="space-y-2">
+                <Label htmlFor="max_retries">Retries</Label>
+                <Input
                   id="max_retries"
                   type="number"
                   min="0"
@@ -449,11 +442,11 @@ export default function NewMonitorPage() {
                   onChange={(e) =>
                     updateField("max_retries", parseInt(e.target.value))
                   }
-                  className="mt-1.5 block w-full rounded-lg border border-neutral-700 bg-neutral-800 px-4 py-2.5 text-white focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
+                  className="h-11"
                 />
               </div>
             </div>
-            <p className="mt-3 text-xs text-neutral-500">
+            <p className="mt-3 text-xs text-muted-foreground">
               Monitor will be marked DOWN after {formData.max_retries + 1}{" "}
               consecutive failures
             </p>
@@ -465,11 +458,11 @@ export default function NewMonitorPage() {
           <Button
             type="submit"
             disabled={loading || success}
-            className="flex-1 bg-green-600 hover:bg-green-700 text-white py-3"
+            className="flex-1 h-11 shadow-lg shadow-primary/20"
           >
             {loading ? (
               <>
-                <div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                 Creating...
               </>
             ) : success ? (
@@ -482,11 +475,7 @@ export default function NewMonitorPage() {
             )}
           </Button>
           <Link href="/dashboard/monitors">
-            <Button
-              type="button"
-              variant="outline"
-              className="border-neutral-700 hover:bg-neutral-800"
-            >
+            <Button type="button" variant="outline" className="h-11">
               Cancel
             </Button>
           </Link>

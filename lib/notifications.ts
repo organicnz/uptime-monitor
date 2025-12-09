@@ -23,19 +23,34 @@ export interface EmailConfig {
   email: string;
 }
 
+export interface PushoverConfig {
+  user_key: string;
+  token: string;
+  priority?: number;
+  sound?: string;
+}
+
+export interface TeamsConfig {
+  webhook_url: string;
+}
+
 export type NotificationConfig =
   | TelegramConfig
   | DiscordConfig
   | SlackConfig
   | WebhookConfig
-  | EmailConfig;
+  | EmailConfig
+  | PushoverConfig
+  | TeamsConfig;
 
 export type NotificationType =
   | "email"
   | "discord"
   | "slack"
   | "webhook"
-  | "telegram";
+  | "telegram"
+  | "pushover"
+  | "teams";
 
 export interface NotificationPayload {
   title: string;
@@ -198,6 +213,109 @@ export async function sendSlackNotification(
   }
 }
 
+// Send Pushover notification
+export async function sendPushoverNotification(
+  config: PushoverConfig,
+  payload: NotificationPayload,
+): Promise<{ success: boolean; error?: string }> {
+  const { user_key, token, priority, sound } = config;
+
+  try {
+    const formData = new FormData();
+    formData.append("user", user_key);
+    formData.append("token", token);
+    formData.append("title", payload.title);
+    formData.append("message", payload.message);
+    if (priority) formData.append("priority", priority.toString());
+    if (sound) formData.append("sound", sound);
+    if (payload.monitorUrl) formData.append("url", payload.monitorUrl);
+    if (payload.monitorName) formData.append("url_title", payload.monitorName);
+    if (payload.timestamp)
+      formData.append(
+        "timestamp",
+        Math.floor(new Date(payload.timestamp).getTime() / 1000).toString(),
+      );
+
+    const response = await fetch("https://api.pushover.net/1/messages.json", {
+      method: "POST",
+      body: formData,
+    });
+
+    const data = await response.json();
+
+    if (!response.ok || data.status !== 1) {
+      return {
+        success: false,
+        error:
+          data.errors?.join(", ") ||
+          `Pushover API error: ${response.statusText}`,
+      };
+    }
+
+    return { success: true };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Unknown error",
+    };
+  }
+}
+
+// Send Microsoft Teams notification
+export async function sendTeamsNotification(
+  config: TeamsConfig,
+  payload: NotificationPayload,
+): Promise<{ success: boolean; error?: string }> {
+  const themeColor =
+    payload.status === "up"
+      ? "00FF00" // Green
+      : payload.status === "down"
+        ? "FF0000" // Red
+        : "FFFF00"; // Yellow
+
+  try {
+    const response = await fetch(config.webhook_url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        "@type": "MessageCard",
+        "@context": "http://schema.org/extensions",
+        themeColor: themeColor,
+        summary: payload.title,
+        sections: [
+          {
+            activityTitle: payload.title,
+            activitySubtitle: payload.message,
+            facts: [
+              payload.monitorName
+                ? { name: "Monitor", value: payload.monitorName }
+                : null,
+              payload.monitorUrl
+                ? { name: "URL", value: payload.monitorUrl }
+                : null,
+              payload.timestamp
+                ? { name: "Time", value: payload.timestamp }
+                : null,
+            ].filter(Boolean),
+            markdown: true,
+          },
+        ],
+      }),
+    });
+
+    if (!response.ok) {
+      return { success: false, error: `Teams API error: ${response.status}` };
+    }
+
+    return { success: true };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Unknown error",
+    };
+  }
+}
+
 // Send webhook notification
 export async function sendWebhookNotification(
   config: WebhookConfig,
@@ -241,6 +359,10 @@ export async function sendNotification(
       return sendSlackNotification(config as SlackConfig, payload);
     case "webhook":
       return sendWebhookNotification(config as WebhookConfig, payload);
+    case "pushover":
+      return sendPushoverNotification(config as PushoverConfig, payload);
+    case "teams":
+      return sendTeamsNotification(config as TeamsConfig, payload);
     case "email":
       // Email would require additional setup (SMTP, SendGrid, etc.)
       return {

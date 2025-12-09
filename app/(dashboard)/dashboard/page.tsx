@@ -9,6 +9,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { LiveMonitorsList } from "@/components/live-monitors";
 import {
   Activity,
   AlertTriangle,
@@ -17,10 +18,7 @@ import {
   Plus,
   TrendingUp,
   Zap,
-  Globe,
-  Server,
-  Shield,
-  ArrowUpRight,
+  Clock,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 
@@ -56,7 +54,6 @@ export default async function DashboardPage() {
 
   const monitors = (monitorsData || []) as Monitor[];
 
-  // Fetch recent heartbeats (last 24 hours)
   const yesterday = new Date();
   yesterday.setDate(yesterday.getDate() - 1);
 
@@ -79,7 +76,6 @@ export default async function DashboardPage() {
 
   const recentHeartbeats = (recentChecksData || []) as unknown as Heartbeat[];
 
-  // Get latest heartbeat per monitor
   const latestByMonitor = new Map<string, Heartbeat>();
   recentHeartbeats.forEach((hb) => {
     if (!latestByMonitor.has(hb.monitor_id)) {
@@ -87,7 +83,6 @@ export default async function DashboardPage() {
     }
   });
 
-  // Calculate stats
   const upMonitors = monitors.filter((m) => {
     const hb = latestByMonitor.get(m.id);
     return hb && hb.status === 1;
@@ -105,7 +100,7 @@ export default async function DashboardPage() {
             recentHeartbeats.length) *
           100
         ).toFixed(1)
-      : "0.0";
+      : "100.0";
 
   const validPings = recentHeartbeats.filter(
     (c) => c.ping !== null && c.ping > 0,
@@ -136,69 +131,19 @@ export default async function DashboardPage() {
 
   const activeIncidents = (incidentsData || []) as Incident[];
 
-  const typeIcons: Record<string, typeof Globe> = {
-    http: Globe,
-    https: Shield,
-    tcp: Server,
-    ping: Zap,
-    keyword: Globe,
-    dns: Server,
-  };
-
-  const getMonitorStatus = (monitorId: string) => {
-    const hb = latestByMonitor.get(monitorId);
-    if (!hb)
-      return {
-        status: "pending",
-        color: "text-neutral-400",
-        bg: "bg-neutral-500/20",
-        icon: AlertTriangle,
-        label: "Pending",
-      };
-
-    if (hb.status === 1)
-      return {
-        status: "up",
-        color: "text-green-400",
-        bg: "bg-green-500/20",
-        icon: CheckCircle2,
-        label: "Up",
-        ping: hb.ping,
-      };
-
-    if (hb.status === 0)
-      return {
-        status: "down",
-        color: "text-red-400",
-        bg: "bg-red-500/20",
-        icon: XCircle,
-        label: "Down",
-      };
-
-    return {
-      status: "pending",
-      color: "text-neutral-400",
-      bg: "bg-neutral-500/20",
-      icon: AlertTriangle,
-      label: "Pending",
-    };
-  };
-
   return (
     <div className="space-y-8">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-green-400 to-emerald-500 bg-clip-text text-transparent">
-            Dashboard
-          </h1>
-          <p className="text-neutral-400 mt-1">
+          <h1 className="text-3xl font-bold gradient-text">Dashboard</h1>
+          <p className="text-muted-foreground mt-1">
             Welcome back! Here&apos;s your uptime overview.
           </p>
         </div>
         <Link href="/dashboard/monitors/new">
-          <Button className="bg-green-600 hover:bg-green-700 text-white">
-            <Plus className="h-4 w-4 mr-2" />
+          <Button className="gap-2 shadow-lg shadow-primary/20">
+            <Plus className="h-4 w-4" />
             Add Monitor
           </Button>
         </Link>
@@ -206,19 +151,19 @@ export default async function DashboardPage() {
 
       {/* Active Incidents Banner */}
       {activeIncidents.length > 0 && (
-        <Card className="border-red-800 bg-gradient-to-r from-red-950/50 to-orange-950/30">
+        <Card className="border-destructive/50 bg-destructive/5 status-glow-down">
           <CardContent className="py-4">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-4">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-red-500/20 rounded-lg">
-                  <AlertTriangle className="h-5 w-5 text-red-400" />
+                <div className="p-2.5 bg-destructive/20 rounded-xl">
+                  <AlertTriangle className="h-5 w-5 text-destructive" />
                 </div>
                 <div>
-                  <p className="font-semibold text-red-200">
+                  <p className="font-semibold text-destructive">
                     {activeIncidents.length} Active Incident
                     {activeIncidents.length > 1 ? "s" : ""}
                   </p>
-                  <p className="text-sm text-red-400">
+                  <p className="text-sm text-muted-foreground">
                     {activeIncidents.map((i) => i.monitors.name).join(", ")}{" "}
                     experiencing issues
                   </p>
@@ -230,7 +175,7 @@ export default async function DashboardPage() {
                 <Button
                   variant="outline"
                   size="sm"
-                  className="border-red-700 text-red-300 hover:bg-red-900/50"
+                  className="border-destructive/30 hover:bg-destructive/10"
                 >
                   View Details
                 </Button>
@@ -241,167 +186,77 @@ export default async function DashboardPage() {
       )}
 
       {/* Stats Grid */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
-        <Card className="bg-neutral-900/50 border-neutral-800">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-neutral-400">Total</p>
-                <p className="text-3xl font-bold text-white">
-                  {monitors.length}
-                </p>
-              </div>
-              <div className="p-3 bg-blue-500/20 rounded-xl">
-                <Activity className="h-6 w-6 text-blue-400" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-neutral-900/50 border-neutral-800">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-neutral-400">Up</p>
-                <p className="text-3xl font-bold text-green-400">
-                  {upMonitors}
-                </p>
-              </div>
-              <div className="p-3 bg-green-500/20 rounded-xl">
-                <CheckCircle2 className="h-6 w-6 text-green-400" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-neutral-900/50 border-neutral-800">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-neutral-400">Down</p>
-                <p className="text-3xl font-bold text-red-400">
-                  {downMonitors}
-                </p>
-              </div>
-              <div className="p-3 bg-red-500/20 rounded-xl">
-                <XCircle className="h-6 w-6 text-red-400" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-neutral-900/50 border-neutral-800">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-neutral-400">Uptime (24h)</p>
-                <p className="text-3xl font-bold text-green-400">
-                  {uptimePercentage}%
-                </p>
-              </div>
-              <div className="p-3 bg-green-500/20 rounded-xl">
-                <TrendingUp className="h-6 w-6 text-green-400" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-neutral-900/50 border-neutral-800">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-neutral-400">Avg Response</p>
-                <p className="text-3xl font-bold text-white">
-                  {avgResponseTime}
-                  <span className="text-lg text-neutral-500">ms</span>
-                </p>
-              </div>
-              <div className="p-3 bg-purple-500/20 rounded-xl">
-                <Zap className="h-6 w-6 text-purple-400" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+        <StatsCard
+          label="Total Monitors"
+          value={monitors.length}
+          icon={Activity}
+          iconColor="text-blue-500"
+          iconBg="bg-blue-500/10"
+        />
+        <StatsCard
+          label="Operational"
+          value={upMonitors}
+          icon={CheckCircle2}
+          iconColor="text-emerald-500"
+          iconBg="bg-emerald-500/10"
+          valueColor="text-emerald-500"
+          glow
+        />
+        <StatsCard
+          label="Down"
+          value={downMonitors}
+          icon={XCircle}
+          iconColor="text-red-500"
+          iconBg="bg-red-500/10"
+          valueColor={downMonitors > 0 ? "text-red-500" : undefined}
+        />
+        <StatsCard
+          label="Uptime (24h)"
+          value={`${uptimePercentage}%`}
+          icon={TrendingUp}
+          iconColor="text-emerald-500"
+          iconBg="bg-emerald-500/10"
+          valueColor="text-emerald-500"
+        />
+        <StatsCard
+          label="Avg Response"
+          value={avgResponseTime}
+          suffix="ms"
+          icon={Zap}
+          iconColor="text-amber-500"
+          iconBg="bg-amber-500/10"
+        />
       </div>
 
       {/* Monitors Grid */}
       <div>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-semibold text-white">Your Monitors</h2>
+        <div className="flex items-center justify-between mb-5">
+          <h2 className="text-xl font-semibold">Your Monitors</h2>
           <Link
             href="/dashboard/monitors"
-            className="text-sm text-green-400 hover:text-green-300"
+            className="text-sm text-primary hover:text-primary/80 font-medium transition-colors"
           >
             View all →
           </Link>
         </div>
 
         {monitors.length > 0 ? (
-          <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-            {monitors.slice(0, 9).map((monitor) => {
-              const status = getMonitorStatus(monitor.id);
-              const StatusIcon = status.icon;
-              const TypeIcon = typeIcons[monitor.type] || Globe;
-              const latestHb = latestByMonitor.get(monitor.id);
-
-              return (
-                <Link
-                  key={monitor.id}
-                  href={`/dashboard/monitors/${monitor.id}`}
-                >
-                  <Card className="bg-neutral-900/50 border-neutral-800 hover:border-green-500/50 hover:bg-neutral-800/50 transition-all cursor-pointer group h-full">
-                    <CardContent className="p-4">
-                      <div className="flex items-start justify-between mb-3">
-                        <div className={`relative p-2 rounded-xl ${status.bg}`}>
-                          <StatusIcon className={`h-5 w-5 ${status.color}`} />
-                          {status.status === "up" && (
-                            <span className="absolute -top-0.5 -right-0.5 h-2 w-2 bg-green-400 rounded-full animate-pulse" />
-                          )}
-                        </div>
-                        <ArrowUpRight className="h-4 w-4 text-neutral-600 group-hover:text-green-400 transition-colors" />
-                      </div>
-
-                      <h3 className="font-semibold text-white group-hover:text-green-400 transition-colors truncate mb-1">
-                        {monitor.name}
-                      </h3>
-
-                      <p className="text-sm text-neutral-400 truncate mb-3">
-                        {monitor.url || monitor.hostname || "No endpoint"}
-                      </p>
-
-                      <div className="flex items-center justify-between text-xs text-neutral-500">
-                        <div className="flex items-center gap-1.5">
-                          <TypeIcon className="h-3 w-3" />
-                          <span className="uppercase">{monitor.type}</span>
-                        </div>
-                        {latestHb?.ping && (
-                          <span className="text-green-400 font-medium">
-                            {latestHb.ping}ms
-                          </span>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                </Link>
-              );
-            })}
-          </div>
+          <LiveMonitorsList monitors={monitors} />
         ) : (
-          <Card className="bg-neutral-900/50 border-neutral-800">
+          <Card className="glass-card">
             <CardContent className="flex flex-col items-center justify-center py-16">
-              <div className="p-4 bg-green-500/20 rounded-2xl mb-4">
-                <Activity className="h-12 w-12 text-green-400" />
+              <div className="p-4 bg-primary/10 rounded-2xl mb-4">
+                <Activity className="h-12 w-12 text-primary" />
               </div>
-              <h3 className="text-xl font-semibold text-white mb-2">
-                No monitors yet
-              </h3>
-              <p className="text-neutral-400 mb-6 text-center max-w-md">
+              <h3 className="text-xl font-semibold mb-2">No monitors yet</h3>
+              <p className="text-muted-foreground mb-6 text-center max-w-md">
                 Create your first monitor to start tracking uptime and
                 performance.
               </p>
               <Link href="/dashboard/monitors/new">
-                <Button className="bg-green-600 hover:bg-green-700 text-white">
-                  <Plus className="h-4 w-4 mr-2" />
+                <Button className="gap-2">
+                  <Plus className="h-4 w-4" />
                   Create Your First Monitor
                 </Button>
               </Link>
@@ -412,52 +267,51 @@ export default async function DashboardPage() {
 
       {/* Recent Activity */}
       {recentHeartbeats.length > 0 && (
-        <Card className="bg-neutral-900/50 border-neutral-800">
+        <Card className="glass-card">
           <CardHeader>
-            <CardTitle className="text-white">Recent Activity</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              <Clock className="h-5 w-5 text-muted-foreground" />
+              Recent Activity
+            </CardTitle>
             <CardDescription>
               Latest health checks across all monitors
             </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
-              {recentHeartbeats.slice(0, 10).map((hb) => {
+              {recentHeartbeats.slice(0, 8).map((hb) => {
                 const monitor = monitors.find((m) => m.id === hb.monitor_id);
                 if (!monitor) return null;
 
-                const Icon =
-                  hb.status === 1
-                    ? CheckCircle2
-                    : hb.status === 0
-                      ? XCircle
-                      : AlertTriangle;
-                const color =
-                  hb.status === 1
-                    ? "text-green-400"
-                    : hb.status === 0
-                      ? "text-red-400"
-                      : "text-neutral-400";
-                const bg =
-                  hb.status === 1
-                    ? "bg-green-500/20"
-                    : hb.status === 0
-                      ? "bg-red-500/20"
-                      : "bg-neutral-500/20";
+                const isUp = hb.status === 1;
+                const isDown = hb.status === 0;
 
                 return (
                   <div
                     key={hb.id}
-                    className="flex items-center justify-between p-3 rounded-lg bg-neutral-800/50 border border-neutral-700/50"
+                    className="flex items-center justify-between p-3 rounded-xl bg-muted/30 hover:bg-muted/50 transition-colors"
                   >
                     <div className="flex items-center gap-3">
-                      <div className={`p-1.5 rounded-lg ${bg}`}>
-                        <Icon className={`h-3.5 w-3.5 ${color}`} />
+                      <div
+                        className={`p-1.5 rounded-lg ${
+                          isUp
+                            ? "bg-emerald-500/20"
+                            : isDown
+                              ? "bg-red-500/20"
+                              : "bg-muted"
+                        }`}
+                      >
+                        {isUp ? (
+                          <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                        ) : isDown ? (
+                          <XCircle className="h-4 w-4 text-red-500" />
+                        ) : (
+                          <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+                        )}
                       </div>
                       <div>
-                        <p className="text-sm font-medium text-white">
-                          {monitor.name}
-                        </p>
-                        <p className="text-xs text-neutral-500">
+                        <p className="text-sm font-medium">{monitor.name}</p>
+                        <p className="text-xs text-muted-foreground">
                           {formatDistanceToNow(new Date(hb.time), {
                             addSuffix: true,
                           })}
@@ -465,7 +319,7 @@ export default async function DashboardPage() {
                       </div>
                     </div>
                     {hb.ping && (
-                      <span className="text-sm text-green-400">
+                      <span className="text-sm font-medium text-emerald-500">
                         {hb.ping}ms
                       </span>
                     )}
@@ -477,5 +331,48 @@ export default async function DashboardPage() {
         </Card>
       )}
     </div>
+  );
+}
+
+function StatsCard({
+  label,
+  value,
+  suffix,
+  icon: Icon,
+  iconColor,
+  iconBg,
+  valueColor,
+  glow,
+}: {
+  label: string;
+  value: string | number;
+  suffix?: string;
+  icon: typeof Activity;
+  iconColor: string;
+  iconBg: string;
+  valueColor?: string;
+  glow?: boolean;
+}) {
+  return (
+    <Card className={`glass-card ${glow ? "status-glow-up" : ""}`}>
+      <CardContent className="pt-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm text-muted-foreground">{label}</p>
+            <p className={`text-3xl font-bold ${valueColor || ""}`}>
+              {value}
+              {suffix && (
+                <span className="text-lg text-muted-foreground ml-0.5">
+                  {suffix}
+                </span>
+              )}
+            </p>
+          </div>
+          <div className={`p-3 rounded-xl ${iconBg}`}>
+            <Icon className={`h-6 w-6 ${iconColor}`} />
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
