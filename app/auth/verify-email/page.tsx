@@ -1,13 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Activity, Mail, CheckCircle2 } from "lucide-react";
+import { Activity, Mail, CheckCircle2, Loader2 } from "lucide-react";
 import { resendVerificationEmail } from "@/lib/actions/auth";
 
-export default function VerifyEmailPage() {
+function VerifyEmailContent() {
   const searchParams = useSearchParams();
   const email = searchParams.get("email") || "";
   const [loading, setLoading] = useState(false);
@@ -29,6 +29,73 @@ export default function VerifyEmailPage() {
     setLoading(false);
   };
 
+  return (
+    <div className="w-full max-w-sm space-y-6 text-center">
+      <div className="mx-auto w-16 h-16 bg-blue-100 dark:bg-blue-900/20 rounded-full flex items-center justify-center">
+        <Mail className="h-8 w-8 text-blue-600 dark:text-blue-400" />
+      </div>
+
+      <div className="space-y-2">
+        <h1 className="text-2xl font-bold tracking-tight">Check your email</h1>
+        <p className="text-neutral-500 dark:text-neutral-400">
+          We sent a verification link to{" "}
+          {email && (
+            <span className="font-medium text-neutral-900 dark:text-neutral-100">
+              {email}
+            </span>
+          )}
+        </p>
+      </div>
+
+      {error && (
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 px-4 py-3 rounded-md text-sm">
+          {error}
+        </div>
+      )}
+
+      {resent && (
+        <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-600 dark:text-green-400 px-4 py-3 rounded-md text-sm flex items-center justify-center gap-2">
+          <CheckCircle2 className="h-4 w-4" />
+          Verification email resent!
+        </div>
+      )}
+
+      <div className="space-y-3 pt-4">
+        <Button
+          onClick={handleResend}
+          variant="outline"
+          className="w-full"
+          disabled={loading || !email}
+        >
+          {loading ? "Sending..." : "Resend verification email"}
+        </Button>
+
+        <Link href="/login">
+          <Button variant="ghost" className="w-full">
+            Back to login
+          </Button>
+        </Link>
+      </div>
+
+      <p className="text-xs text-neutral-500 dark:text-neutral-400 pt-4">
+        Didn&apos;t receive the email? Check your spam folder or try resending.
+      </p>
+    </div>
+  );
+}
+
+function LoadingFallback() {
+  return (
+    <div className="w-full max-w-sm space-y-6 text-center">
+      <div className="mx-auto w-16 h-16 bg-blue-100 dark:bg-blue-900/20 rounded-full flex items-center justify-center">
+        <Loader2 className="h-8 w-8 text-blue-600 dark:text-blue-400 animate-spin" />
+      </div>
+      <p className="text-neutral-500">Loading...</p>
+    </div>
+  );
+}
+
+export default function VerifyEmailPage() {
   return (
     <div className="min-h-screen grid lg:grid-cols-2">
       {/* Left: Branding */}
@@ -62,60 +129,9 @@ export default function VerifyEmailPage() {
 
       {/* Right: Content */}
       <div className="flex items-center justify-center p-8 bg-white dark:bg-neutral-950">
-        <div className="w-full max-w-sm space-y-6 text-center">
-          <div className="mx-auto w-16 h-16 bg-blue-100 dark:bg-blue-900/20 rounded-full flex items-center justify-center">
-            <Mail className="h-8 w-8 text-blue-600 dark:text-blue-400" />
-          </div>
-
-          <div className="space-y-2">
-            <h1 className="text-2xl font-bold tracking-tight">
-              Check your email
-            </h1>
-            <p className="text-neutral-500 dark:text-neutral-400">
-              We sent a verification link to{" "}
-              {email && (
-                <span className="font-medium text-neutral-900 dark:text-neutral-100">
-                  {email}
-                </span>
-              )}
-            </p>
-          </div>
-
-          {error && (
-            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 px-4 py-3 rounded-md text-sm">
-              {error}
-            </div>
-          )}
-
-          {resent && (
-            <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-600 dark:text-green-400 px-4 py-3 rounded-md text-sm flex items-center justify-center gap-2">
-              <CheckCircle2 className="h-4 w-4" />
-              Verification email resent!
-            </div>
-          )}
-
-          <div className="space-y-3 pt-4">
-            <Button
-              onClick={handleResend}
-              variant="outline"
-              className="w-full"
-              disabled={loading || !email}
-            >
-              {loading ? "Sending..." : "Resend verification email"}
-            </Button>
-
-            <Link href="/login">
-              <Button variant="ghost" className="w-full">
-                Back to login
-              </Button>
-            </Link>
-          </div>
-
-          <p className="text-xs text-neutral-500 dark:text-neutral-400 pt-4">
-            Didn&apos;t receive the email? Check your spam folder or try
-            resending.
-          </p>
-        </div>
+        <Suspense fallback={<LoadingFallback />}>
+          <VerifyEmailContent />
+        </Suspense>
       </div>
     </div>
   );
