@@ -1,21 +1,43 @@
-# Lefthook Configuration
+# Lefthook Configuration - Production Ready
 # Run `npx lefthook install` to set up hooks
 
 pre-commit:
   parallel: true
-  jobs:
-    - name: lint
-      glob: "*.{js,jsx,ts,tsx}"
-      run: npx eslint {staged_files}
-    
-    - name: typecheck
+  commands:
+    typecheck:
+      glob: "*.{ts,tsx}"
       run: npx tsc --noEmit
-    
-    - name: format-check
+
+    lint:
+      glob: "*.{js,jsx,ts,tsx}"
+      run: npx eslint {staged_files} --max-warnings 0
+
+    format-check:
       glob: "*.{js,jsx,ts,tsx,json,css,md}"
-      run: scripts/lefthook/format-check.sh {staged_files}
+      run: npx prettier --check {staged_files}
 
 pre-push:
-  jobs:
-    - name: build
+  commands:
+    build:
       run: npm run build
+
+    # Optional: Run tests before push
+    # test:
+    #   run: npm test
+
+# Commit message linting
+commit-msg:
+  commands:
+    # Enforce conventional commits format
+    message-format:
+      run: |
+        if ! grep -qE '^(feat|fix|docs|style|refactor|perf|test|chore|build|ci|revert)(\(.+\))?: .{1,}$' {1}; then
+          echo "❌ Commit message must follow conventional commits format:"
+          echo "   type(scope?): subject"
+          echo ""  
+          echo "Types: feat, fix, docs, style, refactor, perf, test, chore, build, ci, revert"
+          echo ""
+          echo "Example: feat: add monitor status badges"
+          echo "Example: fix(auth): resolve login redirect issue"
+          exit 1
+        fi
