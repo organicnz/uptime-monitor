@@ -19,26 +19,32 @@ SECRET_PATTERNS=(
     "access[_-]?token\s*[:=]\s*['\"][a-zA-Z0-9]"
     "auth[_-]?token\s*[:=]\s*['\"][a-zA-Z0-9]"
     "bearer\s+[a-zA-Z0-9_-]{20,}"
-    
+
     # AWS
     "AKIA[0-9A-Z]{16}"
     "aws[_-]?secret"
-    
-    # Supabase (but allow env var references)
+
+    # Supabase tokens and JWTs
+    "sbp_[a-zA-Z0-9]{30,}"
+    "sb_secret_[a-zA-Z0-9_-]{20,}"
     "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9\."
-    
+
+    # QStash/Upstash tokens
+    "QSTASH_TOKEN\s*[:=]\s*['\"]eyJ"
+    "sig_[a-zA-Z0-9]{20,}"
+
     # Private keys
     "-----BEGIN (RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----"
     "-----BEGIN PGP PRIVATE KEY BLOCK-----"
-    
+
     # Passwords
     "password\s*[:=]\s*['\"][^'\"]{8,}"
-    
+
     # Database URLs with credentials
     "postgres://[^:]+:[^@]+@"
     "mysql://[^:]+:[^@]+@"
     "mongodb://[^:]+:[^@]+@"
-    
+
     # Generic secrets
     "secret[_-]?key\s*[:=]\s*['\"][a-zA-Z0-9]"
 )
