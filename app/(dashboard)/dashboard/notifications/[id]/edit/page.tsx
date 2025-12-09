@@ -107,7 +107,6 @@ export default function EditNotificationPage(props: {
         });
         setLoading(false);
       } catch (err) {
-        console.error("Error loading channel:", err);
         setError(err instanceof Error ? err.message : "Failed to load channel");
         setLoading(false);
       }
@@ -164,7 +163,6 @@ export default function EditNotificationPage(props: {
         router.push("/dashboard/notifications");
       }, 500);
     } catch (err) {
-      console.error("Error updating channel:", err);
       setError(err instanceof Error ? err.message : "Failed to update channel");
       setSaving(false);
     }
@@ -192,7 +190,6 @@ export default function EditNotificationPage(props: {
       toast.success("Channel deleted");
       router.push("/dashboard/notifications");
     } catch (err) {
-      console.error("Error deleting channel:", err);
       setError(err instanceof Error ? err.message : "Failed to delete channel");
       setDeleting(false);
     }
@@ -248,207 +245,209 @@ export default function EditNotificationPage(props: {
   const Icon = config.icon;
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
-      {/* Header */}
-      <div>
-        <Link
-          href="/dashboard/notifications"
-          className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground transition-colors mb-4"
-        >
-          <ArrowLeft className="h-4 w-4 mr-1" />
-          Back to Notifications
-        </Link>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-primary/10">
-              <Icon className="h-5 w-5 text-primary" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold">
-                Edit {config.label} Channel
-              </h1>
-              <p className="text-muted-foreground">{channel.name}</p>
+    <div className="p-4 sm:p-6 lg:p-8">
+      <div className="max-w-2xl mx-auto space-y-6">
+        {/* Header */}
+        <div>
+          <Link
+            href="/dashboard/notifications"
+            className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground transition-colors mb-4"
+          >
+            <ArrowLeft className="h-4 w-4 mr-1" />
+            Back to Notifications
+          </Link>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-primary/10">
+                <Icon className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold">
+                  Edit {config.label} Channel
+                </h1>
+                <p className="text-muted-foreground">{channel.name}</p>
+              </div>
             </div>
           </div>
         </div>
-      </div>
 
-      {error && (
-        <div className="flex items-center gap-3 bg-destructive/10 border border-destructive/30 text-destructive px-4 py-3 rounded-lg">
-          <AlertCircle className="h-5 w-5 flex-shrink-0" />
-          {error}
-        </div>
-      )}
+        {error && (
+          <div className="flex items-center gap-3 bg-destructive/10 border border-destructive/30 text-destructive px-4 py-3 rounded-lg">
+            <AlertCircle className="h-5 w-5 flex-shrink-0" />
+            {error}
+          </div>
+        )}
 
-      {success && (
-        <div className="flex items-center gap-3 bg-emerald-500/10 border border-emerald-500/30 text-emerald-500 px-4 py-3 rounded-lg">
-          <CheckCircle2 className="h-5 w-5 flex-shrink-0" />
-          Channel updated successfully! Redirecting...
-        </div>
-      )}
+        {success && (
+          <div className="flex items-center gap-3 bg-emerald-500/10 border border-emerald-500/30 text-emerald-500 px-4 py-3 rounded-lg">
+            <CheckCircle2 className="h-5 w-5 flex-shrink-0" />
+            Channel updated successfully! Redirecting...
+          </div>
+        )}
 
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <Card className="glass-card">
-          <CardHeader>
-            <CardTitle>Channel Settings</CardTitle>
-            <CardDescription>
-              Update your {config.label} notification settings
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="name">Channel Name</Label>
-              <Input
-                id="name"
-                value={formData.name}
-                onChange={(e) =>
-                  setFormData({ ...formData, name: e.target.value })
-                }
-                required
-              />
-            </div>
-
-            {channel.type === "telegram" && (
-              <>
-                <div className="space-y-2">
-                  <Label htmlFor="bot_token">Bot Token</Label>
-                  <Input
-                    id="bot_token"
-                    value={formData.bot_token}
-                    onChange={(e) =>
-                      setFormData({ ...formData, bot_token: e.target.value })
-                    }
-                    placeholder="123456789:ABCdefGHIjklMNOpqrsTUVwxyz"
-                    required
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Get this from @BotFather
-                  </p>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="chat_id">Chat ID</Label>
-                  <Input
-                    id="chat_id"
-                    value={formData.chat_id}
-                    onChange={(e) =>
-                      setFormData({ ...formData, chat_id: e.target.value })
-                    }
-                    placeholder="-1001234567890 or 123456789"
-                    required
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Your user ID or group chat ID
-                  </p>
-                </div>
-              </>
-            )}
-
-            {(channel.type === "discord" ||
-              channel.type === "slack" ||
-              channel.type === "teams" ||
-              channel.type === "webhook") && (
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <Card className="glass-card">
+            <CardHeader>
+              <CardTitle>Channel Settings</CardTitle>
+              <CardDescription>
+                Update your {config.label} notification settings
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="webhook_url">Webhook URL</Label>
+                <Label htmlFor="name">Channel Name</Label>
                 <Input
-                  id="webhook_url"
-                  type="url"
-                  value={formData.webhook_url}
+                  id="name"
+                  value={formData.name}
                   onChange={(e) =>
-                    setFormData({ ...formData, webhook_url: e.target.value })
+                    setFormData({ ...formData, name: e.target.value })
                   }
-                  placeholder="https://..."
                   required
                 />
               </div>
-            )}
 
-            {channel.type === "pushover" && (
-              <>
+              {channel.type === "telegram" && (
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="bot_token">Bot Token</Label>
+                    <Input
+                      id="bot_token"
+                      value={formData.bot_token}
+                      onChange={(e) =>
+                        setFormData({ ...formData, bot_token: e.target.value })
+                      }
+                      placeholder="123456789:ABCdefGHIjklMNOpqrsTUVwxyz"
+                      required
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Get this from @BotFather
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="chat_id">Chat ID</Label>
+                    <Input
+                      id="chat_id"
+                      value={formData.chat_id}
+                      onChange={(e) =>
+                        setFormData({ ...formData, chat_id: e.target.value })
+                      }
+                      placeholder="-1001234567890 or 123456789"
+                      required
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Your user ID or group chat ID
+                    </p>
+                  </div>
+                </>
+              )}
+
+              {(channel.type === "discord" ||
+                channel.type === "slack" ||
+                channel.type === "teams" ||
+                channel.type === "webhook") && (
                 <div className="space-y-2">
-                  <Label htmlFor="user_key">User Key</Label>
+                  <Label htmlFor="webhook_url">Webhook URL</Label>
                   <Input
-                    id="user_key"
-                    value={formData.user_key}
+                    id="webhook_url"
+                    type="url"
+                    value={formData.webhook_url}
                     onChange={(e) =>
-                      setFormData({ ...formData, user_key: e.target.value })
+                      setFormData({ ...formData, webhook_url: e.target.value })
                     }
+                    placeholder="https://..."
                     required
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="api_token">API Token</Label>
-                  <Input
-                    id="api_token"
-                    value={formData.api_token}
-                    onChange={(e) =>
-                      setFormData({ ...formData, api_token: e.target.value })
-                    }
-                    required
-                  />
+              )}
+
+              {channel.type === "pushover" && (
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="user_key">User Key</Label>
+                    <Input
+                      id="user_key"
+                      value={formData.user_key}
+                      onChange={(e) =>
+                        setFormData({ ...formData, user_key: e.target.value })
+                      }
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="api_token">API Token</Label>
+                    <Input
+                      id="api_token"
+                      value={formData.api_token}
+                      onChange={(e) =>
+                        setFormData({ ...formData, api_token: e.target.value })
+                      }
+                      required
+                    />
+                  </div>
+                </>
+              )}
+
+              <div className="flex items-center justify-between pt-4 border-t">
+                <div className="space-y-0.5">
+                  <Label htmlFor="active">Active</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Receive notifications from this channel
+                  </p>
                 </div>
-              </>
-            )}
-
-            <div className="flex items-center justify-between pt-4 border-t">
-              <div className="space-y-0.5">
-                <Label htmlFor="active">Active</Label>
-                <p className="text-xs text-muted-foreground">
-                  Receive notifications from this channel
-                </p>
+                <Switch
+                  id="active"
+                  checked={formData.active}
+                  onCheckedChange={(checked) =>
+                    setFormData({ ...formData, active: checked })
+                  }
+                />
               </div>
-              <Switch
-                id="active"
-                checked={formData.active}
-                onCheckedChange={(checked) =>
-                  setFormData({ ...formData, active: checked })
-                }
-              />
-            </div>
 
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label htmlFor="is_default">Default Channel</Label>
-                <p className="text-xs text-muted-foreground">
-                  Auto-assign to new monitors
-                </p>
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label htmlFor="is_default">Default Channel</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Auto-assign to new monitors
+                  </p>
+                </div>
+                <Switch
+                  id="is_default"
+                  checked={formData.is_default}
+                  onCheckedChange={(checked) =>
+                    setFormData({ ...formData, is_default: checked })
+                  }
+                />
               </div>
-              <Switch
-                id="is_default"
-                checked={formData.is_default}
-                onCheckedChange={(checked) =>
-                  setFormData({ ...formData, is_default: checked })
-                }
-              />
+            </CardContent>
+          </Card>
+
+          <div className="flex items-center justify-between">
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={handleDelete}
+              disabled={deleting}
+            >
+              {deleting ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : (
+                <Trash2 className="h-4 w-4 mr-2" />
+              )}
+              Delete Channel
+            </Button>
+
+            <div className="flex gap-3">
+              <Button type="button" variant="outline" onClick={handleTest}>
+                Test
+              </Button>
+              <Button type="submit" disabled={saving}>
+                {saving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                Save Changes
+              </Button>
             </div>
-          </CardContent>
-        </Card>
-
-        <div className="flex items-center justify-between">
-          <Button
-            type="button"
-            variant="destructive"
-            onClick={handleDelete}
-            disabled={deleting}
-          >
-            {deleting ? (
-              <Loader2 className="h-4 w-4 animate-spin mr-2" />
-            ) : (
-              <Trash2 className="h-4 w-4 mr-2" />
-            )}
-            Delete Channel
-          </Button>
-
-          <div className="flex gap-3">
-            <Button type="button" variant="outline" onClick={handleTest}>
-              Test
-            </Button>
-            <Button type="submit" disabled={saving}>
-              {saving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-              Save Changes
-            </Button>
           </div>
-        </div>
-      </form>
+        </form>
+      </div>
     </div>
   );
 }

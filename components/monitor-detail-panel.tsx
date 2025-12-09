@@ -99,7 +99,7 @@ export function MonitorDetailPanel({
   };
 
   return (
-    <div className="flex flex-col overflow-y-auto bg-neutral-950/30">
+    <div className="flex flex-col h-full overflow-y-auto bg-neutral-950/30">
       {/* Header */}
       <div className="p-4 sm:p-6 border-b border-white/5 bg-neutral-900/40 backdrop-blur-sm">
         <div className="flex items-start justify-between gap-3">
@@ -362,7 +362,7 @@ function ResponseChart({
 }) {
   if (heartbeats.length < 2) {
     return (
-      <div className="h-[60px] flex items-center justify-center text-neutral-500 text-sm">
+      <div className="h-[80px] flex items-center justify-center text-neutral-500 text-sm">
         Not enough data for chart
       </div>
     );
@@ -372,19 +372,18 @@ function ResponseChart({
   const chartMax = Math.max(maxPing * 1.1, 100);
 
   return (
-    <div className="h-[60px] flex flex-col">
-      <div className="flex-1 relative">
+    <div className="h-[80px]">
+      <div className="h-full relative">
         {/* Y-axis */}
-        <div className="absolute left-0 top-0 bottom-6 w-10 flex flex-col justify-between text-xs text-neutral-600 pr-2 text-right">
+        <div className="absolute left-0 top-0 h-[40px] w-8 flex flex-col justify-between text-[10px] text-neutral-600 pr-1 text-right">
           <span>{Math.round(chartMax)}</span>
-          <span>{Math.round(chartMax / 2)}</span>
           <span>0</span>
         </div>
 
         {/* Chart */}
-        <div className="ml-12 h-full">
+        <div className="ml-10 h-[56px]">
           <svg
-            className="w-full h-[calc(100%-24px)]"
+            className="w-full h-[40px]"
             preserveAspectRatio="none"
             viewBox="0 0 100 100"
           >

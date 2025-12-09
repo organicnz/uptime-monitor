@@ -30,26 +30,28 @@ export default async function SettingsPage() {
   const profile = data as Profile | null;
 
   return (
-    <div className="space-y-6 max-w-2xl">
-      <div>
-        <h1 className="text-2xl font-bold">Settings</h1>
-        <p className="text-neutral-500 dark:text-neutral-400">
-          Manage your account and monitoring settings
-        </p>
+    <div className="p-4 sm:p-6 lg:p-8">
+      <div className="max-w-2xl mx-auto space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold">Settings</h1>
+          <p className="text-neutral-500 dark:text-neutral-400">
+            Manage your account and monitoring settings
+          </p>
+        </div>
+
+        <AccountSettings
+          user={{
+            id: user.id,
+            email: user.email || "",
+            fullName: profile?.full_name || user.user_metadata?.full_name || "",
+            avatarUrl:
+              profile?.avatar_url || user.user_metadata?.avatar_url || "",
+            provider: user.app_metadata?.provider || "email",
+          }}
+        />
+
+        <CronSettings />
       </div>
-
-      <AccountSettings
-        user={{
-          id: user.id,
-          email: user.email || "",
-          fullName: profile?.full_name || user.user_metadata?.full_name || "",
-          avatarUrl:
-            profile?.avatar_url || user.user_metadata?.avatar_url || "",
-          provider: user.app_metadata?.provider || "email",
-        }}
-      />
-
-      <CronSettings />
     </div>
   );
 }
