@@ -167,172 +167,180 @@ export default function NewNotificationPage() {
   };
 
   return (
-    <div className="max-w-3xl mx-auto space-y-8">
-      <div className="flex items-center gap-4">
-        <Link href="/dashboard/notifications">
-          <Button variant="outline" size="sm">
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back
-          </Button>
-        </Link>
-        <div>
-          <h1 className="text-3xl font-bold">Add Notification Channel</h1>
-          <p className="text-neutral-600 dark:text-neutral-400 mt-1">
-            Configure a new way to receive alerts
-          </p>
+    <div className="p-4 sm:p-6 lg:p-8">
+      <div className="max-w-3xl mx-auto space-y-8">
+        <div className="flex items-center gap-4">
+          <Link href="/dashboard/notifications">
+            <Button variant="outline" size="sm">
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back
+            </Button>
+          </Link>
+          <div>
+            <h1 className="text-3xl font-bold">Add Notification Channel</h1>
+            <p className="text-neutral-600 dark:text-neutral-400 mt-1">
+              Configure a new way to receive alerts
+            </p>
+          </div>
         </div>
-      </div>
 
-      {/* Step 1: Select Type */}
-      {!selectedType && (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {channelTypes.map(({ type, name, icon: Icon, description }) => (
-            <Card
-              key={type}
-              className={`cursor-pointer transition-all hover:border-blue-500 hover:shadow-md ${
-                type === "email" ? "opacity-50 cursor-not-allowed" : ""
-              }`}
-              onClick={() => type !== "email" && setSelectedType(type)}
-            >
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Icon className="h-5 w-5" />
-                  {name}
-                </CardTitle>
-                <CardDescription>{description}</CardDescription>
-              </CardHeader>
-            </Card>
-          ))}
-        </div>
-      )}
+        {/* Step 1: Select Type */}
+        {!selectedType && (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {channelTypes.map(({ type, name, icon: Icon, description }) => (
+              <Card
+                key={type}
+                className={`cursor-pointer transition-all hover:border-blue-500 hover:shadow-md ${
+                  type === "email" ? "opacity-50 cursor-not-allowed" : ""
+                }`}
+                onClick={() => type !== "email" && setSelectedType(type)}
+              >
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Icon className="h-5 w-5" />
+                    {name}
+                  </CardTitle>
+                  <CardDescription>{description}</CardDescription>
+                </CardHeader>
+              </Card>
+            ))}
+          </div>
+        )}
 
-      {/* Step 2: Configure */}
-      {selectedType && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="capitalize">
-              {selectedType} Configuration
-            </CardTitle>
-            <CardDescription>
-              Enter the details for your {selectedType} notification channel
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <div className="space-y-2">
-                <Label htmlFor="name">Channel Name</Label>
-                <Input
-                  id="name"
-                  placeholder="e.g., My Telegram Alerts"
-                  value={formData.name}
-                  onChange={(e) =>
-                    setFormData({ ...formData, name: e.target.value })
-                  }
-                  required
-                />
-              </div>
-
-              {selectedType === "telegram" && (
-                <>
-                  <div className="space-y-2">
-                    <Label htmlFor="bot_token">Bot Token</Label>
-                    <Input
-                      id="bot_token"
-                      placeholder="123456789:ABCdefGHIjklMNOpqrsTUVwxyz"
-                      value={formData.bot_token}
-                      onChange={(e) =>
-                        setFormData({ ...formData, bot_token: e.target.value })
-                      }
-                      required
-                    />
-                    <p className="text-xs text-neutral-500">
-                      Get this from @BotFather
-                    </p>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="chat_id">Chat ID</Label>
-                    <Input
-                      id="chat_id"
-                      placeholder="-1001234567890 or 123456789"
-                      value={formData.chat_id}
-                      onChange={(e) =>
-                        setFormData({ ...formData, chat_id: e.target.value })
-                      }
-                      required
-                    />
-                    <p className="text-xs text-neutral-500">
-                      Your user ID or group chat ID
-                    </p>
-                  </div>
-                </>
-              )}
-
-              {(selectedType === "discord" ||
-                selectedType === "slack" ||
-                selectedType === "webhook") && (
+        {/* Step 2: Configure */}
+        {selectedType && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="capitalize">
+                {selectedType} Configuration
+              </CardTitle>
+              <CardDescription>
+                Enter the details for your {selectedType} notification channel
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleSubmit} className="space-y-6">
                 <div className="space-y-2">
-                  <Label htmlFor="webhook_url">Webhook URL</Label>
+                  <Label htmlFor="name">Channel Name</Label>
                   <Input
-                    id="webhook_url"
-                    type="url"
-                    placeholder="https://..."
-                    value={formData.webhook_url}
+                    id="name"
+                    placeholder="e.g., My Telegram Alerts"
+                    value={formData.name}
                     onChange={(e) =>
-                      setFormData({ ...formData, webhook_url: e.target.value })
+                      setFormData({ ...formData, name: e.target.value })
                     }
                     required
                   />
                 </div>
-              )}
 
-              {error && (
-                <div className="p-3 rounded-lg bg-red-50 dark:bg-red-950 text-red-700 dark:text-red-300 text-sm">
-                  {error}
+                {selectedType === "telegram" && (
+                  <>
+                    <div className="space-y-2">
+                      <Label htmlFor="bot_token">Bot Token</Label>
+                      <Input
+                        id="bot_token"
+                        placeholder="123456789:ABCdefGHIjklMNOpqrsTUVwxyz"
+                        value={formData.bot_token}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            bot_token: e.target.value,
+                          })
+                        }
+                        required
+                      />
+                      <p className="text-xs text-neutral-500">
+                        Get this from @BotFather
+                      </p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="chat_id">Chat ID</Label>
+                      <Input
+                        id="chat_id"
+                        placeholder="-1001234567890 or 123456789"
+                        value={formData.chat_id}
+                        onChange={(e) =>
+                          setFormData({ ...formData, chat_id: e.target.value })
+                        }
+                        required
+                      />
+                      <p className="text-xs text-neutral-500">
+                        Your user ID or group chat ID
+                      </p>
+                    </div>
+                  </>
+                )}
+
+                {(selectedType === "discord" ||
+                  selectedType === "slack" ||
+                  selectedType === "webhook") && (
+                  <div className="space-y-2">
+                    <Label htmlFor="webhook_url">Webhook URL</Label>
+                    <Input
+                      id="webhook_url"
+                      type="url"
+                      placeholder="https://..."
+                      value={formData.webhook_url}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          webhook_url: e.target.value,
+                        })
+                      }
+                      required
+                    />
+                  </div>
+                )}
+
+                {error && (
+                  <div className="p-3 rounded-lg bg-red-50 dark:bg-red-950 text-red-700 dark:text-red-300 text-sm">
+                    {error}
+                  </div>
+                )}
+
+                {testResult && (
+                  <div
+                    className={`p-3 rounded-lg text-sm ${
+                      testResult.success
+                        ? "bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300"
+                        : "bg-red-50 dark:bg-red-950 text-red-700 dark:text-red-300"
+                    }`}
+                  >
+                    {testResult.message}
+                  </div>
+                )}
+
+                <div className="flex gap-3">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setSelectedType(null)}
+                  >
+                    Back
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleTest}
+                    disabled={isLoading || !formData.name}
+                  >
+                    {isLoading ? (
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    ) : null}
+                    Test
+                  </Button>
+                  <Button type="submit" disabled={isLoading}>
+                    {isLoading ? (
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    ) : null}
+                    Create Channel
+                  </Button>
                 </div>
-              )}
-
-              {testResult && (
-                <div
-                  className={`p-3 rounded-lg text-sm ${
-                    testResult.success
-                      ? "bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300"
-                      : "bg-red-50 dark:bg-red-950 text-red-700 dark:text-red-300"
-                  }`}
-                >
-                  {testResult.message}
-                </div>
-              )}
-
-              <div className="flex gap-3">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setSelectedType(null)}
-                >
-                  Back
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={handleTest}
-                  disabled={isLoading || !formData.name}
-                >
-                  {isLoading ? (
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                  ) : null}
-                  Test
-                </Button>
-                <Button type="submit" disabled={isLoading}>
-                  {isLoading ? (
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                  ) : null}
-                  Create Channel
-                </Button>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
-      )}
+              </form>
+            </CardContent>
+          </Card>
+        )}
+      </div>
     </div>
   );
 }
