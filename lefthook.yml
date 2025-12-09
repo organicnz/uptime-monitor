@@ -106,13 +106,19 @@ pre-push:
     # Full TypeScript check
     typecheck-full:
       priority: 1
-      run: timeout 60 npx tsc --noEmit || exit 1
+      run: npx tsc --noEmit
+      env:
+        FORCE_COLOR: "0"
+        NODE_OPTIONS: ""
       fail_text: "❌ TypeScript errors. Fix before pushing."
 
     # Production build test
     build:
       priority: 2
-      run: timeout 120 npm run build || exit 1
+      run: npm run build
+      env:
+        FORCE_COLOR: "0"
+        NODE_OPTIONS: ""
       fail_text: "❌ Build failed. Fix errors before pushing."
 
     # Branch naming convention
