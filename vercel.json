@@ -1,11 +1,5 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "security": {
-    "deployment_protection": {
-      "preview": "all",
-      "prod": "none"
-    }
-  },
   "headers": [
     {
       "source": "/api/(.*)",
