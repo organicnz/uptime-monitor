@@ -1,0 +1,21 @@
+# Lefthook Configuration
+# Run `npx lefthook install` to set up hooks
+
+pre-commit:
+  parallel: true
+  jobs:
+    - name: lint
+      glob: "*.{js,jsx,ts,tsx}"
+      run: npx eslint {staged_files}
+    
+    - name: typecheck
+      run: npx tsc --noEmit
+    
+    - name: format-check
+      glob: "*.{js,jsx,ts,tsx,json,css,md}"
+      run: scripts/lefthook/format-check.sh {staged_files}
+
+pre-push:
+  jobs:
+    - name: build
+      run: npm run build
