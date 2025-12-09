@@ -4,25 +4,21 @@ import { useState, useSyncExternalStore } from "react";
 import { Moon, Sun } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-// Helper to safely access localStorage
 function getThemeFromStorage(): "light" | "dark" {
   if (typeof window === "undefined") return "dark";
   return (localStorage.getItem("theme") as "light" | "dark") || "dark";
 }
 
-// Subscribe function for useSyncExternalStore
 function subscribe(callback: () => void) {
   window.addEventListener("storage", callback);
   return () => window.removeEventListener("storage", callback);
 }
 
-// Server snapshot always returns dark
 function getServerSnapshot(): "light" | "dark" {
   return "dark";
 }
 
 export function ThemeToggle() {
-  // Use useSyncExternalStore for hydration-safe localStorage access
   const storedTheme = useSyncExternalStore(
     subscribe,
     getThemeFromStorage,
@@ -51,15 +47,15 @@ export function ThemeToggle() {
       variant="ghost"
       size="icon"
       onClick={toggleTheme}
-      className="h-9 w-9"
+      className="h-9 w-9 rounded-full hover:bg-muted"
       aria-label={
         theme === "dark" ? "Switch to light mode" : "Switch to dark mode"
       }
     >
       {theme === "dark" ? (
-        <Sun className="h-4 w-4 text-yellow-500" />
+        <Sun className="h-4 w-4 text-amber-500" />
       ) : (
-        <Moon className="h-4 w-4" />
+        <Moon className="h-4 w-4 text-indigo-500" />
       )}
     </Button>
   );

@@ -22,7 +22,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const validTypes = ["email", "discord", "slack", "webhook", "telegram"];
+    const validTypes = [
+      "email",
+      "discord",
+      "slack",
+      "webhook",
+      "telegram",
+      "pushover",
+      "teams",
+    ];
     if (!validTypes.includes(type)) {
       return NextResponse.json(
         { error: `Invalid type. Must be one of: ${validTypes.join(", ")}` },

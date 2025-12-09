@@ -1,5 +1,23 @@
-import { createClient as createServerClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/service";
 import { notifyUser } from "@/lib/notifications";
+
+// Status constants (matching Uptime Kuma)
+export const HEARTBEAT_STATUS = {
+  DOWN: 0,
+  UP: 1,
+  PENDING: 2,
+  MAINTENANCE: 3,
+} as const;
+
+export const INCIDENT_STATUS = {
+  OPEN: 0,
+  RESOLVED: 1,
+  INVESTIGATING: 2,
+} as const;
+
+// Config
+const DEFAULT_TIMEOUT_SECONDS = 48;
+const USER_AGENT = "Uptime-Monitor/1.0";
 
 // Types
 type Monitor = {
@@ -12,353 +30,484 @@ type Monitor = {
   port: number | null;
   method: string | null;
   keyword: string | null;
+  headers: Record<string, string> | null;
+  body: string | null;
   interval: number;
+  retry_interval: number;
   timeout: number;
   max_retries: number;
+  ignore_tls: boolean;
+  upside_down: boolean;
   active: boolean;
 };
 
-type CheckResult = {
-  success: boolean;
+type Heartbeat = {
+  id: string;
+  monitor_id: string;
+  status: number;
+  msg: string | null;
   ping: number | null;
-  message: string;
-  status: number; // 0=DOWN, 1=UP, 2=PENDING
+  duration: number | null;
+  down_count: number;
+  time: string;
 };
 
-// HTTP/HTTPS Monitor Check
-export async function checkHttpMonitor(monitor: Monitor): Promise<CheckResult> {
+type CheckResult = {
+  status: number;
+  ping: number | null;
+  msg: string;
+};
+
+type HeartbeatInsert = {
+  monitor_id: string;
+  status: number;
+  msg: string;
+  ping: number | null;
+  duration: number;
+  down_count: number;
+  time: string;
+};
+
+// Timeout helper
+function createTimeoutController(timeoutSeconds: number) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutSeconds * 1000);
+  return { controller, clear: () => clearTimeout(timeoutId) };
+}
+
+// HTTP/HTTPS check
+async function checkHttp(monitor: Monitor): Promise<CheckResult> {
   const startTime = Date.now();
+  const timeout = monitor.timeout || DEFAULT_TIMEOUT_SECONDS;
+  const { controller, clear } = createTimeoutController(timeout);
 
   try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(
-      () => controller.abort(),
-      (monitor.timeout || 48) * 1000,
-    );
+    const headers: Record<string, string> = {
+      "User-Agent": USER_AGENT,
+      ...(monitor.headers || {}),
+    };
 
     const response = await fetch(monitor.url!, {
       method: monitor.method || "GET",
-      headers: {
-        "User-Agent": "Uptime-Monitor/1.0",
-      },
+      headers,
+      body: monitor.body || undefined,
       signal: controller.signal,
       redirect: "follow",
     });
 
-    clearTimeout(timeoutId);
+    clear();
     const ping = Date.now() - startTime;
 
-    // Check if status code is successful (2xx or 3xx)
-    const isSuccess =
-      response.ok || (response.status >= 200 && response.status < 400);
-
-    // For keyword monitors, also check content
+    // Keyword check
     if (monitor.type === "keyword" && monitor.keyword) {
       const text = await response.text();
-      const hasKeyword = text.includes(monitor.keyword);
+      const keywordFound = text.includes(monitor.keyword);
+      const success = monitor.upside_down ? !keywordFound : keywordFound;
 
-      if (!hasKeyword) {
+      if (!success) {
         return {
-          success: false,
+          status: HEARTBEAT_STATUS.DOWN,
           ping,
-          message: `Keyword "${monitor.keyword}" not found in response`,
-          status: 0,
+          msg: monitor.upside_down
+            ? `Keyword "${monitor.keyword}" found (upside down mode)`
+            : `Keyword "${monitor.keyword}" not found`,
         };
       }
     }
 
+    // HTTP status check
+    const isSuccess = monitor.upside_down ? !response.ok : response.ok;
+
     return {
-      success: isSuccess,
+      status: isSuccess ? HEARTBEAT_STATUS.UP : HEARTBEAT_STATUS.DOWN,
       ping,
-      message: isSuccess
-        ? `HTTP ${response.status}`
-        : `HTTP ${response.status} ${response.statusText}`,
-      status: isSuccess ? 1 : 0,
+      msg: `${response.status} - ${response.statusText}`,
     };
   } catch (error) {
+    clear();
     const ping = Date.now() - startTime;
 
-    if (error instanceof Error) {
-      if (error.name === "AbortError") {
-        return {
-          success: false,
-          ping,
-          message: `Timeout after ${monitor.timeout}s`,
-          status: 0,
-        };
-      }
-
+    if (error instanceof Error && error.name === "AbortError") {
       return {
-        success: false,
+        status: HEARTBEAT_STATUS.DOWN,
         ping,
-        message: error.message,
-        status: 0,
+        msg: `Timeout after ${timeout}s`,
       };
     }
 
     return {
-      success: false,
+      status: HEARTBEAT_STATUS.DOWN,
       ping,
-      message: "Unknown error",
-      status: 0,
+      msg: error instanceof Error ? error.message : "Connection failed",
     };
   }
 }
 
-// TCP Port Check (using HTTP request as proxy since pure TCP requires different runtime)
-export async function checkTcpMonitor(monitor: Monitor): Promise<CheckResult> {
+// TCP check (simplified - uses HTTP HEAD as proxy in serverless)
+async function checkTcp(monitor: Monitor): Promise<CheckResult> {
   const startTime = Date.now();
+  const timeout = monitor.timeout || DEFAULT_TIMEOUT_SECONDS;
+  const { controller, clear } = createTimeoutController(timeout);
 
   try {
-    // Note: In serverless environments, we can't do raw TCP connections
-    // This is a simplified check using HTTP as a proxy
-    // For production, consider using a dedicated monitoring service or edge function
     const url = `http://${monitor.hostname}:${monitor.port}`;
+    await fetch(url, { method: "HEAD", signal: controller.signal });
+    clear();
 
-    const controller = new AbortController();
-    const timeoutId = setTimeout(
-      () => controller.abort(),
-      (monitor.timeout || 48) * 1000,
-    );
-
-    await fetch(url, {
-      method: "HEAD",
-      signal: controller.signal,
-    });
-
-    clearTimeout(timeoutId);
     const ping = Date.now() - startTime;
+    const success = !monitor.upside_down;
 
     return {
-      success: true,
+      status: success ? HEARTBEAT_STATUS.UP : HEARTBEAT_STATUS.DOWN,
       ping,
-      message: "Port is open",
-      status: 1,
+      msg: success
+        ? "Connection successful"
+        : "Connection successful (upside down)",
     };
   } catch (error) {
+    clear();
     const ping = Date.now() - startTime;
+    const success = monitor.upside_down;
+
+    if (error instanceof Error && error.name === "AbortError") {
+      return {
+        status: success ? HEARTBEAT_STATUS.UP : HEARTBEAT_STATUS.DOWN,
+        ping,
+        msg: `Timeout after ${timeout}s`,
+      };
+    }
 
     return {
-      success: false,
+      status: success ? HEARTBEAT_STATUS.UP : HEARTBEAT_STATUS.DOWN,
       ping,
-      message:
-        error instanceof Error
-          ? error.message
-          : "Port is closed or unreachable",
-      status: 0,
+      msg: error instanceof Error ? error.message : "Connection failed",
     };
   }
 }
 
-// Ping Check (using HTTP HEAD as substitute)
-export async function checkPingMonitor(monitor: Monitor): Promise<CheckResult> {
+// Ping check (uses HTTP HEAD as substitute in serverless)
+async function checkPing(monitor: Monitor): Promise<CheckResult> {
   const startTime = Date.now();
+  const timeout = monitor.timeout || DEFAULT_TIMEOUT_SECONDS;
+  const { controller, clear } = createTimeoutController(timeout);
 
   try {
-    // Use HTTP HEAD request as a ping substitute
-    // Note: This is not a true ICMP ping, but works in serverless environments
     const url = monitor.hostname?.startsWith("http")
       ? monitor.hostname
       : `https://${monitor.hostname}`;
-
-    const controller = new AbortController();
-    const timeoutId = setTimeout(
-      () => controller.abort(),
-      (monitor.timeout || 48) * 1000,
-    );
 
     const response = await fetch(url, {
       method: "HEAD",
       signal: controller.signal,
     });
+    clear();
 
-    clearTimeout(timeoutId);
     const ping = Date.now() - startTime;
+    const isReachable = response.ok || response.status < 500;
+    const success = monitor.upside_down ? !isReachable : isReachable;
 
     return {
-      success: response.ok,
+      status: success ? HEARTBEAT_STATUS.UP : HEARTBEAT_STATUS.DOWN,
       ping,
-      message: `Reachable (${ping}ms)`,
-      status: response.ok ? 1 : 0,
+      msg: `${ping}ms`,
     };
   } catch (error) {
+    clear();
     const ping = Date.now() - startTime;
+    const success = monitor.upside_down;
 
     return {
-      success: false,
+      status: success ? HEARTBEAT_STATUS.UP : HEARTBEAT_STATUS.DOWN,
       ping,
-      message: error instanceof Error ? error.message : "Host unreachable",
-      status: 0,
+      msg: error instanceof Error ? error.message : "Host unreachable",
     };
   }
 }
 
-// DNS Check
-export async function checkDnsMonitor(monitor: Monitor): Promise<CheckResult> {
+// DNS check
+type DnsResponse = {
+  Status: number;
+  Answer?: Array<{ data: string }>;
+};
+
+async function checkDns(monitor: Monitor): Promise<CheckResult> {
   const startTime = Date.now();
+  const timeout = monitor.timeout || DEFAULT_TIMEOUT_SECONDS;
+  const { controller, clear } = createTimeoutController(timeout);
 
   try {
-    // Use a DNS-over-HTTPS provider
     const response = await fetch(
       `https://dns.google/resolve?name=${monitor.hostname}&type=A`,
+      { signal: controller.signal },
     );
+    clear();
 
-    const data = await response.json();
+    const data: DnsResponse = await response.json();
     const ping = Date.now() - startTime;
+    const resolved =
+      data.Status === 0 && Array.isArray(data.Answer) && data.Answer.length > 0;
+    const success = monitor.upside_down ? !resolved : resolved;
 
-    if (data.Status === 0 && data.Answer && data.Answer.length > 0) {
+    if (success && resolved) {
       return {
-        success: true,
+        status: HEARTBEAT_STATUS.UP,
         ping,
-        message: `Resolved to ${data.Answer[0].data}`,
-        status: 1,
+        msg: `Resolved: ${data.Answer![0].data}`,
       };
     }
 
     return {
-      success: false,
+      status: success ? HEARTBEAT_STATUS.UP : HEARTBEAT_STATUS.DOWN,
       ping,
-      message: "DNS resolution failed",
-      status: 0,
+      msg: resolved ? "Resolved (upside down)" : "DNS resolution failed",
     };
   } catch (error) {
+    clear();
     const ping = Date.now() - startTime;
 
     return {
-      success: false,
+      status: monitor.upside_down ? HEARTBEAT_STATUS.UP : HEARTBEAT_STATUS.DOWN,
       ping,
-      message: error instanceof Error ? error.message : "DNS query failed",
-      status: 0,
+      msg: error instanceof Error ? error.message : "DNS query failed",
     };
   }
 }
 
-// Main check function
+// Main check dispatcher
 export async function checkMonitor(monitor: Monitor): Promise<CheckResult> {
   switch (monitor.type) {
     case "http":
     case "keyword":
-      return checkHttpMonitor(monitor);
+      return checkHttp(monitor);
     case "tcp":
-      return checkTcpMonitor(monitor);
+      return checkTcp(monitor);
     case "ping":
-      return checkPingMonitor(monitor);
+      return checkPing(monitor);
     case "dns":
-      return checkDnsMonitor(monitor);
+      return checkDns(monitor);
     default:
       return {
-        success: false,
+        status: HEARTBEAT_STATUS.PENDING,
         ping: null,
-        message: `Unsupported monitor type: ${monitor.type}`,
-        status: 2,
+        msg: `Unsupported monitor type: ${monitor.type}`,
       };
   }
 }
 
-// Process monitor check with retry logic and incident management
-export async function processMonitorCheck(monitor: Monitor): Promise<void> {
-  const supabase = await createServerClient();
-  let attempts = 0;
-  let lastResult: CheckResult | null = null;
+// Get previous heartbeat for a monitor
+async function getPreviousHeartbeat(
+  supabase: ReturnType<typeof createServiceClient>,
+  monitorId: string,
+): Promise<Heartbeat | null> {
+  const { data } = await supabase
+    .from("heartbeats")
+    .select("*")
+    .eq("monitor_id", monitorId)
+    .order("time", { ascending: false })
+    .limit(1)
+    .single();
 
-  // Perform check with retries
-  while (attempts <= monitor.max_retries) {
-    lastResult = await checkMonitor(monitor);
+  return data as Heartbeat | null;
+}
 
-    if (lastResult.success) {
-      break;
+// Check if monitor is under maintenance
+async function isUnderMaintenance(
+  supabase: ReturnType<typeof createServiceClient>,
+  monitorId: string,
+): Promise<boolean> {
+  const now = new Date().toISOString();
+
+  const { data } = await supabase
+    .from("maintenance_monitors")
+    .select(
+      `
+      maintenance:maintenance_id (
+        active,
+        start_date,
+        end_date
+      )
+    `,
+    )
+    .eq("monitor_id", monitorId);
+
+  if (!data || data.length === 0) return false;
+
+  return (
+    data as unknown as Array<{
+      maintenance: { active: boolean; start_date: string; end_date: string };
+    }>
+  ).some((item) => {
+    const m = item.maintenance;
+    return m?.active && m.start_date <= now && m.end_date >= now;
+  });
+}
+
+// Record heartbeat (Uptime Kuma style)
+async function recordHeartbeat(
+  supabase: ReturnType<typeof createServiceClient>,
+  heartbeat: HeartbeatInsert,
+): Promise<void> {
+  await supabase.from("heartbeats").insert(heartbeat as unknown as never);
+}
+
+// Handle status change notifications and incidents
+async function handleStatusChange(
+  supabase: ReturnType<typeof createServiceClient>,
+  monitor: Monitor,
+  previousStatus: number | null,
+  currentStatus: number,
+  msg: string,
+): Promise<void> {
+  // No change or first heartbeat with UP status - no notification needed
+  if (previousStatus === currentStatus) return;
+  if (previousStatus === null && currentStatus === HEARTBEAT_STATUS.UP) return;
+
+  const isDown = currentStatus === HEARTBEAT_STATUS.DOWN;
+  const isRecovery =
+    previousStatus === HEARTBEAT_STATUS.DOWN &&
+    currentStatus === HEARTBEAT_STATUS.UP;
+
+  if (isDown) {
+    // Create incident if none exists
+    const { data: existingIncident } = await supabase
+      .from("incidents")
+      .select("id")
+      .eq("monitor_id", monitor.id)
+      .eq("status", INCIDENT_STATUS.OPEN)
+      .limit(1)
+      .single();
+
+    if (!existingIncident) {
+      await supabase.from("incidents").insert({
+        monitor_id: monitor.id,
+        title: `${monitor.name} is down`,
+        content: msg,
+        status: INCIDENT_STATUS.OPEN,
+        started_at: new Date().toISOString(),
+      } as unknown as never);
     }
 
-    attempts++;
-    if (attempts <= monitor.max_retries) {
-      // Wait a bit before retry (exponential backoff)
-      await new Promise((resolve) =>
-        setTimeout(resolve, Math.min(1000 * Math.pow(2, attempts), 10000)),
+    // Send DOWN notification
+    try {
+      await notifyUser(monitor.user_id, {
+        title: `🔴 ${monitor.name} is DOWN`,
+        message: msg,
+        monitorName: monitor.name,
+        monitorUrl: monitor.url || monitor.hostname || undefined,
+        status: "down",
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      console.error(
+        `[${monitor.name}] Failed to send DOWN notification:`,
+        error,
       );
     }
   }
 
-  if (!lastResult) return;
+  if (isRecovery) {
+    // Resolve open incidents
+    await supabase
+      .from("incidents")
+      .update({
+        status: INCIDENT_STATUS.RESOLVED,
+        resolved_at: new Date().toISOString(),
+      } as unknown as never)
+      .eq("monitor_id", monitor.id)
+      .eq("status", INCIDENT_STATUS.OPEN);
 
-  // Record heartbeat
-  // @ts-expect-error - Supabase types show as 'never'
-  await supabase.from("heartbeats").insert({
+    // Send UP notification
+    try {
+      await notifyUser(monitor.user_id, {
+        title: `✅ ${monitor.name} is UP`,
+        message: "Service has recovered",
+        monitorName: monitor.name,
+        monitorUrl: monitor.url || monitor.hostname || undefined,
+        status: "up",
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      console.error(`[${monitor.name}] Failed to send UP notification:`, error);
+    }
+  }
+}
+
+/**
+ * Process a single monitor check (Uptime Kuma style)
+ *
+ * Key behaviors:
+ * 1. Tracks down_count for consecutive failures
+ * 2. Only marks as DOWN after max_retries consecutive failures
+ * 3. Respects maintenance windows
+ * 4. Only notifies on actual status changes
+ * 5. Supports upside_down mode (inverts success/failure)
+ */
+export async function processMonitorCheck(monitor: Monitor): Promise<void> {
+  const supabase = createServiceClient();
+  const checkStartTime = Date.now();
+
+  // Check maintenance status first
+  const inMaintenance = await isUnderMaintenance(supabase, monitor.id);
+  if (inMaintenance) {
+    await recordHeartbeat(supabase, {
+      monitor_id: monitor.id,
+      status: HEARTBEAT_STATUS.MAINTENANCE,
+      msg: "Under maintenance",
+      ping: null,
+      duration: 0,
+      down_count: 0,
+      time: new Date().toISOString(),
+    });
+    return;
+  }
+
+  // Get previous heartbeat for down_count tracking
+  const previousHeartbeat = await getPreviousHeartbeat(supabase, monitor.id);
+  const previousDownCount = previousHeartbeat?.down_count ?? 0;
+  const previousStatus = previousHeartbeat?.status ?? null;
+
+  // Perform the actual check
+  const result = await checkMonitor(monitor);
+  const duration = Date.now() - checkStartTime;
+
+  // Calculate new down_count and effective status (Uptime Kuma logic)
+  let downCount = 0;
+  let effectiveStatus = result.status;
+
+  if (result.status === HEARTBEAT_STATUS.DOWN) {
+    downCount = previousDownCount + 1;
+
+    // Only mark as DOWN after max_retries consecutive failures
+    // Until then, keep previous status (or PENDING if first check)
+    if (downCount <= monitor.max_retries) {
+      effectiveStatus = previousStatus ?? HEARTBEAT_STATUS.PENDING;
+    }
+  }
+
+  // Record the heartbeat
+  await recordHeartbeat(supabase, {
     monitor_id: monitor.id,
-    status: lastResult.status,
-    msg: lastResult.message,
-    ping: lastResult.ping,
+    status: effectiveStatus,
+    msg: result.msg,
+    ping: result.ping,
+    duration,
+    down_count: downCount,
     time: new Date().toISOString(),
   });
 
-  // Handle incidents
-  if (!lastResult.success) {
-    // Check if there's already an open incident
-    const { data: existingIncidents } = await supabase
-      .from("incidents")
-      .select("*")
-      .eq("monitor_id", monitor.id)
-      .eq("status", 0) // 0 = OPEN
-      .order("started_at", { ascending: false })
-      .limit(1);
-
-    // Create new incident if none exists
-    if (!existingIncidents || existingIncidents.length === 0) {
-      // @ts-expect-error - Supabase types show as 'never'
-      await supabase.from("incidents").insert({
-        monitor_id: monitor.id,
-        title: `${monitor.name} is down`,
-        content: lastResult.message,
-        status: 0, // OPEN
-        started_at: new Date().toISOString(),
-      });
-
-      // Send notifications
-      try {
-        await notifyUser(monitor.user_id, {
-          title: `🔴 ${monitor.name} is Down`,
-          message: lastResult.message,
-          monitorName: monitor.name,
-          monitorUrl: monitor.url || monitor.hostname || undefined,
-          status: "down",
-          timestamp: new Date().toISOString(),
-        });
-      } catch (error) {
-        console.error("Failed to send notification:", error);
-      }
-    }
-  } else {
-    // Monitor is up - close any open incidents
-    const { data: openIncidents } = await supabase
-      .from("incidents")
-      .select("*")
-      .eq("monitor_id", monitor.id)
-      .eq("status", 0) // OPEN
-      .order("started_at", { ascending: false });
-
-    if (openIncidents && openIncidents.length > 0) {
-      // Close all open incidents
-      await supabase
-        .from("incidents")
-        .update({
-          status: 1, // RESOLVED
-          resolved_at: new Date().toISOString(),
-        } as unknown as never)
-        .eq("monitor_id", monitor.id)
-        .eq("status", 0);
-
-      // Send recovery notification
-      try {
-        await notifyUser(monitor.user_id, {
-          title: `✅ ${monitor.name} is Back Online`,
-          message: "Service has recovered and is operational",
-          monitorName: monitor.name,
-          monitorUrl: monitor.url || monitor.hostname || undefined,
-          status: "up",
-          timestamp: new Date().toISOString(),
-        });
-      } catch (error) {
-        console.error("Failed to send notification:", error);
-      }
-    }
+  // Handle notifications only on actual status changes
+  // and only when we've exceeded retry threshold
+  if (effectiveStatus !== previousStatus) {
+    await handleStatusChange(
+      supabase,
+      monitor,
+      previousStatus,
+      effectiveStatus,
+      result.msg,
+    );
   }
+
+  console.log(
+    `[${monitor.name}] ${effectiveStatus === HEARTBEAT_STATUS.UP ? "UP" : effectiveStatus === HEARTBEAT_STATUS.DOWN ? "DOWN" : "PENDING"} - ${result.msg} (${result.ping}ms, down_count: ${downCount})`,
+  );
 }
