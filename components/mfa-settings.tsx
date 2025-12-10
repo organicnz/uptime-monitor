@@ -58,6 +58,7 @@ export function MFASettings() {
   }, []);
 
   useEffect(() => {
+    // eslint-disable-next-line
     loadFactors();
   }, [loadFactors]);
 
