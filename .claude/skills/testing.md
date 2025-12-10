@@ -3,14 +3,18 @@
 ## Commands
 
 ```bash
-npm run lint     # ESLint
-npm run build    # Type check + build
+npm run lint         # ESLint
+npm run build        # Type check + build
+npm run build:audit  # Build the Rust audit tool
 ```
 
 ## Pre-commit Hooks (Lefthook)
 
-- `pre-commit`: Runs lint
-- `pre-push`: Runs build
+Lefthook runs the `tools/audit` Rust binary for fast checks:
+
+- `pre-commit`: lint, typecheck, format, no-debug, secrets-check
+- `commit-msg`: conventional commits format
+- `pre-push`: full build and branch naming check
 
 ## Type Checking
 

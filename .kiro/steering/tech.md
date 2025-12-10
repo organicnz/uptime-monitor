@@ -23,6 +23,7 @@
 - ESLint for linting
 - Lefthook for git hooks (pre-commit lint, pre-push build)
 - Trunk for code quality checks
+- Rust Audit Tool (`tools/audit`) for automated checks and tasks
 
 ## Commands
 
@@ -30,6 +31,10 @@
 npm run dev      # Start dev server on port 3001 (Turbopack)
 npm run build    # Production build
 npm run lint     # Run ESLint
+
+# Rust Tools
+npm run build:audit      # Build audit binary
+tools/audit/target/release/audit --help  # Show help
 ```
 
 ## Environment Variables
@@ -39,6 +44,7 @@ Required in `.env.local` or Vercel:
 - `NEXT_PUBLIC_SUPABASE_URL` - Supabase project URL
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY` - Supabase anonymous key
 - `CRON_SECRET` - Secret for authenticating cron job requests
+- `VERCEL_AUTOMATION_BYPASS_SECRET` - Secret for bypassing Vercel Authentication
 
 ## Database
 
