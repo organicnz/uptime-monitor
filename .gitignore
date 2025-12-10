@@ -55,3 +55,4 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 scripts/generate-favicons.js
+tools/audit/target/
