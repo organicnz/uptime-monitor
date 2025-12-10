@@ -13,3 +13,13 @@ anyhow = "1.0"
 walkdir = "2.5"
 colored = "2.1"
 rayon = "1.10"
+
+# Image processing for favicon generation
+resvg = "0.44"
+tiny-skia = "0.11"
+png = "0.17"
+
+# Async HTTP for local-cron
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "time"] }
+reqwest = { version = "0.12", features = ["json"] }
+chrono = "0.4"
