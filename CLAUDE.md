@@ -25,6 +25,10 @@ npm run lint     # Run ESLint
 # Database
 # Schema: supabase/schema.sql
 # Types: types/database.ts
+
+# Rust Tools
+npm run build:audit      # Build the audit binary
+tools/audit/target/release/audit --help  # Show help
 ```
 
 ## Project Structure
@@ -62,6 +66,12 @@ supabase/              # Database schema
 npm run dev      # Start dev server on port 3001 (Turbopack)
 npm run build    # Production build
 npm run lint     # Run ESLint
+
+# Rust Tools
+npm run build:audit                        # Build audit tool
+./tools/audit/target/release/audit generate-favicons  # Generate favicons
+./tools/audit/target/release/audit local-cron         # Run local monitor check
+./tools/audit/target/release/audit vercel-cleanup     # Cleanup deployments
 ```
 
 ## Environment Variables
@@ -72,6 +82,7 @@ See `.env.local.example` for all required variables:
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY` - Supabase anon key
 - `SUPABASE_SERVICE_ROLE_KEY` - Service role key (server-side only)
 - `CRON_SECRET` - Secret for cron job authentication
+- `VERCEL_AUTOMATION_BYPASS_SECRET` - Bypass secret for Vercel Authentication (QStash/Tests)
 
 ## Database
 
