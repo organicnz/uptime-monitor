@@ -28,6 +28,8 @@ import {
   Search,
   Radio,
   Shield,
+  RefreshCw,
+  Copy,
   CheckCircle2,
   AlertCircle,
   Loader2,
@@ -661,8 +663,13 @@ export default function EditMonitorPage(props: {
                     if (newHeaders["x-vercel-protection-bypass"]) {
                       delete newHeaders["x-vercel-protection-bypass"];
                     } else {
-                      newHeaders["x-vercel-protection-bypass"] =
-                        "YOUR_32_CHAR_SECRET";
+                      // Generate a random 32-character hex secret
+                      const array = new Uint8Array(16);
+                      crypto.getRandomValues(array);
+                      const secret = Array.from(array)
+                        .map((b) => b.toString(16).padStart(2, "0"))
+                        .join("");
+                      newHeaders["x-vercel-protection-bypass"] = secret;
                     }
                     setFormData((prev) => ({ ...prev, headers: newHeaders }));
                   }}
@@ -670,8 +677,52 @@ export default function EditMonitorPage(props: {
                   <Shield className="h-4 w-4 mr-1" />
                   {formData.headers["x-vercel-protection-bypass"]
                     ? "Remove Vercel Bypass"
-                    : "Add Vercel Bypass Header"}
+                    : "Generate & Add Vercel Bypass"}
                 </Button>
+                {formData.headers["x-vercel-protection-bypass"] && (
+                  <>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="border-green-600 text-green-400 hover:bg-green-950"
+                      onClick={() => {
+                        const array = new Uint8Array(16);
+                        crypto.getRandomValues(array);
+                        const secret = Array.from(array)
+                          .map((b) => b.toString(16).padStart(2, "0"))
+                          .join("");
+                        const newHeaders = { ...formData.headers };
+                        newHeaders["x-vercel-protection-bypass"] = secret;
+                        setFormData((prev) => ({
+                          ...prev,
+                          headers: newHeaders,
+                        }));
+                        toast.success("New secret generated!");
+                      }}
+                    >
+                      <RefreshCw className="h-4 w-4 mr-1" />
+                      Regenerate
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="border-blue-600 text-blue-400 hover:bg-blue-950"
+                      onClick={() => {
+                        navigator.clipboard.writeText(
+                          formData.headers["x-vercel-protection-bypass"] || "",
+                        );
+                        toast.success(
+                          "Secret copied! Paste it in Vercel Dashboard",
+                        );
+                      }}
+                    >
+                      <Copy className="h-4 w-4 mr-1" />
+                      Copy Secret
+                    </Button>
+                  </>
+                )}
               </div>
 
               {/* Current Headers */}
