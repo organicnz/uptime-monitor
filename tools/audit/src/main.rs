@@ -128,7 +128,7 @@ fn check_no_debug(files: &[String]) -> Result<()> {
         let content = content.unwrap();
 
         for (i, line) in content.lines().enumerate() {
-            for (j, pattern) in patterns.iter().enumerate() {
+            for (_, pattern) in patterns.iter().enumerate() {
                 if pattern.is_match(line) {
                     println!("{} {}:{}: {}", "❌ Debug statement found in".red(), file, i + 1, line.trim());
                     errors += 1;
@@ -278,6 +278,16 @@ fn check_deps(old_head: &str, new_head: &str) -> Result<()> {
 }
 
 fn remind_deps() -> Result<()> {
-    // Just a dummy reminder hook if needed, but check_deps handles the logic usually
+    let output = Command::new("git")
+        .args(["diff", "--name-only", "ORIG_HEAD", "HEAD"])
+        .output()
+        .context("Failed to run git diff")?;
+        
+    let diff = String::from_utf8(output.stdout)?;
+    
+    if diff.lines().any(|l| l.contains("package-lock.json") || l.contains("yarn.lock") || l.contains("pnpm-lock.yaml")) {
+        println!("{}", "⚠️  Dependencies changed!".yellow());
+        println!("Run 'npm install' or 'yarn' to update your local dependencies.");
+    }
     Ok(())
 }
