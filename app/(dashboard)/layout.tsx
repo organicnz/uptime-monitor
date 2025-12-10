@@ -10,6 +10,8 @@ import {
   Globe,
   Menu,
   Settings,
+  Wrench,
+  AlertTriangle,
 } from "lucide-react";
 
 export default async function DashboardLayout({
@@ -36,6 +38,8 @@ export default async function DashboardLayout({
   const navItems = [
     { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
     { href: "/dashboard/status-pages", label: "Status Pages", icon: Globe },
+    { href: "/dashboard/incidents", label: "Incidents", icon: AlertTriangle },
+    { href: "/dashboard/maintenance", label: "Maintenance", icon: Wrench },
     { href: "/dashboard/notifications", label: "Notifications", icon: Bell },
     { href: "/dashboard/settings", label: "Settings", icon: Settings },
   ];

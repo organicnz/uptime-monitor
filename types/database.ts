@@ -71,6 +71,8 @@ export interface Database {
           packet_size: number;
           description: string | null;
           parent_id: string | null;
+          ssl_expiry: string | null;
+          ssl_issuer: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -105,6 +107,8 @@ export interface Database {
           packet_size?: number;
           description?: string | null;
           parent_id?: string | null;
+          ssl_expiry?: string | null;
+          ssl_issuer?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -139,6 +143,8 @@ export interface Database {
           packet_size?: number;
           description?: string | null;
           parent_id?: string | null;
+          ssl_expiry?: string | null;
+          ssl_issuer?: string | null;
           created_at?: string;
           updated_at?: string;
         };

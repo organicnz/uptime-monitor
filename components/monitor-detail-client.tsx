@@ -34,12 +34,13 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { formatDistanceToNow } from "date-fns";
+import { formatDistanceToNow, differenceInDays } from "date-fns";
 import { useState, useTransition } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import { duplicateMonitor } from "@/lib/actions/monitors";
 import { toast } from "sonner";
+import { ResponseTimeChart } from "@/components/response-time-chart";
 
 type Monitor = {
   id: string;
@@ -55,6 +56,8 @@ type Monitor = {
   max_retries: number;
   active: boolean;
   description: string | null;
+  ssl_expiry: string | null;
+  ssl_issuer: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -169,6 +172,11 @@ export function MonitorDetailClient({
         ? "down"
         : "pending"
     : "pending";
+
+  // Calculate SSL days remaining using date-fns (avoids impure Date.now during render)
+  const sslDaysRemaining = monitor.ssl_expiry
+    ? differenceInDays(new Date(monitor.ssl_expiry), new Date())
+    : null;
 
   const supabase = createClient();
 
@@ -444,6 +452,73 @@ export function MonitorDetailClient({
             </div>
           </CardContent>
         </Card>
+        {/* SSL Certificate Info Card - only for HTTPS monitors */}
+        {monitor.url?.startsWith("https://") && (
+          <Card className="glass-card">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">
+                    SSL Certificate
+                  </p>
+                  {sslDaysRemaining !== null ? (
+                    <>
+                      <p
+                        className={cn(
+                          "text-xl font-bold",
+                          sslDaysRemaining <= 7
+                            ? "text-red-500"
+                            : sslDaysRemaining <= 30
+                              ? "text-amber-500"
+                              : "text-emerald-500",
+                        )}
+                      >
+                        {sslDaysRemaining} days
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1 truncate max-w-[150px]">
+                        {monitor.ssl_issuer || "Unknown issuer"}
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-xl font-bold text-muted-foreground">
+                        Checking...
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Pending first check
+                      </p>
+                    </>
+                  )}
+                </div>
+                <div
+                  className={cn(
+                    "p-3 rounded-xl",
+                    sslDaysRemaining === null
+                      ? "bg-muted"
+                      : sslDaysRemaining <= 7
+                        ? "bg-red-500/10"
+                        : sslDaysRemaining <= 30
+                          ? "bg-amber-500/10"
+                          : "bg-emerald-500/10",
+                  )}
+                >
+                  <Shield
+                    className={cn(
+                      "h-6 w-6",
+                      sslDaysRemaining === null
+                        ? "text-muted-foreground"
+                        : sslDaysRemaining <= 7
+                          ? "text-red-500"
+                          : sslDaysRemaining <= 30
+                            ? "text-amber-500"
+                            : "text-emerald-500",
+                    )}
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       <Card className="glass-card">
@@ -516,6 +591,12 @@ export function MonitorDetailClient({
           </div>
         </CardContent>
       </Card>
+
+      {/* Interactive Response Time Chart */}
+      <ResponseTimeChart
+        heartbeats={displayHeartbeats}
+        monitorId={monitor.id}
+      />
 
       <Card className="glass-card">
         <CardHeader>

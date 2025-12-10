@@ -1,6 +1,11 @@
 import { createServiceClient } from "@/lib/supabase/service";
 import { notifyMonitor } from "@/lib/notifications";
 import { isValidMonitorUrl } from "@/lib/security";
+import {
+  checkSslCertificate,
+  shouldWarnSslExpiry,
+  SSL_WARNING_DAYS,
+} from "@/lib/ssl-utils";
 
 // Status constants (matching Uptime Kuma)
 export const HEARTBEAT_STATUS = {
@@ -521,6 +526,14 @@ export async function processMonitorCheck(monitor: Monitor): Promise<void> {
     time: new Date().toISOString(),
   });
 
+  // SSL Certificate check for HTTPS monitors (runs periodically, not every check)
+  if (
+    (monitor.type === "http" || monitor.type === "keyword") &&
+    monitor.url?.startsWith("https://")
+  ) {
+    await checkAndUpdateSsl(supabase, monitor);
+  }
+
   // Handle notifications only on actual status changes
   // and only when we've exceeded retry threshold
   if (effectiveStatus !== previousStatus) {
@@ -531,5 +544,78 @@ export async function processMonitorCheck(monitor: Monitor): Promise<void> {
       effectiveStatus,
       result.msg,
     );
+  }
+}
+
+/**
+ * Check SSL certificate and update monitor record
+ * Also sends notifications for expiring certificates
+ */
+async function checkAndUpdateSsl(
+  supabase: ReturnType<typeof createServiceClient>,
+  monitor: Monitor,
+): Promise<void> {
+  if (!monitor.url) return;
+
+  try {
+    const sslResult = await checkSslCertificate(monitor.url);
+
+    if (sslResult.success && sslResult.info) {
+      const { info } = sslResult;
+
+      // Get current SSL info from monitor to check if we need to send warning
+      const { data: currentMonitor } = await supabase
+        .from("monitors")
+        .select("ssl_expiry")
+        .eq("id", monitor.id)
+        .single();
+
+      const monitorData = currentMonitor as {
+        ssl_expiry: string | null;
+      } | null;
+      const previousExpiry = monitorData?.ssl_expiry
+        ? new Date(monitorData.ssl_expiry)
+        : null;
+      const previousDaysRemaining = previousExpiry
+        ? Math.floor(
+            (previousExpiry.getTime() - Date.now()) / (1000 * 60 * 60 * 24),
+          )
+        : undefined;
+
+      // Update monitor with SSL info
+      if (info.validTo && info.daysRemaining !== -1) {
+        await supabase
+          .from("monitors")
+          .update({
+            ssl_expiry: new Date(info.validTo).toISOString(),
+            ssl_issuer: info.issuer,
+          } as unknown as never)
+          .eq("id", monitor.id);
+      }
+
+      // Check if we should send SSL expiry warning
+      if (
+        info.daysRemaining !== -1 &&
+        info.daysRemaining <= SSL_WARNING_DAYS &&
+        shouldWarnSslExpiry(info.daysRemaining, previousDaysRemaining)
+      ) {
+        // Send SSL expiry warning notification
+        try {
+          await notifyMonitor(monitor.id, monitor.user_id, {
+            title: `⚠️ SSL Certificate Expiring: ${monitor.name}`,
+            message: `Certificate expires in ${info.daysRemaining} days (${info.validTo})`,
+            monitorName: monitor.name,
+            monitorUrl: monitor.url,
+            status: info.daysRemaining <= 7 ? "down" : "degraded",
+            timestamp: new Date().toISOString(),
+          });
+        } catch (error) {
+          console.error(`[${monitor.name}] Failed to send SSL warning:`, error);
+        }
+      }
+    }
+  } catch (error) {
+    // SSL check failures are non-critical, just log
+    console.error(`[${monitor.name}] SSL check failed:`, error);
   }
 }
