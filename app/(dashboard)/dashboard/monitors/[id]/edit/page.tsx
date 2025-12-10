@@ -30,6 +30,8 @@ import {
   Shield,
   RefreshCw,
   Copy,
+  Eye,
+  EyeOff,
   CheckCircle2,
   AlertCircle,
   Loader2,
@@ -139,6 +141,7 @@ export default function EditMonitorPage(props: {
   const [channels, setChannels] = useState<NotificationChannel[]>([]);
   const [selectedChannels, setSelectedChannels] = useState<string[]>([]);
   const [channelsLoading, setChannelsLoading] = useState(true);
+  const [visibleSecrets, setVisibleSecrets] = useState<Set<string>>(new Set());
 
   const selectedType = monitorTypes.find((t) => t.id === formData.type);
 
@@ -731,50 +734,81 @@ export default function EditMonitorPage(props: {
                   <Label className="text-neutral-300 text-sm">
                     Active Headers
                   </Label>
-                  {Object.entries(formData.headers).map(([key, value]) => (
-                    <div key={key} className="flex items-center gap-2">
-                      <input
-                        type="text"
-                        value={key}
-                        readOnly
-                        className="flex-1 rounded-lg border border-neutral-700 bg-neutral-800/50 px-3 py-2 text-sm text-neutral-300"
-                      />
-                      <input
-                        type="text"
-                        value={value}
-                        onChange={(e) => {
-                          const newHeaders = { ...formData.headers };
-                          newHeaders[key] = e.target.value;
-                          setFormData((prev) => ({
-                            ...prev,
-                            headers: newHeaders,
-                          }));
-                        }}
-                        placeholder={
-                          key === "x-vercel-protection-bypass"
-                            ? "Enter your 32-char secret"
-                            : "Value"
-                        }
-                        className="flex-1 rounded-lg border border-neutral-700 bg-neutral-800 px-3 py-2 text-sm text-white focus:border-green-500 focus:outline-none"
-                      />
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="text-red-400 hover:text-red-300 hover:bg-red-950/50"
-                        onClick={() => {
-                          const newHeaders = { ...formData.headers };
-                          delete newHeaders[key];
-                          setFormData((prev) => ({
-                            ...prev,
-                            headers: newHeaders,
-                          }));
-                        }}
-                      >
-                        ×
-                      </Button>
-                    </div>
-                  ))}
+                  {Object.entries(formData.headers).map(([key, value]) => {
+                    const isSecret =
+                      key.toLowerCase().includes("secret") ||
+                      key.toLowerCase().includes("bypass") ||
+                      key.toLowerCase().includes("token") ||
+                      key.toLowerCase().includes("auth");
+                    const isVisible = visibleSecrets.has(key);
+                    return (
+                      <div key={key} className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={key}
+                          readOnly
+                          className="flex-1 rounded-lg border border-neutral-700 bg-neutral-800/50 px-3 py-2 text-sm text-neutral-300"
+                        />
+                        <div className="flex-1 relative">
+                          <input
+                            type={isSecret && !isVisible ? "password" : "text"}
+                            value={value}
+                            onChange={(e) => {
+                              const newHeaders = { ...formData.headers };
+                              newHeaders[key] = e.target.value;
+                              setFormData((prev) => ({
+                                ...prev,
+                                headers: newHeaders,
+                              }));
+                            }}
+                            placeholder={
+                              key === "x-vercel-protection-bypass"
+                                ? "Enter your 32-char secret"
+                                : "Value"
+                            }
+                            className="w-full rounded-lg border border-neutral-700 bg-neutral-800 px-3 py-2 pr-10 text-sm text-white focus:border-green-500 focus:outline-none font-mono"
+                          />
+                          {isSecret && (
+                            <button
+                              type="button"
+                              className="absolute right-2 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-white"
+                              onClick={() => {
+                                const newVisible = new Set(visibleSecrets);
+                                if (isVisible) {
+                                  newVisible.delete(key);
+                                } else {
+                                  newVisible.add(key);
+                                }
+                                setVisibleSecrets(newVisible);
+                              }}
+                            >
+                              {isVisible ? (
+                                <EyeOff className="h-4 w-4" />
+                              ) : (
+                                <Eye className="h-4 w-4" />
+                              )}
+                            </button>
+                          )}
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="text-red-400 hover:text-red-300 hover:bg-red-950/50"
+                          onClick={() => {
+                            const newHeaders = { ...formData.headers };
+                            delete newHeaders[key];
+                            setFormData((prev) => ({
+                              ...prev,
+                              headers: newHeaders,
+                            }));
+                          }}
+                        >
+                          ×
+                        </Button>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
 
