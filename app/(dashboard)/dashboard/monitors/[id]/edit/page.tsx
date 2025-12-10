@@ -27,6 +27,7 @@ import {
   Zap,
   Search,
   Radio,
+  Shield,
   CheckCircle2,
   AlertCircle,
   Loader2,
@@ -114,6 +115,7 @@ export default function EditMonitorPage(props: {
     max_retries: 3,
     description: "",
     active: true,
+    headers: {} as Record<string, string>,
   });
 
   // QStash schedule state
@@ -156,6 +158,7 @@ export default function EditMonitorPage(props: {
           max_retries: number;
           description: string | null;
           active: boolean;
+          headers: Record<string, string> | null;
         };
 
         const { data, error } = await supabase
@@ -183,6 +186,7 @@ export default function EditMonitorPage(props: {
           max_retries: monitorData.max_retries || 3,
           description: monitorData.description || "",
           active: monitorData.active ?? true,
+          headers: (monitorData.headers as Record<string, string>) || {},
         });
         setLoading(false);
       } catch (err) {
@@ -297,6 +301,8 @@ export default function EditMonitorPage(props: {
         max_retries: formData.max_retries,
         description: formData.description || null,
         active: formData.active,
+        headers:
+          Object.keys(formData.headers).length > 0 ? formData.headers : null,
       };
 
       if (formData.type === "http" || formData.type === "keyword") {
@@ -625,6 +631,137 @@ export default function EditMonitorPage(props: {
             </div>
           </CardContent>
         </Card>
+
+        {/* Custom Headers - only for HTTP types */}
+        {(formData.type === "http" || formData.type === "keyword") && (
+          <Card className="bg-neutral-900/50 border-neutral-800">
+            <CardHeader>
+              <CardTitle className="text-white flex items-center gap-2">
+                <Shield className="h-5 w-5 text-amber-400" />
+                Custom Headers
+              </CardTitle>
+              <CardDescription>
+                Add custom headers to send with monitor requests
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Quick Actions */}
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className={`border-amber-600 text-amber-400 hover:bg-amber-950 ${
+                    formData.headers["x-vercel-protection-bypass"]
+                      ? "bg-amber-950"
+                      : ""
+                  }`}
+                  onClick={() => {
+                    const newHeaders = { ...formData.headers };
+                    if (newHeaders["x-vercel-protection-bypass"]) {
+                      delete newHeaders["x-vercel-protection-bypass"];
+                    } else {
+                      newHeaders["x-vercel-protection-bypass"] =
+                        "YOUR_32_CHAR_SECRET";
+                    }
+                    setFormData((prev) => ({ ...prev, headers: newHeaders }));
+                  }}
+                >
+                  <Shield className="h-4 w-4 mr-1" />
+                  {formData.headers["x-vercel-protection-bypass"]
+                    ? "Remove Vercel Bypass"
+                    : "Add Vercel Bypass Header"}
+                </Button>
+              </div>
+
+              {/* Current Headers */}
+              {Object.keys(formData.headers).length > 0 && (
+                <div className="space-y-2">
+                  <Label className="text-neutral-300 text-sm">
+                    Active Headers
+                  </Label>
+                  {Object.entries(formData.headers).map(([key, value]) => (
+                    <div key={key} className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        value={key}
+                        readOnly
+                        className="flex-1 rounded-lg border border-neutral-700 bg-neutral-800/50 px-3 py-2 text-sm text-neutral-300"
+                      />
+                      <input
+                        type="text"
+                        value={value}
+                        onChange={(e) => {
+                          const newHeaders = { ...formData.headers };
+                          newHeaders[key] = e.target.value;
+                          setFormData((prev) => ({
+                            ...prev,
+                            headers: newHeaders,
+                          }));
+                        }}
+                        placeholder={
+                          key === "x-vercel-protection-bypass"
+                            ? "Enter your 32-char secret"
+                            : "Value"
+                        }
+                        className="flex-1 rounded-lg border border-neutral-700 bg-neutral-800 px-3 py-2 text-sm text-white focus:border-green-500 focus:outline-none"
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="text-red-400 hover:text-red-300 hover:bg-red-950/50"
+                        onClick={() => {
+                          const newHeaders = { ...formData.headers };
+                          delete newHeaders[key];
+                          setFormData((prev) => ({
+                            ...prev,
+                            headers: newHeaders,
+                          }));
+                        }}
+                      >
+                        ×
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Add Custom Header */}
+              <div className="pt-2 border-t border-neutral-800">
+                <button
+                  type="button"
+                  className="text-sm text-green-400 hover:text-green-300"
+                  onClick={() => {
+                    const key = prompt("Enter header name:");
+                    if (key && key.trim()) {
+                      const newHeaders = { ...formData.headers };
+                      newHeaders[key.trim()] = "";
+                      setFormData((prev) => ({ ...prev, headers: newHeaders }));
+                    }
+                  }}
+                >
+                  + Add custom header
+                </button>
+              </div>
+
+              {formData.headers["x-vercel-protection-bypass"] && (
+                <div className="mt-3 p-3 bg-amber-950/30 border border-amber-900/50 rounded-lg text-sm text-amber-200">
+                  <p className="font-medium mb-1">To get your bypass secret:</p>
+                  <ol className="list-decimal list-inside space-y-1 text-xs">
+                    <li>Go to Vercel Dashboard → Project → Settings</li>
+                    <li>Navigate to Deployment Protection</li>
+                    <li>
+                      Under &quot;Protection Bypass for Automation&quot;, add a
+                      secret
+                    </li>
+                    <li>Copy the 32-character value here</li>
+                  </ol>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         {/* Advanced */}
         <Card className="bg-neutral-900/50 border-neutral-800">
