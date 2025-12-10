@@ -31,6 +31,43 @@ To learn more about Next.js, take a look at the following resources:
 
 You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
 
+## Development Tools
+
+This project includes a **Rust-based audit tool** (`tools/audit`) to manage code quality, security checks, and automation tasks.
+
+### Building the Tool
+
+The tool is automatically built during `npm install`. To build it manually:
+
+```bash
+npm run build:audit
+```
+
+### Usage
+
+The compiled binary is located at `tools/audit/target/release/audit`.
+
+```bash
+# General Usage
+./tools/audit/target/release/audit [COMMAND]
+
+# Key Commands
+audit start            # Run all pre-commit checks
+audit vercel-cleanup   # Manage old Vercel deployments
+audit generate-favicons # Generate favicons from SVG
+audit local-cron       # Run monitor checks locally
+audit test-bypass      # Test Vercel protection bypass
+```
+
+### Vercel Protection Bypass
+
+If Vercel Authentication is enabled, you can use the bypass feature:
+
+```bash
+# Test if bypass works (requires VERCEL_AUTOMATION_BYPASS_SECRET env var)
+audit test-bypass --url https://your-project.vercel.app
+```
+
 ## Deploy on Vercel
 
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
