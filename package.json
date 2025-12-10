@@ -14,7 +14,7 @@
     "prepare": "lefthook install",
     "hooks:install": "lefthook install",
     "hooks:uninstall": "lefthook uninstall",
-    "build:audit": "cd tools/audit && cargo build --release",
+    "build:audit": "git submodule update --init --recursive && (command -v cargo >/dev/null 2>&1 && cd tools/audit && cargo build --release || echo 'Cargo not found, skipping audit build')",
     "postinstall": "npm run build:audit"
   },
   "dependencies": {
