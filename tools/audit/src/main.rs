@@ -117,6 +117,15 @@ enum Commands {
         #[arg(long, default_value = "uptime-monitor-cron-secret-2024")]
         token: String,
     },
+    /// Test Vercel protection bypass header
+    TestBypass {
+        /// URL to test (your Vercel deployment)
+        #[arg(default_value = "https://uptime-monitor-organicnz.vercel.app/api/cron/check-monitors")]
+        url: String,
+        /// Bypass secret (VERCEL_AUTOMATION_BYPASS_SECRET)
+        #[arg(long, env = "VERCEL_AUTOMATION_BYPASS_SECRET")]
+        secret: Option<String>,
+    },
 }
 
 const SECRET_PATTERNS: &[&str] = &[
@@ -212,6 +221,11 @@ fn main() {
             // Run async runtime for local-cron
             let rt = tokio::runtime::Runtime::new().expect("Failed to create runtime");
             rt.block_on(local_cron(url, *interval, *once, token))
+        }
+        Commands::TestBypass { url, secret } => {
+            // Run async runtime for test-bypass
+            let rt = tokio::runtime::Runtime::new().expect("Failed to create runtime");
+            rt.block_on(test_bypass(url, secret.as_deref()))
         }
     };
 
@@ -926,6 +940,109 @@ async fn local_cron(url: &str, interval: u64, once: bool, token: &str) -> Result
         }
 
         sleep(Duration::from_secs(interval)).await;
+    }
+
+    Ok(result)
+}
+
+/// Test Vercel protection bypass header
+async fn test_bypass(url: &str, secret: Option<&str>) -> Result<CheckResult> {
+    let mut result = CheckResult::new("test-bypass");
+
+    println!("{}", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".blue());
+    println!("{}", "  Vercel Protection Bypass Test".blue());
+    println!("{}", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".blue());
+    println!();
+
+    println!("URL: {}", url);
+    println!();
+
+    let client = reqwest::Client::new();
+
+    // Test 1: Request WITHOUT bypass header (should fail if protection is enabled)
+    println!("{}", "Test 1: Request WITHOUT bypass header".yellow());
+    print!("  Sending request... ");
+
+    let response_no_bypass = client
+        .get(url)
+        .send()
+        .await;
+
+    match &response_no_bypass {
+        Ok(resp) => {
+            let status = resp.status();
+            if status.as_u16() == 401 || status.as_u16() == 403 {
+                println!("{} {} (Expected - protection is active)", "✓".green(), status);
+            } else if status.is_success() {
+                println!("{} {} (Protection may not be enabled)", "⚠".yellow(), status);
+            } else {
+                println!("{} {}", status.as_u16(), status.canonical_reason().unwrap_or(""));
+            }
+        }
+        Err(e) => println!("{} {}", "❌".red(), e),
+    }
+
+    // Test 2: Request WITH bypass header (should succeed)
+    println!();
+    println!("{}", "Test 2: Request WITH bypass header".yellow());
+
+    // Try to get from env if not provided via --secret flag
+    let bypass_secret = match secret {
+        Some(s) => s.to_string(),
+        None => std::env::var("VERCEL_AUTOMATION_BYPASS_SECRET").unwrap_or_default(),
+    };
+
+    if bypass_secret.is_empty() {
+        println!("  {} No bypass secret provided", "⚠".yellow());
+        println!("  Set VERCEL_AUTOMATION_BYPASS_SECRET or use --secret flag");
+        result.add_violation(Violation {
+            file: String::new(),
+            line: None,
+            message: "No bypass secret provided".to_string(),
+            pattern: None,
+        });
+        return Ok(result);
+    }
+
+    print!("  Secret: {}...{} ", &bypass_secret[..4], &bypass_secret[bypass_secret.len()-4..]);
+    println!();
+    print!("  Sending request... ");
+
+    let response_with_bypass = client
+        .get(url)
+        .header("x-vercel-protection-bypass", &bypass_secret)
+        .send()
+        .await;
+
+    match response_with_bypass {
+        Ok(resp) => {
+            let status = resp.status();
+            if status.is_success() {
+                println!("{} {} - Bypass working!", "✓".green(), status);
+                println!();
+                println!("{}", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".blue());
+                println!("{}", "✅ Protection bypass is correctly configured!".green());
+            } else if status.as_u16() == 401 || status.as_u16() == 403 {
+                println!("{} {} - Bypass NOT working", "❌".red(), status);
+                result.add_violation(Violation {
+                    file: url.to_string(),
+                    line: None,
+                    message: format!("Bypass failed with status {}", status),
+                    pattern: None,
+                });
+            } else {
+                println!("{} {}", status.as_u16(), status.canonical_reason().unwrap_or(""));
+            }
+        }
+        Err(e) => {
+            println!("{} {}", "❌".red(), e);
+            result.add_violation(Violation {
+                file: url.to_string(),
+                line: None,
+                message: format!("Request failed: {}", e),
+                pattern: None,
+            });
+        }
     }
 
     Ok(result)
