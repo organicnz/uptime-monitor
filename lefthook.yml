@@ -54,14 +54,14 @@ pre-commit:
     no-debug:
       priority: 3
       glob: "*.{ts,tsx,js,jsx}"
-      run: bash scripts/lefthook/no-debug.sh {staged_files}
+      run: tools/audit/target/release/audit no-debug {staged_files}
       fail_text: "❌ Debug statements found. Remove console.log, debugger, etc."
 
     # Check for secrets/credentials
     secrets-check:
       priority: 3
       glob: "*.{ts,tsx,js,jsx,json,env*}"
-      run: bash scripts/lefthook/secrets-check.sh {staged_files}
+      run: tools/audit/target/release/audit secrets-check {staged_files}
       fail_text: "❌ Potential secrets detected. Never commit credentials!"
 
     # Validate JSON files
@@ -69,13 +69,13 @@ pre-commit:
       priority: 2
       glob: "*.json"
       exclude: "package-lock.json"
-      run: bash scripts/lefthook/json-validate.sh {staged_files}
+      run: tools/audit/target/release/audit json-validate {staged_files}
       fail_text: "❌ Invalid JSON syntax detected."
 
     # Check file size (prevent large files)
     file-size:
       priority: 4
-      run: bash scripts/lefthook/file-size-check.sh {staged_files}
+      run: tools/audit/target/release/audit file-size {staged_files}
       fail_text: "❌ File too large. Max 500KB for source files."
 
 # Commit message validation
@@ -83,7 +83,7 @@ commit-msg:
   commands:
     # Conventional commits format
     conventional:
-      run: bash scripts/lefthook/commit-msg.sh {1}
+      run: tools/audit/target/release/audit commit-msg {1}
       fail_text: |
         ❌ Invalid commit message format!
 
@@ -98,7 +98,7 @@ commit-msg:
 
     # Commit message length check
     length:
-      run: bash scripts/lefthook/commit-msg-length.sh {1}
+      run: tools/audit/target/release/audit commit-msg-length {1}
       fail_text: "❌ Commit subject too long. Keep under 72 characters."
 
 # Pre-push: Full validation before pushing
@@ -128,7 +128,7 @@ pre-push:
     # Branch naming convention
     branch-name:
       priority: 0
-      run: bash scripts/lefthook/branch-name.sh
+      run: tools/audit/target/release/audit branch-name
       fail_text: |
         ❌ Invalid branch name!
 
@@ -145,10 +145,10 @@ pre-push:
 post-checkout:
   commands:
     deps-check:
-      run: bash scripts/lefthook/deps-check.sh {1} {2}
+      run: tools/audit/target/release/audit deps-check {1} {2}
 
 # Post-merge: Dependency updates reminder
 post-merge:
   commands:
     deps-reminder:
-      run: bash scripts/lefthook/deps-reminder.sh
+      run: tools/audit/target/release/audit deps-reminder
