@@ -93,6 +93,30 @@ enum Commands {
         #[arg(long)]
         errors_only: bool,
     },
+    /// Generate favicon PNG files from SVG
+    GenerateFavicons {
+        /// Path to SVG file
+        #[arg(default_value = "public/favicon.svg")]
+        svg_path: String,
+        /// Output directory
+        #[arg(short, long, default_value = "public")]
+        output_dir: String,
+    },
+    /// Run local cron to trigger monitor checks
+    LocalCron {
+        /// URL to check
+        #[arg(default_value = "http://localhost:3001/api/cron/check-monitors")]
+        url: String,
+        /// Interval in seconds
+        #[arg(short, long, default_value = "30")]
+        interval: u64,
+        /// Run once and exit
+        #[arg(long)]
+        once: bool,
+        /// Bearer token for authorization
+        #[arg(long, default_value = "uptime-monitor-cron-secret-2024")]
+        token: String,
+    },
 }
 
 const SECRET_PATTERNS: &[&str] = &[
@@ -183,6 +207,12 @@ fn main() {
         Commands::DepsCheck { old_head, new_head } => check_deps(old_head, new_head),
         Commands::DepsReminder => remind_deps(),
         Commands::VercelCleanup { delete, errors_only } => vercel_cleanup(*delete, *errors_only),
+        Commands::GenerateFavicons { svg_path, output_dir } => generate_favicons(svg_path, output_dir),
+        Commands::LocalCron { url, interval, once, token } => {
+            // Run async runtime for local-cron
+            let rt = tokio::runtime::Runtime::new().expect("Failed to create runtime");
+            rt.block_on(local_cron(url, *interval, *once, token))
+        }
     };
 
     match result {
@@ -741,6 +771,161 @@ fn vercel_cleanup(delete: bool, errors_only: bool) -> Result<CheckResult> {
         println!("Options:");
         println!("  audit vercel-cleanup --delete          # Delete error deployments");
         println!("  audit vercel-cleanup --delete --errors-only  # Delete only error deployments");
+    }
+
+    Ok(result)
+}
+
+/// Generate favicon PNG files from SVG
+fn generate_favicons(svg_path: &str, output_dir: &str) -> Result<CheckResult> {
+    use resvg::usvg::{Options, Tree};
+    use std::io::BufWriter;
+
+    let mut result = CheckResult::new("generate-favicons");
+
+    println!("{}", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".blue());
+    println!("{}", "  Favicon Generator".blue());
+    println!("{}", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".blue());
+    println!();
+
+    // Check if SVG file exists
+    if !Path::new(svg_path).exists() {
+        println!("{} {}", "Error: SVG file not found:".red(), svg_path);
+        result.add_violation(Violation {
+            file: svg_path.to_string(),
+            line: None,
+            message: "SVG file not found".to_string(),
+            pattern: None,
+        });
+        return Ok(result);
+    }
+
+    // Create output directory if it doesn't exist
+    fs::create_dir_all(output_dir).context("Failed to create output directory")?;
+
+    // Read SVG
+    let svg_data = fs::read(svg_path).context("Failed to read SVG file")?;
+
+    // Parse SVG
+    let opt = Options::default();
+    let tree = Tree::from_data(&svg_data, &opt)
+        .map_err(|e| anyhow::anyhow!("Failed to parse SVG: {}", e))?;
+
+    // Sizes to generate
+    let sizes = [
+        ("favicon-16x16.png", 16),
+        ("favicon-32x32.png", 32),
+        ("apple-touch-icon.png", 180),
+        ("android-chrome-192x192.png", 192),
+        ("android-chrome-512x512.png", 512),
+    ];
+
+    println!("Source: {}", svg_path);
+    println!("Output: {}/", output_dir);
+    println!();
+
+    for (name, size) in sizes {
+        let output_path = Path::new(output_dir).join(name);
+
+        // Create pixmap
+        let mut pixmap = tiny_skia::Pixmap::new(size, size)
+            .ok_or_else(|| anyhow::anyhow!("Failed to create pixmap"))?;
+
+        // Calculate scale to fit
+        let scale_x = size as f32 / tree.size().width();
+        let scale_y = size as f32 / tree.size().height();
+        let scale = scale_x.min(scale_y);
+
+        let transform = tiny_skia::Transform::from_scale(scale, scale);
+
+        // Render
+        resvg::render(&tree, transform, &mut pixmap.as_mut());
+
+        // Save as PNG
+        let file = fs::File::create(&output_path)
+            .context(format!("Failed to create {}", name))?;
+        let mut writer = BufWriter::new(file);
+
+        let mut encoder = png::Encoder::new(&mut writer, size, size);
+        encoder.set_color(png::ColorType::Rgba);
+        encoder.set_depth(png::BitDepth::Eight);
+
+        let mut png_writer = encoder.write_header()
+            .context("Failed to write PNG header")?;
+        png_writer.write_image_data(pixmap.data())
+            .context("Failed to write PNG data")?;
+
+        println!("{} Generated {}", "✓".green(), name);
+    }
+
+    // Generate favicon.ico (just use 32x32 PNG rename for simplicity)
+    let ico_path = Path::new(output_dir).join("favicon.ico");
+    fs::copy(
+        Path::new(output_dir).join("favicon-32x32.png"),
+        &ico_path,
+    ).context("Failed to create favicon.ico")?;
+    println!("{} Generated favicon.ico", "✓".green());
+
+    println!();
+    println!("{}", "✅ All favicons generated!".green());
+
+    Ok(result)
+}
+
+/// Run local cron to trigger monitor checks
+async fn local_cron(url: &str, interval: u64, once: bool, token: &str) -> Result<CheckResult> {
+    use std::time::Duration;
+    use tokio::time::sleep;
+
+    let result = CheckResult::new("local-cron");
+
+    println!("{}", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".blue());
+    println!("{}", "  Local Cron Runner".blue());
+    println!("{}", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".blue());
+    println!();
+
+    println!("URL: {}", url);
+    println!("Interval: {}s", interval);
+    println!("Mode: {}", if once { "once" } else { "loop" });
+    println!();
+
+    let client = reqwest::Client::new();
+
+    loop {
+        let timestamp = chrono::Local::now().format("%Y-%m-%dT%H:%M:%S");
+        print!("[{}] Triggering monitor check... ", timestamp);
+
+        match client
+            .get(url)
+            .header("Authorization", format!("Bearer {}", token))
+            .send()
+            .await
+        {
+            Ok(response) => {
+                if response.status().is_success() {
+                    match response.json::<serde_json::Value>().await {
+                        Ok(data) => println!("{} {:?}", "✅".green(), data),
+                        Err(_) => println!("{}", "✅ (no JSON body)".green()),
+                    }
+                } else {
+                    println!(
+                        "{} {} {}",
+                        "❌".red(),
+                        response.status().as_u16(),
+                        response.status().canonical_reason().unwrap_or("Unknown")
+                    );
+                }
+            }
+            Err(e) => {
+                println!("{} Network error: {}", "❌".red(), e);
+            }
+        }
+
+        if once {
+            break;
+        }
+
+        sleep(Duration::from_secs(interval)).await;
     }
 
     Ok(result)
