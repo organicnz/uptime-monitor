@@ -129,10 +129,25 @@ async function checkHttp(monitor: Monitor): Promise<CheckResult> {
     // HTTP status check
     const isSuccess = monitor.upside_down ? !response.ok : response.ok;
 
+    let msg = `${response.status} - ${response.statusText}`;
+
+    // Enrich message for common blocking scenarios
+    if (response.status === 429 || response.status === 403) {
+      const server = response.headers.get("server")?.toLowerCase() || "";
+      const mitigated = response.headers.get("x-vercel-mitigated");
+
+      if (server.includes("vercel") || mitigated) {
+        msg +=
+          " (Vercel Protection detected - try adding x-vercel-protection-bypass header)";
+      } else if (server.includes("cloudflare")) {
+        msg += " (Cloudflare detected - try whitelisting monitor IP)";
+      }
+    }
+
     return {
       status: isSuccess ? HEARTBEAT_STATUS.UP : HEARTBEAT_STATUS.DOWN,
       ping,
-      msg: `${response.status} - ${response.statusText}`,
+      msg,
     };
   } catch (error) {
     clear();
