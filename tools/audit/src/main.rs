@@ -120,7 +120,7 @@ enum Commands {
     /// Test Vercel protection bypass header
     TestBypass {
         /// URL to test (your Vercel deployment)
-        #[arg(default_value = "https://uptime-monitor-organicnz.vercel.app/api/cron/check-monitors")]
+        #[arg(default_value = "https://uptime-monitor-next.vercel.app/api/cron/check-monitors")]
         url: String,
         /// Bypass secret (VERCEL_AUTOMATION_BYPASS_SECRET)
         #[arg(long, env = "VERCEL_AUTOMATION_BYPASS_SECRET")]
