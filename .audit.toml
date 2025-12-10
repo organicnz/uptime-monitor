@@ -1,0 +1,37 @@
+# Audit Tool Configuration
+# Place this file in your project root as .audit.toml
+
+# Secret detection configuration
+[secrets]
+# Additional regex patterns to detect secrets (on top of defaults)
+extra_patterns = [
+    # "custom_token_[a-zA-Z0-9]{20,}",
+]
+# Patterns to exclude from secret detection
+exclude_patterns = []
+
+# Debug statement detection
+[debug]
+# Additional regex patterns for debug statements
+extra_patterns = [
+    # "print\\(",  # Uncomment to also catch Rust print statements
+]
+# File extensions to check (default: ts, tsx, js, jsx)
+extensions = ["ts", "tsx", "js", "jsx"]
+
+# File configuration
+[files]
+# Maximum file size in bytes (default: 512000 = 500KB)
+max_size_bytes = 512000
+# Paths to exclude from all checks
+exclude_paths = [
+    "node_modules",
+    "dist",
+    ".next",
+    "coverage",
+]
+
+# Output configuration
+[output]
+# Default output format: "text" or "json"
+format = "text"
