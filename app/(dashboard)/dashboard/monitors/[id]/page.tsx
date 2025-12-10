@@ -31,6 +31,8 @@ export default async function MonitorDetailPage({
     max_retries: number;
     active: boolean;
     description: string | null;
+    ssl_expiry: string | null;
+    ssl_issuer: string | null;
     created_at: string;
     updated_at: string;
   };
