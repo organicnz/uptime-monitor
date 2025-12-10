@@ -84,6 +84,15 @@ enum Commands {
     DepsCheck { old_head: String, new_head: String },
     /// Reminder to check dependencies
     DepsReminder,
+    /// Manage Vercel deployments (cleanup old/error deployments)
+    VercelCleanup {
+        /// Actually delete deployments (default is dry-run)
+        #[arg(long)]
+        delete: bool,
+        /// Delete error deployments only
+        #[arg(long)]
+        errors_only: bool,
+    },
 }
 
 const SECRET_PATTERNS: &[&str] = &[
@@ -173,6 +182,7 @@ fn main() {
         Commands::FileSize { files } => check_file_size(files, &config),
         Commands::DepsCheck { old_head, new_head } => check_deps(old_head, new_head),
         Commands::DepsReminder => remind_deps(),
+        Commands::VercelCleanup { delete, errors_only } => vercel_cleanup(*delete, *errors_only),
     };
 
     match result {
@@ -564,6 +574,173 @@ fn remind_deps() -> Result<CheckResult> {
     }) {
         println!("{}", "⚠️  Dependencies changed!".yellow());
         println!("Run 'npm install' or 'yarn' to update your local dependencies.");
+    }
+
+    Ok(result)
+}
+
+/// Deployment info parsed from vercel list output
+#[derive(Debug, Serialize)]
+#[allow(dead_code)] // Reserved for JSON output mode
+struct Deployment {
+    url: String,
+    age: String,
+    status: String,
+}
+
+fn vercel_cleanup(delete: bool, errors_only: bool) -> Result<CheckResult> {
+    let mut result = CheckResult::new("vercel-cleanup");
+
+    println!("{}", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".blue());
+    println!("{}", "  Vercel Deployment Manager".blue());
+    println!("{}", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".blue());
+    println!();
+
+    // Check if vercel CLI is available
+    let vercel_check = Command::new("which")
+        .arg("vercel")
+        .output();
+
+    if vercel_check.is_err() || !vercel_check.unwrap().status.success() {
+        println!("{}", "Error: Vercel CLI not found".red());
+        println!("Install with: npm i -g vercel");
+        result.add_violation(Violation {
+            file: String::new(),
+            line: None,
+            message: "Vercel CLI not installed".to_string(),
+            pattern: None,
+        });
+        return Ok(result);
+    }
+
+    // Show current package versions
+    println!("{}", "Current package versions:".blue());
+    if let Ok(pkg) = fs::read_to_string("package.json") {
+        for line in pkg.lines() {
+            if line.contains("\"next\"") || line.contains("\"react\"") {
+                println!("  {}", line.trim());
+            }
+        }
+    }
+    println!();
+
+    // CVE info
+    println!("{}", "CVE-2025-55182 patched versions:".blue());
+    println!("  Next.js: >= 16.0.7");
+    println!("  React:   >= 19.2.1");
+    println!();
+
+    // Get deployments
+    println!("{}", "Fetching deployments...".blue());
+    println!();
+
+    let output = Command::new("vercel")
+        .arg("list")
+        .output()
+        .context("Failed to run vercel list")?;
+
+    let list_output = String::from_utf8_lossy(&output.stdout);
+    let list_stderr = String::from_utf8_lossy(&output.stderr);
+
+    // Print the list output
+    println!("{}", list_output);
+    if !list_stderr.is_empty() && !output.status.success() {
+        eprintln!("{}", list_stderr);
+    }
+
+    // Parse deployments to find error ones
+    let mut error_deployments: Vec<String> = Vec::new();
+    let mut total_deployments = 0;
+
+    for line in list_output.lines() {
+        // Lines with deployments contain "https://"
+        if line.contains("https://") {
+            total_deployments += 1;
+            // Check if this is an error deployment
+            if line.contains("Error") {
+                // Extract URL - it's the second field typically
+                if let Some(url) = line.split_whitespace()
+                    .find(|s| s.starts_with("https://"))
+                {
+                    error_deployments.push(url.to_string());
+                }
+            }
+        }
+    }
+
+    println!();
+    println!("{}", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━".blue());
+    println!();
+
+    // Get first commit date
+    let git_log = Command::new("git")
+        .args(["log", "--format=%ad", "--date=short", "--reverse"])
+        .output();
+
+    if let Ok(log_output) = git_log {
+        let log_str = String::from_utf8_lossy(&log_output.stdout);
+        if let Some(first_date) = log_str.lines().next() {
+            println!("Project first commit: {}", first_date.green());
+        }
+    }
+
+    println!();
+    println!("{}", "Summary:".blue());
+    println!("  Total deployments: {}", total_deployments);
+    println!("  Error deployments: {}", error_deployments.len().to_string().red());
+    println!();
+
+    if delete {
+        if errors_only || !error_deployments.is_empty() {
+            println!("{}", "Deleting error deployments...".yellow());
+            println!();
+
+            let mut deleted = 0;
+            let mut failed = 0;
+
+            for url in &error_deployments {
+                print!("Removing {}... ", url);
+                
+                let rm_result = Command::new("vercel")
+                    .args(["remove", url, "--yes"])
+                    .output();
+
+                match rm_result {
+                    Ok(output) if output.status.success() => {
+                        println!("{}", "✓".green());
+                        deleted += 1;
+                    }
+                    _ => {
+                        println!("{}", "✗".red());
+                        failed += 1;
+                        result.add_violation(Violation {
+                            file: url.clone(),
+                            line: None,
+                            message: "Failed to delete deployment".to_string(),
+                            pattern: None,
+                        });
+                    }
+                }
+            }
+
+            println!();
+            println!("{} {}", "Deleted:".green(), deleted);
+            if failed > 0 {
+                println!("{} {}", "Failed:".red(), failed);
+            }
+        } else {
+            println!("{}", "No error deployments to delete.".green());
+        }
+    } else {
+        if error_deployments.is_empty() {
+            println!("{}", "✅ No error deployments found.".green());
+        } else {
+            println!("{}", "⚠️  Error deployments found. Run with --delete to remove them.".yellow());
+        }
+        println!();
+        println!("Options:");
+        println!("  audit vercel-cleanup --delete          # Delete error deployments");
+        println!("  audit vercel-cleanup --delete --errors-only  # Delete only error deployments");
     }
 
     Ok(result)
