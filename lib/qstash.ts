@@ -88,9 +88,18 @@ export async function createSchedule(params: {
   cron: string;
 }): Promise<{ scheduleId: string }> {
   const client = getQStashClient();
+
+  // Build headers for authentication bypass if Vercel Authentication is enabled
+  const headers: Record<string, string> = {};
+  const bypassSecret = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
+  if (bypassSecret) {
+    headers["x-vercel-protection-bypass"] = bypassSecret;
+  }
+
   const result = await client.schedules.create({
     destination: params.destination,
     cron: params.cron,
+    headers: Object.keys(headers).length > 0 ? headers : undefined,
   });
   return { scheduleId: result.scheduleId };
 }
@@ -109,12 +118,20 @@ export async function updateSchedule(
   // Delete old schedule
   await client.schedules.delete(scheduleId);
 
+  // Build headers for authentication bypass if Vercel Authentication is enabled
+  const headers: Record<string, string> = {};
+  const bypassSecret = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
+  if (bypassSecret) {
+    headers["x-vercel-protection-bypass"] = bypassSecret;
+  }
+
   // Build create options
   const createOptions: Record<string, unknown> = {
     destination: existing.destination,
     cron: config.cron || existing.cron || "* * * * *",
     retries: config.retries ?? existing.retries ?? 3,
     failureCallback: config.failureCallback || existing.failureCallback,
+    headers: Object.keys(headers).length > 0 ? headers : undefined,
   };
 
   // Add timezone if provided
