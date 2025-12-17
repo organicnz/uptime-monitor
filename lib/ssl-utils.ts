@@ -23,6 +23,7 @@ export type SslCheckResult = {
 // Warning thresholds (in days)
 export const SSL_WARNING_DAYS = 30;
 export const SSL_CRITICAL_DAYS = 7;
+export const SSL_DAYS_REMAINING_UNKNOWN = -999;
 
 /**
  * Check SSL certificate for a URL using SSL Labs-style API
@@ -146,7 +147,7 @@ async function fallbackSslCheck(url: string): Promise<SslCheckResult> {
           issuer: "Unknown (fallback check)",
           validFrom: "",
           validTo: "",
-          daysRemaining: -1, // Unknown
+          daysRemaining: SSL_DAYS_REMAINING_UNKNOWN, // Unknown
           isValid: true,
           subject: new URL(url).hostname,
         },
@@ -185,26 +186,14 @@ export function getSslExpiryStatus(daysRemaining: number): {
   label: string;
   color: string;
 } {
-  if (daysRemaining < 0 && daysRemaining !== -1) {
-    return { status: "expired", label: "Expired", color: "red" };
-  }
-  if (daysRemaining === -1) {
+  if (daysRemaining === SSL_DAYS_REMAINING_UNKNOWN) {
     return { status: "unknown", label: "Unknown", color: "gray" };
   }
-  if (daysRemaining <= SSL_CRITICAL_DAYS) {
-    return {
-      status: "critical",
-      label: `${daysRemaining}d remaining`,
-      color: "red",
-    };
+  if (daysRemaining < 0) {
+    return { status: "expired", label: "Expired", color: "red" };
   }
-  if (daysRemaining <= SSL_WARNING_DAYS) {
-    return {
-      status: "warning",
-      label: `${daysRemaining}d remaining`,
-      color: "yellow",
-    };
-  }
+
+  // No warning/critical for upcoming expiry, as requested
   return { status: "ok", label: `${daysRemaining}d remaining`, color: "green" };
 }
 
@@ -216,18 +205,31 @@ export function shouldWarnSslExpiry(
   lastWarningDays?: number,
 ): boolean {
   // Don't warn if unknown
-  if (daysRemaining === -1) return false;
+  if (daysRemaining === SSL_DAYS_REMAINING_UNKNOWN) return false;
 
-  // Warn at specific thresholds: 30, 14, 7, 3, 1 days
-  const warningThresholds = [30, 14, 7, 3, 1];
+  // Only warn if expired (negative days remaining)
+  if (daysRemaining < 0) {
+    // Check if we already warned for this specific negative value (or lower)
+    // Actually, simply ensuring we don't spam is the goal.
+    // If lastWarningDays is undefined (never warned) -> Warn
+    // If lastWarningDays > daysRemaining (e.g. warned at -1, now -2) -> Warn?
+    // Or just warn once when it expires?
+    // Let's stick to the previous logic pattern: warn if we cross a threshold.
+    // But here the "threshold" is essentially 0.
 
-  for (const threshold of warningThresholds) {
-    if (daysRemaining <= threshold) {
-      // Only warn if we haven't warned at this threshold yet
-      if (lastWarningDays === undefined || lastWarningDays > threshold) {
-        return true;
-      }
+    // If we haven't warned yet (undefined), warn.
+    if (lastWarningDays === undefined) {
+      return true;
     }
+
+    // If we warned when it was NOT expired (positive), and now it IS (negative), warn.
+    // Also cover the case where lastWarningDays implies unknown (if we ever stored -1 as unknown previously).
+    // Safest bet: if lastWarningDays >= 0, then we haven't warned about expiration yet.
+    if (lastWarningDays >= 0) {
+      return true;
+    }
+
+    return false;
   }
 
   return false;
@@ -242,7 +244,7 @@ export function formatSslInfo(info: SslInfo): string {
     `Issuer: ${info.issuer}`,
     `Valid From: ${info.validFrom}`,
     `Valid To: ${info.validTo}`,
-    `Days Remaining: ${info.daysRemaining === -1 ? "Unknown" : info.daysRemaining}`,
+    `Days Remaining: ${info.daysRemaining === SSL_DAYS_REMAINING_UNKNOWN ? "Unknown" : info.daysRemaining}`,
   ];
   return lines.join("\n");
 }

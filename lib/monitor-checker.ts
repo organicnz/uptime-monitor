@@ -4,7 +4,7 @@ import { isValidMonitorUrl } from "@/lib/security";
 import {
   checkSslCertificate,
   shouldWarnSslExpiry,
-  SSL_WARNING_DAYS,
+  SSL_DAYS_REMAINING_UNKNOWN,
 } from "@/lib/ssl-utils";
 
 // Status constants (matching Uptime Kuma)
@@ -593,17 +593,17 @@ async function checkAndUpdateSsl(
           .eq("id", monitor.id);
       }
 
-      // Check if we should send SSL expiry warning
+      // Check if we should send SSL expiry warning (now only for actual expiration)
       if (
-        info.daysRemaining !== -1 &&
-        info.daysRemaining <= SSL_WARNING_DAYS &&
+        info.daysRemaining !== SSL_DAYS_REMAINING_UNKNOWN &&
+        info.daysRemaining < 0 &&
         shouldWarnSslExpiry(info.daysRemaining, previousDaysRemaining)
       ) {
         // Send SSL expiry warning notification
         try {
           await notifyMonitor(monitor.id, monitor.user_id, {
-            title: `⚠️ SSL Certificate Expiring: ${monitor.name}`,
-            message: `Certificate expires in ${info.daysRemaining} days (${info.validTo})`,
+            title: `🔴 SSL Certificate Expired: ${monitor.name}`,
+            message: `Certificate has expired! (${info.daysRemaining} days ago, on ${info.validTo})`,
             monitorName: monitor.name,
             monitorUrl: monitor.url,
             status: info.daysRemaining <= 7 ? "down" : "degraded",
