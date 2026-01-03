@@ -1,75 +1,167 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Uptime Monitor
+
+A self-hosted uptime monitoring application inspired by [Uptime Kuma](https://github.com/louislam/uptime-kuma), built with Next.js and Supabase.
 
 [Live Demo](https://uptime-monitor-next.vercel.app/)
 
+## Features
+
+- **Multiple Monitor Types**: HTTP/HTTPS, TCP, Ping, DNS, Keyword
+- **Notifications**: Telegram, Discord, Slack, Teams, Pushover, Webhooks
+- **Status Pages**: Public dashboards with custom slugs
+- **Incident Tracking**: Automatic incident creation and resolution
+- **SSL Monitoring**: Certificate expiration alerts
+- **MFA Support**: TOTP-based two-factor authentication
+- **Real-time Updates**: WebSocket-powered live dashboard
+
+## Tech Stack
+
+- **Framework**: Next.js 16 (App Router, React 19, Turbopack)
+- **Database**: Supabase (PostgreSQL + Auth + Realtime)
+- **Styling**: Tailwind CSS v4
+- **Language**: TypeScript (strict mode)
+- **Cron**: QStash (Upstash)
+- **Deployment**: Vercel
+
 ## Getting Started
 
-First, run the development server:
+### Prerequisites
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+- Node.js 20+
+- Supabase account
+- Vercel account (for deployment)
+- Upstash account (for QStash scheduling)
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Installation
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+1. Clone the repository:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+   ```bash
+   git clone https://github.com/organicnz/uptime-monitor.git
+   cd uptime-monitor
+   ```
 
-## Learn More
+2. Install dependencies:
 
-To learn more about Next.js, take a look at the following resources:
+   ```bash
+   npm install
+   ```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+3. Set up environment variables:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+   ```bash
+   cp .env.local.example .env.local
+   ```
+
+4. Configure your `.env.local` with:
+   - Supabase credentials (URL, anon key, service role key)
+   - QStash credentials (token, signing keys)
+   - Site URL
+
+5. Set up the database:
+   - Run the schema from `supabase/schema.sql` in your Supabase project
+
+6. Start the development server:
+
+   ```bash
+   npm run dev
+   ```
+
+   Open [http://localhost:3001](http://localhost:3001) in your browser.
+
+## Environment Variables
+
+See `.env.local.example` for all required variables:
+
+| Variable                          | Description                                  |
+| --------------------------------- | -------------------------------------------- |
+| `NEXT_PUBLIC_SUPABASE_URL`        | Supabase project URL                         |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY`   | Supabase anonymous key                       |
+| `SUPABASE_SERVICE_ROLE_KEY`       | Supabase service role key (server-side only) |
+| `NEXT_PUBLIC_SITE_URL`            | Public URL of your deployment                |
+| `QSTASH_TOKEN`                    | QStash API token                             |
+| `QSTASH_CURRENT_SIGNING_KEY`      | QStash signing key                           |
+| `QSTASH_NEXT_SIGNING_KEY`         | QStash next signing key                      |
+| `VERCEL_AUTOMATION_BYPASS_SECRET` | Bypass secret for Vercel Authentication      |
+
+## Cron Scheduling
+
+Monitor checks are scheduled via [QStash](https://upstash.com/docs/qstash) (Upstash). The schedule can be configured through the dashboard settings.
+
+Default: Every 3 minutes
+
+The cron endpoint is protected and requires the `x-vercel-protection-bypass` header when Vercel Authentication is enabled.
 
 ## Development Tools
 
-This project includes a **Rust-based audit tool** (`tools/audit`) to manage code quality, security checks, and automation tasks.
+This project includes a **Rust-based audit tool** (`tools/audit`) for code quality, security checks, and automation.
 
 ### Building the Tool
-
-The tool is automatically built during `npm install`. To build it manually:
 
 ```bash
 npm run build:audit
 ```
 
-### Usage
-
-The compiled binary is located at `tools/audit/target/release/audit`.
+### Commands
 
 ```bash
-# General Usage
-./tools/audit/target/release/audit [COMMAND]
+# Run all pre-commit checks
+./tools/audit/target/release/audit start
 
-# Key Commands
-audit start            # Run all pre-commit checks
-audit vercel-cleanup   # Manage old Vercel deployments
-audit generate-favicons # Generate favicons from SVG
-audit local-cron       # Run monitor checks locally
-audit test-bypass      # Test Vercel protection bypass
+# Generate favicons from SVG
+./tools/audit/target/release/audit generate-favicons
+
+# Run monitor checks locally
+./tools/audit/target/release/audit local-cron --token $CRON_SECRET
+
+# Test Vercel protection bypass
+./tools/audit/target/release/audit test-bypass
+
+# Clean up old Vercel deployments
+./tools/audit/target/release/audit vercel-cleanup
 ```
 
-### Vercel Protection Bypass
+## Deployment
 
-If Vercel Authentication is enabled, you can use the bypass feature:
+### Vercel (Recommended)
 
-```bash
-# Test if bypass works (requires VERCEL_AUTOMATION_BYPASS_SECRET env var)
-audit test-bypass --url https://your-project.vercel.app
+1. Push to GitHub
+2. Import project in Vercel
+3. Add environment variables in Vercel dashboard
+4. Deploy
+
+### QStash Setup
+
+1. Create a schedule in [Upstash Console](https://console.upstash.com/qstash)
+2. Set destination: `https://your-domain.vercel.app/api/cron/check-monitors`
+3. Add header: `x-vercel-protection-bypass: <your-bypass-secret>`
+4. Set cron expression (e.g., `*/3 * * * *` for every 3 minutes)
+
+## Project Structure
+
+```
+app/                    # Next.js App Router pages
+├── (auth)/            # Auth pages (login, signup, mfa)
+├── (dashboard)/       # Protected dashboard pages
+├── api/               # API routes
+├── status/            # Public status pages
+lib/                   # Utilities and services
+├── supabase/          # Supabase clients
+├── actions/           # Server actions
+├── qstash.ts          # QStash client
+components/            # Reusable UI components
+supabase/              # Database schema
+tools/audit/           # Rust CLI tool
 ```
 
-## Deploy on Vercel
+## Security
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- Row Level Security (RLS) on all database tables
+- SSRF protection for monitor URLs
+- Rate limiting on auth endpoints
+- MFA support with TOTP
+- Security headers (HSTS, CSP, X-Frame-Options)
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## License
+
+MIT
