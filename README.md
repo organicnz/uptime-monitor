@@ -132,10 +132,77 @@ npm run build:audit
 
 ### QStash Setup
 
+#### Option 1: Via Upstash Console (UI)
+
 1. Create a schedule in [Upstash Console](https://console.upstash.com/qstash)
 2. Set destination: `https://your-domain.vercel.app/api/cron/check-monitors`
 3. Add header: `x-vercel-protection-bypass: <your-bypass-secret>`
 4. Set cron expression (e.g., `*/3 * * * *` for every 3 minutes)
+
+#### Option 2: Via CLI (Automation)
+
+Set your QStash token:
+
+```bash
+export QSTASH_TOKEN="your-qstash-token"
+```
+
+**Create a schedule:**
+
+```bash
+curl -X POST "https://qstash.upstash.io/v2/schedules" \
+  -H "Authorization: Bearer $QSTASH_TOKEN" \
+  -H "Content-Type: application/json" \
+  -H "Upstash-Cron: */3 * * * *" \
+  -H "Upstash-Forward-x-vercel-protection-bypass: $VERCEL_AUTOMATION_BYPASS_SECRET" \
+  -d "https://your-domain.vercel.app/api/cron/check-monitors"
+```
+
+**List schedules:**
+
+```bash
+curl -s -H "Authorization: Bearer $QSTASH_TOKEN" \
+  https://qstash.upstash.io/v2/schedules | jq '.'
+```
+
+**Pause a schedule:**
+
+```bash
+curl -X POST "https://qstash.upstash.io/v2/schedules/{schedule_id}/pause" \
+  -H "Authorization: Bearer $QSTASH_TOKEN"
+```
+
+**Resume a schedule:**
+
+```bash
+curl -X POST "https://qstash.upstash.io/v2/schedules/{schedule_id}/resume" \
+  -H "Authorization: Bearer $QSTASH_TOKEN"
+```
+
+**Delete a schedule:**
+
+```bash
+curl -X DELETE "https://qstash.upstash.io/v2/schedules/{schedule_id}" \
+  -H "Authorization: Bearer $QSTASH_TOKEN"
+```
+
+**Trigger manually (one-time):**
+
+```bash
+curl -X POST "https://qstash.upstash.io/v2/publish/https://your-domain.vercel.app/api/cron/check-monitors" \
+  -H "Authorization: Bearer $QSTASH_TOKEN" \
+  -H "Upstash-Forward-x-vercel-protection-bypass: $VERCEL_AUTOMATION_BYPASS_SECRET"
+```
+
+#### Environment Variables for QStash
+
+Get these from [Upstash Console](https://console.upstash.com/qstash):
+
+```bash
+QSTASH_TOKEN=eyJ...                    # API token for creating/managing schedules
+QSTASH_CURRENT_SIGNING_KEY=sig_...     # Verify incoming webhook signatures
+QSTASH_NEXT_SIGNING_KEY=sig_...        # Next rotation signing key
+```
 
 ## Project Structure
 
