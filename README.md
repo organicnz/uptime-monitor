@@ -28,6 +28,7 @@ A self-hosted uptime monitoring application inspired by [Uptime Kuma](https://gi
 ### Prerequisites
 
 - Node.js 20+
+- Rust/Cargo (for audit tool, optional)
 - Supabase account
 - Vercel account (for deployment)
 - Upstash account (for QStash scheduling)
@@ -69,20 +70,23 @@ A self-hosted uptime monitoring application inspired by [Uptime Kuma](https://gi
 
    Open [http://localhost:3001](http://localhost:3001) in your browser.
 
+> **Note**: Signups are disabled by default (private instance). Create users directly in Supabase Auth dashboard.
+
 ## Environment Variables
 
 See `.env.local.example` for all required variables:
 
-| Variable                          | Description                                  |
-| --------------------------------- | -------------------------------------------- |
-| `NEXT_PUBLIC_SUPABASE_URL`        | Supabase project URL                         |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY`   | Supabase anonymous key                       |
-| `SUPABASE_SERVICE_ROLE_KEY`       | Supabase service role key (server-side only) |
-| `NEXT_PUBLIC_SITE_URL`            | Public URL of your deployment                |
-| `QSTASH_TOKEN`                    | QStash API token                             |
-| `QSTASH_CURRENT_SIGNING_KEY`      | QStash signing key                           |
-| `QSTASH_NEXT_SIGNING_KEY`         | QStash next signing key                      |
-| `VERCEL_AUTOMATION_BYPASS_SECRET` | Bypass secret for Vercel Authentication      |
+| Variable                          | Description                                  | Required |
+| --------------------------------- | -------------------------------------------- | -------- |
+| `NEXT_PUBLIC_SUPABASE_URL`        | Supabase project URL                         | Yes      |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY`   | Supabase anonymous key                       | Yes      |
+| `SUPABASE_SERVICE_ROLE_KEY`       | Supabase service role key (server-side only) | Yes      |
+| `NEXT_PUBLIC_SITE_URL`            | Public URL of your deployment                | Yes      |
+| `CRON_SECRET`                     | Secret for cron job authentication           | Yes      |
+| `QSTASH_TOKEN`                    | QStash API token                             | Yes      |
+| `QSTASH_CURRENT_SIGNING_KEY`      | QStash signing key                           | Yes      |
+| `QSTASH_NEXT_SIGNING_KEY`         | QStash next signing key                      | Yes      |
+| `VERCEL_AUTOMATION_BYPASS_SECRET` | Bypass secret for Vercel Authentication      | No       |
 
 ## Cron Scheduling
 
@@ -94,25 +98,27 @@ The cron endpoint is protected and requires the `x-vercel-protection-bypass` hea
 
 ## Development Tools
 
-This project includes a **Rust-based audit tool** (`tools/audit`) for code quality, security checks, and automation.
+This project includes a **Rust-based audit tool** (`tools/audit`) for code quality, security checks, and automation. Git hooks are managed via [Lefthook](https://github.com/evilmartians/lefthook).
 
-### Building the Tool
+### Building the Audit Tool
 
 ```bash
 npm run build:audit
 ```
 
-### Commands
+> Requires Rust/Cargo. Skipped automatically if Cargo is not installed.
+
+### Audit Commands
 
 ```bash
-# Run all pre-commit checks
-./tools/audit/target/release/audit start
-
 # Generate favicons from SVG
 ./tools/audit/target/release/audit generate-favicons
 
-# Run monitor checks locally
-./tools/audit/target/release/audit local-cron --token $CRON_SECRET
+# Run monitor checks locally (uses CRON_SECRET env var)
+./tools/audit/target/release/audit local-cron
+
+# Run once instead of looping
+./tools/audit/target/release/audit local-cron --once
 
 # Test Vercel protection bypass
 ./tools/audit/target/release/audit test-bypass
@@ -120,6 +126,14 @@ npm run build:audit
 # Clean up old Vercel deployments
 ./tools/audit/target/release/audit vercel-cleanup
 ```
+
+### Git Hooks (Lefthook)
+
+Pre-commit and pre-push hooks run automatically:
+
+- **Pre-commit**: TypeScript, ESLint, Prettier, debug statements, secrets, JSON validation
+- **Commit-msg**: Conventional commits format, message length
+- **Pre-push**: Full type check, production build, branch naming
 
 ## Deployment
 
@@ -141,10 +155,11 @@ npm run build:audit
 
 #### Option 2: Via CLI (Automation)
 
-Set your QStash token:
+Set environment variables:
 
 ```bash
 export QSTASH_TOKEN="your-qstash-token"
+export VERCEL_AUTOMATION_BYPASS_SECRET="your-bypass-secret"
 ```
 
 **Create a schedule:**
@@ -207,18 +222,20 @@ QSTASH_NEXT_SIGNING_KEY=sig_...        # Next rotation signing key
 ## Project Structure
 
 ```
-app/                    # Next.js App Router pages
-├── (auth)/            # Auth pages (login, signup, mfa)
-├── (dashboard)/       # Protected dashboard pages
-├── api/               # API routes
-├── status/            # Public status pages
-lib/                   # Utilities and services
-├── supabase/          # Supabase clients
-├── actions/           # Server actions
-├── qstash.ts          # QStash client
-components/            # Reusable UI components
-supabase/              # Database schema
-tools/audit/           # Rust CLI tool
+├── app/                      # Next.js App Router
+│   ├── (auth)/               # Auth pages (login, signup, mfa)
+│   ├── (dashboard)/          # Protected dashboard pages
+│   ├── api/                  # API routes
+│   └── status/               # Public status pages
+├── components/               # React components
+│   └── ui/                   # shadcn/ui components
+├── lib/                      # Utilities and services
+│   ├── supabase/             # Supabase clients
+│   ├── actions/              # Server actions
+│   └── qstash.ts             # QStash client
+├── supabase/                 # Database schema and migrations
+├── tools/audit/              # Rust CLI tool
+└── types/                    # TypeScript type definitions
 ```
 
 ## Security
@@ -228,6 +245,7 @@ tools/audit/           # Rust CLI tool
 - Rate limiting on auth endpoints
 - MFA support with TOTP
 - Security headers (HSTS, CSP, X-Frame-Options)
+- Secrets detection in pre-commit hooks
 
 ## License
 
