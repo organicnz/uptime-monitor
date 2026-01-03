@@ -56,3 +56,4 @@ yarn-error.log*
 next-env.d.ts
 scripts/generate-favicons.js
 tools/audit/target/
+supabase-mcp.json

@@ -113,8 +113,8 @@ enum Commands {
         /// Run once and exit
         #[arg(long)]
         once: bool,
-        /// Bearer token for authorization
-        #[arg(long, default_value = "REDACTED_CRON_SECRET")]
+        /// Bearer token for authorization (reads from CRON_SECRET env var)
+        #[arg(long, env = "CRON_SECRET")]
         token: String,
     },
     /// Test Vercel protection bypass header
