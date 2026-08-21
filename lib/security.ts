@@ -32,6 +32,50 @@ export function sanitizeHtml(input: string): string {
     .replace(/'/g, "&#x27;");
 }
 
+const BLOCKED_HOSTNAME_PATTERNS = [
+  "localhost",
+  "127.0.0.1",
+  "0.0.0.0",
+  "::1",
+  "10.",
+  "172.16.",
+  "172.17.",
+  "172.18.",
+  "172.19.",
+  "172.20.",
+  "172.21.",
+  "172.22.",
+  "172.23.",
+  "172.24.",
+  "172.25.",
+  "172.26.",
+  "172.27.",
+  "172.28.",
+  "172.29.",
+  "172.30.",
+  "172.31.",
+  "192.168.",
+  "169.254.",
+  ".local",
+  ".internal",
+];
+
+/**
+ * Validate and sanitize hostname to prevent SSRF against private networks.
+ * Can be a domain name or an IP address.
+ */
+export function isValidHostname(hostname: string): boolean {
+  if (!hostname || typeof hostname !== "string") return false;
+
+  const lowerHostname = hostname.toLowerCase();
+  for (const pattern of BLOCKED_HOSTNAME_PATTERNS) {
+    if (lowerHostname.startsWith(pattern) || lowerHostname.endsWith(pattern)) {
+      return false;
+    }
+  }
+  return true;
+}
+
 /**
  * Validate and sanitize URL to prevent SSRF
  */
@@ -44,43 +88,8 @@ export function isValidMonitorUrl(url: string): boolean {
       return false;
     }
 
-    // Block localhost and private IPs
-    const hostname = parsed.hostname.toLowerCase();
-    const blockedPatterns = [
-      "localhost",
-      "127.0.0.1",
-      "0.0.0.0",
-      "::1",
-      "10.",
-      "172.16.",
-      "172.17.",
-      "172.18.",
-      "172.19.",
-      "172.20.",
-      "172.21.",
-      "172.22.",
-      "172.23.",
-      "172.24.",
-      "172.25.",
-      "172.26.",
-      "172.27.",
-      "172.28.",
-      "172.29.",
-      "172.30.",
-      "172.31.",
-      "192.168.",
-      "169.254.",
-      ".local",
-      ".internal",
-    ];
-
-    for (const pattern of blockedPatterns) {
-      if (hostname.startsWith(pattern) || hostname.endsWith(pattern)) {
-        return false;
-      }
-    }
-
-    return true;
+    // Delegate to hostname validation
+    return isValidHostname(parsed.hostname);
   } catch {
     return false;
   }

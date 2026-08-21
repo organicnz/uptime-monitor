@@ -22,12 +22,7 @@ import {
 } from "@/components/icons";
 
 type ChannelType =
-  | "telegram"
-  | "discord"
-  | "slack"
-  | "webhook"
-  | "email"
-  | "teams";
+  "telegram" | "discord" | "slack" | "webhook" | "email" | "teams";
 
 const channelTypes: {
   type: ChannelType;

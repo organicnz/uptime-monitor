@@ -79,7 +79,7 @@ export async function createMaintenance(
   if (maintenanceError || !maintenance) {
     return {
       success: false,
-      error: maintenanceError?.message || "Failed to create maintenance",
+      error: "Failed to create maintenance",
     };
   }
 
@@ -161,7 +161,7 @@ export async function updateMaintenance(
     .eq("user_id", user.id);
 
   if (updateError) {
-    return { success: false, error: updateError.message };
+    return { success: false, error: "Failed to update record." };
   }
 
   // Update monitor assignments
@@ -204,7 +204,10 @@ export async function deleteMaintenance(
     .eq("user_id", user.id);
 
   if (error) {
-    return { success: false, error: error.message };
+    return {
+      success: false,
+      error: "An unexpected error occurred. Please try again.",
+    };
   }
 
   revalidatePath("/dashboard/maintenance");

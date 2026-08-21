@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // Database Types (Auto-generated representation of current schema)
 export type Json =
   | string
@@ -38,6 +39,7 @@ export interface Database {
           created_at?: string;
           updated_at?: string;
         };
+        Relationships: any[];
       };
       monitors: {
         Row: {
@@ -45,13 +47,7 @@ export interface Database {
           user_id: string;
           name: string;
           type:
-            | "http"
-            | "tcp"
-            | "ping"
-            | "keyword"
-            | "dns"
-            | "docker"
-            | "steam";
+            "http" | "tcp" | "ping" | "keyword" | "dns" | "docker" | "steam";
           active: boolean;
           url: string | null;
           method: string | null;
@@ -81,13 +77,7 @@ export interface Database {
           user_id: string;
           name: string;
           type:
-            | "http"
-            | "tcp"
-            | "ping"
-            | "keyword"
-            | "dns"
-            | "docker"
-            | "steam";
+            "http" | "tcp" | "ping" | "keyword" | "dns" | "docker" | "steam";
           active?: boolean;
           url?: string | null;
           method?: string | null;
@@ -117,13 +107,7 @@ export interface Database {
           user_id?: string;
           name?: string;
           type?:
-            | "http"
-            | "tcp"
-            | "ping"
-            | "keyword"
-            | "dns"
-            | "docker"
-            | "steam";
+            "http" | "tcp" | "ping" | "keyword" | "dns" | "docker" | "steam";
           active?: boolean;
           url?: string | null;
           method?: string | null;
@@ -148,6 +132,7 @@ export interface Database {
           created_at?: string;
           updated_at?: string;
         };
+        Relationships: any[];
       };
       heartbeats: {
         Row: {
@@ -183,6 +168,7 @@ export interface Database {
           time?: string;
           created_at?: string;
         };
+        Relationships: any[];
       };
       incidents: {
         Row: {
@@ -215,6 +201,14 @@ export interface Database {
           resolved_at?: string | null;
           created_at?: string;
         };
+        Relationships: [
+          {
+            foreignKeyName: "incidents_monitor_id_fkey";
+            columns: ["monitor_id"];
+            referencedRelation: "monitors";
+            referencedColumns: ["id"];
+          },
+        ];
       };
       notification_channels: {
         Row: {
@@ -271,6 +265,7 @@ export interface Database {
           created_at?: string;
           updated_at?: string;
         };
+        Relationships: any[];
       };
       monitor_notifications: {
         Row: {
@@ -291,6 +286,7 @@ export interface Database {
           channel_id?: string;
           created_at?: string;
         };
+        Relationships: any[];
       };
       maintenance: {
         Row: {
@@ -332,6 +328,7 @@ export interface Database {
           created_at?: string;
           updated_at?: string;
         };
+        Relationships: any[];
       };
       maintenance_monitors: {
         Row: {
@@ -352,6 +349,42 @@ export interface Database {
           monitor_id?: string;
           created_at?: string;
         };
+        Relationships: [
+          {
+            foreignKeyName: "maintenance_monitors_monitor_id_fkey";
+            columns: ["monitor_id"];
+            referencedRelation: "monitors";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+
+      monitor_groups: {
+        Row: {
+          id: string;
+          user_id: string;
+          name: string;
+          sort_order: number;
+          collapsed: boolean;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          name: string;
+          sort_order?: number;
+          collapsed?: boolean;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          name?: string;
+          sort_order?: number;
+          collapsed?: boolean;
+          created_at?: string;
+        };
+        Relationships: any[];
       };
       status_pages: {
         Row: {
@@ -396,6 +429,7 @@ export interface Database {
           created_at?: string;
           updated_at?: string;
         };
+        Relationships: any[];
       };
       status_page_monitors: {
         Row: {
@@ -419,6 +453,14 @@ export interface Database {
           display_order?: number;
           created_at?: string;
         };
+        Relationships: [
+          {
+            foreignKeyName: "status_page_monitors_monitor_id_fkey";
+            columns: ["monitor_id"];
+            referencedRelation: "monitors";
+            referencedColumns: ["id"];
+          },
+        ];
       };
     };
     Views: {

@@ -67,7 +67,7 @@ export async function createStatusPage(
       slug,
       description,
       is_public: is_public ?? true,
-    } as never)
+    })
     .select("id")
     .single();
 
@@ -75,7 +75,8 @@ export async function createStatusPage(
     if (pageError.code === "23505") {
       return { error: "Slug already exists. Please choose a unique URL." };
     }
-    return { error: pageError.message };
+    console.error("Failed to create status page:", pageError);
+    return { error: "Failed to create status page. Please try again." };
   }
 
   // 2. Link Monitors
@@ -90,7 +91,7 @@ export async function createStatusPage(
 
     const { error: monitorsError } = await supabase
       .from("status_page_monitors")
-      .insert(monitorInserts as never);
+      .insert(monitorInserts);
 
     if (monitorsError) {
       console.error("Failed to link monitors:", monitorsError);
@@ -147,7 +148,7 @@ export async function updateStatusPage(
       description,
       is_public,
       updated_at: new Date().toISOString(),
-    } as never)
+    })
     .eq("id", id)
     .eq("user_id", user.id);
 
@@ -155,7 +156,8 @@ export async function updateStatusPage(
     if (pageError.code === "23505") {
       return { error: "Slug already exists. Please choose a unique URL." };
     }
-    return { error: pageError.message };
+    console.error("Failed to update status page:", pageError);
+    return { error: "Failed to update status page. Please try again." };
   }
 
   // 2. Relink Monitors (Delete all -> Add all)
@@ -179,7 +181,7 @@ export async function updateStatusPage(
 
     const { error: monitorsError } = await supabase
       .from("status_page_monitors")
-      .insert(monitorInserts as never);
+      .insert(monitorInserts);
 
     if (monitorsError) {
       return { error: "Failed to update monitors (insert step)" };
@@ -208,7 +210,8 @@ export async function deleteStatusPage(id: string) {
     .eq("user_id", user.id);
 
   if (error) {
-    throw error;
+    console.error("Failed to delete status page:", error);
+    throw new Error("Failed to delete status page");
   }
 
   revalidatePath("/dashboard/status-pages");

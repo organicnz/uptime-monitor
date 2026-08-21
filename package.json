@@ -11,11 +11,11 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "typecheck": "tsc --noEmit",
-    "prepare": "lefthook install",
-    "hooks:install": "lefthook install",
-    "hooks:uninstall": "lefthook uninstall",
-    "build:audit": "git submodule update --init --recursive && (command -v cargo >/dev/null 2>&1 && cd tools/audit && cargo build --release || echo 'Cargo not found, skipping audit build')",
-    "postinstall": "npm run build:audit"
+    "prepare": "[ -d .git ] && lefthook install || true",
+    "hooks:install": "[ -d .git ] && lefthook install || true",
+    "hooks:uninstall": "[ -d .git ] && lefthook uninstall || true",
+    "build:audit": "[ -d .git ] && git submodule update --init --recursive || echo 'Not a git repo, skipping submodules'; (command -v cargo >/dev/null 2>&1 && cd tools/audit && cargo build --release || echo 'Cargo not found, skipping audit build')",
+    "postinstall": "bun run build:audit"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

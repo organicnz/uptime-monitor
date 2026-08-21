@@ -72,7 +72,7 @@ export async function createIncident(
   if (error || !incident) {
     return {
       success: false,
-      error: error?.message || "Failed to create incident",
+      error: "Failed to create incident",
     };
   }
 
@@ -121,7 +121,10 @@ export async function updateIncidentStatus(
     .eq("id", id);
 
   if (error) {
-    return { success: false, error: error.message };
+    return {
+      success: false,
+      error: "An unexpected error occurred. Please try again.",
+    };
   }
 
   revalidatePath("/dashboard/incidents");
@@ -181,7 +184,10 @@ export async function updateIncident(
     .eq("id", id);
 
   if (error) {
-    return { success: false, error: error.message };
+    return {
+      success: false,
+      error: "An unexpected error occurred. Please try again.",
+    };
   }
 
   revalidatePath("/dashboard/incidents");
@@ -217,7 +223,10 @@ export async function deleteIncident(id: string): Promise<IncidentFormState> {
   const { error } = await supabase.from("incidents").delete().eq("id", id);
 
   if (error) {
-    return { success: false, error: error.message };
+    return {
+      success: false,
+      error: "An unexpected error occurred. Please try again.",
+    };
   }
 
   revalidatePath("/dashboard/incidents");

@@ -33,21 +33,21 @@ pre-commit:
     typecheck:
       priority: 1
       glob: "*.{ts,tsx}"
-      run: npx tsc --noEmit --skipLibCheck
+      run: bunx tsc --noEmit --skipLibCheck
       fail_text: "❌ TypeScript errors found. Fix type issues before committing."
 
     # ESLint with auto-fix disabled (check only)
     lint:
       priority: 1
       glob: "*.{js,jsx,ts,tsx}"
-      run: npx eslint {staged_files} --max-warnings 0 --no-fix
+      run: bunx eslint {staged_files} --max-warnings 0 --no-fix
       fail_text: "❌ ESLint errors found. Run 'npm run lint -- --fix' to auto-fix."
 
     # Prettier format check
     format:
       priority: 2
       glob: "*.{js,jsx,ts,tsx,json,css,md,yml,yaml}"
-      run: npx prettier --check {staged_files}
+      run: bunx prettier --check {staged_files}
       fail_text: "❌ Formatting issues found. Run 'npx prettier --write .' to fix."
 
     # Check for debug statements
@@ -110,7 +110,7 @@ pre-push:
     # Full TypeScript check
     typecheck-full:
       priority: 1
-      run: npx tsc --noEmit
+      run: bunx tsc --noEmit
       env:
         FORCE_COLOR: "0"
         NODE_OPTIONS: ""
@@ -119,7 +119,7 @@ pre-push:
     # Production build test
     build:
       priority: 2
-      run: npm run build
+      run: bun run build
       env:
         FORCE_COLOR: "0"
         NODE_OPTIONS: ""

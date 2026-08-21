@@ -103,7 +103,7 @@ export async function signInWithOAuth(provider: "google" | "github") {
   });
 
   if (error) {
-    return { error: error.message };
+    return { error: "An unexpected error occurred. Please try again." };
   }
 
   if (data.url) {
@@ -161,7 +161,7 @@ export async function updatePassword(formData: FormData) {
   });
 
   if (error) {
-    return { error: error.message };
+    return { error: "An unexpected error occurred. Please try again." };
   }
 
   revalidatePath("/", "layout");
@@ -178,7 +178,7 @@ export async function updateProfile(formData: FormData) {
   });
 
   if (authError) {
-    return { error: authError.message };
+    return { error: "Authentication failed. Please try again." };
   }
 
   const {
@@ -192,7 +192,7 @@ export async function updateProfile(formData: FormData) {
       .eq("id", user.id);
 
     if (profileError) {
-      return { error: profileError.message };
+      return { error: "Profile update failed. Please try again." };
     }
   }
 
@@ -213,7 +213,7 @@ export async function updateEmail(formData: FormData) {
   );
 
   if (error) {
-    return { error: error.message };
+    return { error: "An unexpected error occurred. Please try again." };
   }
 
   return {
@@ -240,7 +240,7 @@ export async function deleteAccount() {
     .eq("id", user.id);
 
   if (deleteError) {
-    return { error: deleteError.message };
+    return { error: "Failed to delete record." };
   }
 
   await supabase.auth.signOut();
@@ -259,7 +259,7 @@ export async function resendVerificationEmail(email: string) {
   });
 
   if (error) {
-    return { error: error.message };
+    return { error: "An unexpected error occurred. Please try again." };
   }
 
   return { success: true };

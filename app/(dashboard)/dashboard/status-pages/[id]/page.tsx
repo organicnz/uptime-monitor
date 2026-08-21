@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { createClient } from "@/lib/supabase/server";
 import { notFound, redirect } from "next/navigation";
 import { StatusPageForm } from "@/components/status-page-form";
@@ -61,7 +62,10 @@ export default async function EditStatusPage({
 
   return (
     <div className="max-w-5xl mx-auto">
-      <StatusPageForm monitors={allMonitors || []} initialData={initialData} />
+      <StatusPageForm
+        monitors={(allMonitors as any[]) || []}
+        initialData={initialData}
+      />
     </div>
   );
 }

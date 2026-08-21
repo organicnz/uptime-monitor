@@ -52,7 +52,7 @@ export async function duplicateMonitor(
     return { success: false, error: "Monitor not found" };
   }
 
-  const original = data as unknown as Monitor;
+  const original = data;
   const newName = `${original.name} (Copy)`;
 
   // Create a copy without id, created_at, updated_at
@@ -76,14 +76,18 @@ export async function duplicateMonitor(
     active: false, // Start paused so user can review before activating
   };
 
-  const { data: newMonitor, error: insertError } = await supabase
+  const { data: newerror: insertError } = await supabase
     .from("monitors")
-    .insert([monitorCopy] as unknown as never)
+    .insert([monitorCopy])
     .select()
     .single();
 
   if (insertError) {
-    return { success: false, error: insertError.message };
+    console.error("Failed to duplicate monitor:", insertError);
+    return {
+      success: false,
+      error: "Failed to duplicate monitor. Please try again.",
+    };
   }
 
   revalidatePath("/dashboard");

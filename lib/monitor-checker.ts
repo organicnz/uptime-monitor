@@ -1,6 +1,6 @@
 import { createServiceClient } from "@/lib/supabase/service";
 import { notifyMonitor } from "@/lib/notifications";
-import { isValidMonitorUrl } from "@/lib/security";
+import { isValidMonitorUrl, isValidHostname } from "@/lib/security";
 import {
   checkSslCertificate,
   shouldWarnSslExpiry,
@@ -178,6 +178,16 @@ async function checkHttp(monitor: Monitor): Promise<CheckResult> {
 async function checkTcp(monitor: Monitor): Promise<CheckResult> {
   const startTime = Date.now();
   const timeout = monitor.timeout || DEFAULT_TIMEOUT_SECONDS;
+
+  // SSRF protection - validate hostname
+  if (!monitor.hostname || !isValidHostname(monitor.hostname)) {
+    return {
+      status: HEARTBEAT_STATUS.DOWN,
+      ping: null,
+      msg: "Invalid or blocked hostname (private IPs not allowed)",
+    };
+  }
+
   const { controller, clear } = createTimeoutController(timeout);
 
   try {
@@ -220,6 +230,16 @@ async function checkTcp(monitor: Monitor): Promise<CheckResult> {
 async function checkPing(monitor: Monitor): Promise<CheckResult> {
   const startTime = Date.now();
   const timeout = monitor.timeout || DEFAULT_TIMEOUT_SECONDS;
+
+  // SSRF protection - validate hostname
+  if (!monitor.hostname || !isValidHostname(monitor.hostname)) {
+    return {
+      status: HEARTBEAT_STATUS.DOWN,
+      ping: null,
+      msg: "Invalid or blocked hostname (private IPs not allowed)",
+    };
+  }
+
   const { controller, clear } = createTimeoutController(timeout);
 
   try {
@@ -378,7 +398,7 @@ async function recordHeartbeat(
   supabase: ReturnType<typeof createServiceClient>,
   heartbeat: HeartbeatInsert,
 ): Promise<void> {
-  await supabase.from("heartbeats").insert(heartbeat as unknown as never);
+  await supabase.from("heartbeats").insert(heartbeat);
 }
 
 // Handle status change notifications and incidents
@@ -415,7 +435,7 @@ async function handleStatusChange(
         content: msg,
         status: INCIDENT_STATUS.OPEN,
         started_at: new Date().toISOString(),
-      } as unknown as never);
+      });
     }
 
     // Send DOWN notification
@@ -443,7 +463,7 @@ async function handleStatusChange(
       .update({
         status: INCIDENT_STATUS.RESOLVED,
         resolved_at: new Date().toISOString(),
-      } as unknown as never)
+      })
       .eq("monitor_id", monitor.id)
       .eq("status", INCIDENT_STATUS.OPEN);
 
@@ -589,7 +609,7 @@ async function checkAndUpdateSsl(
           .update({
             ssl_expiry: new Date(info.validTo).toISOString(),
             ssl_issuer: info.issuer,
-          } as unknown as never)
+          })
           .eq("id", monitor.id);
       }
 

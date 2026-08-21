@@ -29,13 +29,7 @@ import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 
 type ChannelType =
-  | "telegram"
-  | "discord"
-  | "slack"
-  | "webhook"
-  | "email"
-  | "teams"
-  | "pushover";
+  "telegram" | "discord" | "slack" | "webhook" | "email" | "teams" | "pushover";
 
 type NotificationChannel = {
   id: string;

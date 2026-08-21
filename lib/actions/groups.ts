@@ -70,7 +70,7 @@ export async function createGroup(formData: FormData): Promise<GroupFormState> {
   if (error || !group) {
     return {
       success: false,
-      error: error?.message || "Failed to create group",
+      error: "Failed to create group",
     };
   }
 
@@ -117,7 +117,10 @@ export async function updateGroup(
     .eq("user_id", user.id);
 
   if (error) {
-    return { success: false, error: error.message };
+    return {
+      success: false,
+      error: "An unexpected error occurred. Please try again.",
+    };
   }
 
   revalidatePath("/dashboard");
@@ -142,7 +145,10 @@ export async function deleteGroup(id: string): Promise<GroupFormState> {
     .eq("user_id", user.id);
 
   if (error) {
-    return { success: false, error: error.message };
+    return {
+      success: false,
+      error: "An unexpected error occurred. Please try again.",
+    };
   }
 
   revalidatePath("/dashboard");
@@ -196,7 +202,10 @@ export async function assignMonitorToGroup(
     .eq("user_id", user.id);
 
   if (error) {
-    return { success: false, error: error.message };
+    return {
+      success: false,
+      error: "An unexpected error occurred. Please try again.",
+    };
   }
 
   revalidatePath("/dashboard");
@@ -236,7 +245,10 @@ export async function toggleGroupCollapsed(
     .eq("id", id);
 
   if (error) {
-    return { success: false, error: error.message };
+    return {
+      success: false,
+      error: "An unexpected error occurred. Please try again.",
+    };
   }
 
   revalidatePath("/dashboard");

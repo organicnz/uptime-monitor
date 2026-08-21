@@ -45,13 +45,7 @@ export type NotificationConfig =
   | TeamsConfig;
 
 export type NotificationType =
-  | "email"
-  | "discord"
-  | "slack"
-  | "webhook"
-  | "telegram"
-  | "pushover"
-  | "teams";
+  "email" | "discord" | "slack" | "webhook" | "telegram" | "pushover" | "teams";
 
 export interface NotificationPayload {
   title: string;
@@ -419,7 +413,7 @@ export async function notifyMonitor(
     if (channelError) {
       console.error(`[notifyMonitor] Error fetching channels:`, channelError);
     }
-    channels = (channelsData || []) as NotificationChannel[];
+    channels = (channelsData || []) as unknown as NotificationChannel[];
   } else {
     // Fallback: use default channels if no specific links exist
     const { data: channelsData, error: defaultError } = await supabase
@@ -435,7 +429,7 @@ export async function notifyMonitor(
         defaultError,
       );
     }
-    channels = (channelsData || []) as NotificationChannel[];
+    channels = (channelsData || []) as unknown as NotificationChannel[];
   }
 
   if (channels.length === 0) {
@@ -487,7 +481,7 @@ export async function notifyUser(
     .eq("user_id", userId)
     .eq("active", true);
 
-  const channels = (channelsData || []) as NotificationChannel[];
+  const channels = (channelsData || []) as unknown as NotificationChannel[];
 
   if (error || channels.length === 0) {
     return { sent: 0, failed: 0, errors: error ? [error.message] : [] };
