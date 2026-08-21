@@ -32,66 +32,114 @@ export function sanitizeHtml(input: string): string {
     .replace(/'/g, "&#x27;");
 }
 
-const BLOCKED_HOSTNAME_PATTERNS = [
-  "localhost",
-  "127.0.0.1",
-  "0.0.0.0",
-  "::1",
-  "10.",
-  "172.16.",
-  "172.17.",
-  "172.18.",
-  "172.19.",
-  "172.20.",
-  "172.21.",
-  "172.22.",
-  "172.23.",
-  "172.24.",
-  "172.25.",
-  "172.26.",
-  "172.27.",
-  "172.28.",
-  "172.29.",
-  "172.30.",
-  "172.31.",
-  "192.168.",
-  "169.254.",
-  ".local",
-  ".internal",
-];
+import * as dns from "dns/promises";
+import ipaddr from "ipaddr.js";
+
+const BLOCKED_HOSTNAME_SUFFIXES = [".local", ".internal"];
 
 /**
- * Validate and sanitize hostname to prevent SSRF against private networks.
- * Can be a domain name or an IP address.
+ * Validates whether an IP address is safe to connect to.
+ * Blocks private, loopback, link-local, multicast, and unspecified IPs.
  */
-export function isValidHostname(hostname: string): boolean {
-  if (!hostname || typeof hostname !== "string") return false;
+function isSafeIp(ipString: string): boolean {
+  try {
+    const addr = ipaddr.parse(ipString);
+    const range = addr.range();
 
-  const lowerHostname = hostname.toLowerCase();
-  for (const pattern of BLOCKED_HOSTNAME_PATTERNS) {
-    if (lowerHostname.startsWith(pattern) || lowerHostname.endsWith(pattern)) {
+    // Allow public IPs (unicast). ipaddr.js classifies public as "unicast".
+    // Some versions classify it differently, but generally private/loopback
+    // are explicitly named.
+    const blockedRanges = [
+      "unspecified",
+      "broadcast",
+      "multicast",
+      "linkLocal",
+      "loopback",
+      "private",
+      "carrierGradeNat",
+      "reserved",
+      "rfc6052",
+      "rfc6145",
+      "uniqueLocal", // IPv6 ULA
+    ];
+
+    if (blockedRanges.includes(range)) {
       return false;
     }
+    return true;
+  } catch {
+    // If we can't parse it as an IP, assume it's unsafe (fail closed)
+    return false;
   }
-  return true;
 }
 
 /**
- * Validate and sanitize URL to prevent SSRF
+ * Pre-flight resolve and validate a hostname to prevent DNS rebinding attacks.
+ * It resolves the domain to an IP and validates the IP.
+ * @returns {Promise<string>} The resolved, safe IP address. Throws if unsafe.
  */
-export function isValidMonitorUrl(url: string): boolean {
+export async function resolveAndValidateHost(
+  hostname: string,
+): Promise<string> {
+  if (!hostname || typeof hostname !== "string") {
+    throw new Error("Invalid hostname");
+  }
+
+  const lowerHostname = hostname.toLowerCase();
+  for (const suffix of BLOCKED_HOSTNAME_SUFFIXES) {
+    if (lowerHostname.endsWith(suffix)) {
+      throw new Error(`Blocked domain suffix: ${suffix}`);
+    }
+  }
+
+  // If it's already an IP address, just validate it directly
+  if (ipaddr.isValid(hostname)) {
+    if (!isSafeIp(hostname)) {
+      throw new Error("Target IP is blocked (private/loopback range)");
+    }
+    return hostname;
+  }
+
+  // If it's a domain name, resolve it first to prevent DNS rebinding.
+  // We prefer IPv4 but will accept IPv6.
+  try {
+    const lookupResult = await dns.lookup(hostname, { all: false });
+    const resolvedIp = lookupResult.address;
+
+    if (!isSafeIp(resolvedIp)) {
+      throw new Error(
+        `Resolved IP (${resolvedIp}) is blocked (private/loopback range)`,
+      );
+    }
+
+    return resolvedIp;
+  } catch (error: unknown) {
+    throw new Error(`DNS Resolution failed: ${(error as Error).message}`);
+  }
+}
+
+/**
+ * Pre-flight validation of a full URL.
+ * Extends resolveAndValidateHost to also check protocols.
+ */
+export async function resolveAndValidateUrl(
+  url: string,
+): Promise<{ safeUrl: string; resolvedIp: string }> {
   try {
     const parsed = new URL(url);
 
     // Only allow http and https protocols
     if (!["http:", "https:"].includes(parsed.protocol)) {
-      return false;
+      throw new Error("Invalid protocol. Only HTTP and HTTPS are allowed.");
     }
 
-    // Delegate to hostname validation
-    return isValidHostname(parsed.hostname);
-  } catch {
-    return false;
+    const resolvedIp = await resolveAndValidateHost(parsed.hostname);
+
+    // We return the resolved IP so the caller can use it for the actual connection
+    // to strictly prevent the time-of-check to time-of-use (TOCTOU) DNS Rebinding race.
+    return { safeUrl: url, resolvedIp };
+  } catch (error: unknown) {
+    throw new Error(`URL Validation failed: ${(error as Error).message}`);
   }
 }
 

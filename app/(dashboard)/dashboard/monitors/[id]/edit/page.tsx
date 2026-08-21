@@ -19,6 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { createClient } from "@/lib/supabase/client";
+import { updateMonitor } from "@/lib/actions/monitors";
 import {
   ArrowLeft,
   Trash2,
@@ -296,8 +297,6 @@ export default function EditMonitorPage(props: {
     setError(null);
 
     try {
-      const supabase = createClient();
-
       const updateData: Record<string, unknown> = {
         name: formData.name,
         type: formData.type,
@@ -328,13 +327,13 @@ export default function EditMonitorPage(props: {
         updateData.port = null;
       }
 
-      const { error: updateError } = await supabase
-        .from("monitors")
-        .update(updateData as unknown as never)
-        .eq("id", params.id);
+      const result = await updateMonitor(params.id, updateData);
 
-      if (updateError) throw updateError;
+      if (result.error) {
+        throw new Error(result.error);
+      }
 
+      const supabase = createClient();
       // Update notification channel links
       // First, delete existing links
       await supabase

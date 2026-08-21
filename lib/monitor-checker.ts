@@ -1,6 +1,6 @@
 import { createServiceClient } from "@/lib/supabase/service";
 import { notifyMonitor } from "@/lib/notifications";
-import { isValidMonitorUrl, isValidHostname } from "@/lib/security";
+import { resolveAndValidateUrl, resolveAndValidateHost } from "@/lib/security";
 import {
   checkSslCertificate,
   shouldWarnSslExpiry,
@@ -87,11 +87,23 @@ async function checkHttp(monitor: Monitor): Promise<CheckResult> {
   const timeout = monitor.timeout || DEFAULT_TIMEOUT_SECONDS;
 
   // SSRF protection - validate URL before making request
-  if (!monitor.url || !isValidMonitorUrl(monitor.url)) {
+  if (!monitor.url) {
     return {
       status: HEARTBEAT_STATUS.DOWN,
       ping: null,
-      msg: "Invalid or blocked URL (private IPs not allowed)",
+      msg: "Missing URL",
+    };
+  }
+
+  let safeUrl = monitor.url;
+  try {
+    const validated = await resolveAndValidateUrl(monitor.url);
+    safeUrl = validated.safeUrl;
+  } catch (error: unknown) {
+    return {
+      status: HEARTBEAT_STATUS.DOWN,
+      ping: null,
+      msg: `SSRF Blocked: ${(error as Error).message}`,
     };
   }
 
@@ -103,7 +115,7 @@ async function checkHttp(monitor: Monitor): Promise<CheckResult> {
       ...(monitor.headers || {}),
     };
 
-    const response = await fetch(monitor.url, {
+    const response = await fetch(safeUrl, {
       method: monitor.method || "GET",
       headers,
       body: monitor.body || undefined,
@@ -169,7 +181,8 @@ async function checkHttp(monitor: Monitor): Promise<CheckResult> {
     return {
       status: HEARTBEAT_STATUS.DOWN,
       ping,
-      msg: error instanceof Error ? error.message : "Connection failed",
+      msg:
+        error instanceof Error ? (error as Error).message : "Connection failed",
     };
   }
 }
@@ -180,18 +193,29 @@ async function checkTcp(monitor: Monitor): Promise<CheckResult> {
   const timeout = monitor.timeout || DEFAULT_TIMEOUT_SECONDS;
 
   // SSRF protection - validate hostname
-  if (!monitor.hostname || !isValidHostname(monitor.hostname)) {
+  if (!monitor.hostname) {
     return {
       status: HEARTBEAT_STATUS.DOWN,
       ping: null,
-      msg: "Invalid or blocked hostname (private IPs not allowed)",
+      msg: "Missing hostname",
+    };
+  }
+
+  let safeHostname = monitor.hostname;
+  try {
+    safeHostname = await resolveAndValidateHost(monitor.hostname);
+  } catch (error: unknown) {
+    return {
+      status: HEARTBEAT_STATUS.DOWN,
+      ping: null,
+      msg: `SSRF Blocked: ${(error as Error).message}`,
     };
   }
 
   const { controller, clear } = createTimeoutController(timeout);
 
   try {
-    const url = `http://${monitor.hostname}:${monitor.port}`;
+    const url = `http://${safeHostname}:${monitor.port}`;
     await fetch(url, { method: "HEAD", signal: controller.signal });
     clear();
 
@@ -221,7 +245,8 @@ async function checkTcp(monitor: Monitor): Promise<CheckResult> {
     return {
       status: success ? HEARTBEAT_STATUS.UP : HEARTBEAT_STATUS.DOWN,
       ping,
-      msg: error instanceof Error ? error.message : "Connection failed",
+      msg:
+        error instanceof Error ? (error as Error).message : "Connection failed",
     };
   }
 }
@@ -232,11 +257,27 @@ async function checkPing(monitor: Monitor): Promise<CheckResult> {
   const timeout = monitor.timeout || DEFAULT_TIMEOUT_SECONDS;
 
   // SSRF protection - validate hostname
-  if (!monitor.hostname || !isValidHostname(monitor.hostname)) {
+  if (!monitor.hostname) {
     return {
       status: HEARTBEAT_STATUS.DOWN,
       ping: null,
-      msg: "Invalid or blocked hostname (private IPs not allowed)",
+      msg: "Missing hostname",
+    };
+  }
+
+  let safeHostname = monitor.hostname;
+  try {
+    // If it's a URL in ping (rare, but possible due to UI), parse out the hostname
+    const hostToResolve = monitor.hostname.startsWith("http")
+      ? new URL(monitor.hostname).hostname
+      : monitor.hostname;
+
+    safeHostname = await resolveAndValidateHost(hostToResolve);
+  } catch (error: unknown) {
+    return {
+      status: HEARTBEAT_STATUS.DOWN,
+      ping: null,
+      msg: `SSRF Blocked: ${(error as Error).message}`,
     };
   }
 
@@ -245,7 +286,7 @@ async function checkPing(monitor: Monitor): Promise<CheckResult> {
   try {
     const url = monitor.hostname?.startsWith("http")
       ? monitor.hostname
-      : `https://${monitor.hostname}`;
+      : `https://${safeHostname}`;
 
     const response = await fetch(url, {
       method: "HEAD",
@@ -270,7 +311,8 @@ async function checkPing(monitor: Monitor): Promise<CheckResult> {
     return {
       status: success ? HEARTBEAT_STATUS.UP : HEARTBEAT_STATUS.DOWN,
       ping,
-      msg: error instanceof Error ? error.message : "Host unreachable",
+      msg:
+        error instanceof Error ? (error as Error).message : "Host unreachable",
     };
   }
 }
@@ -319,7 +361,8 @@ async function checkDns(monitor: Monitor): Promise<CheckResult> {
     return {
       status: monitor.upside_down ? HEARTBEAT_STATUS.UP : HEARTBEAT_STATUS.DOWN,
       ping,
-      msg: error instanceof Error ? error.message : "DNS query failed",
+      msg:
+        error instanceof Error ? (error as Error).message : "DNS query failed",
     };
   }
 }

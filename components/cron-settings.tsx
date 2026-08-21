@@ -110,6 +110,7 @@ export function CronSettings() {
   };
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchSchedule();
   }, []);
 

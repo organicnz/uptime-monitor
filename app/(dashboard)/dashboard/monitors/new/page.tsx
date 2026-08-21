@@ -13,7 +13,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { createClient } from "@/lib/supabase/client";
+import { createMonitor } from "@/lib/actions/monitors";
 import {
   ArrowLeft,
   Globe,
@@ -103,26 +103,13 @@ export default function NewMonitorPage() {
     setError(null);
 
     try {
-      const supabase = createClient();
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      if (!user) {
-        setError("You must be logged in to create a monitor");
-        setLoading(false);
-        return;
-      }
-
       const monitorData: Record<string, unknown> = {
-        user_id: user.id,
         name: formData.name,
         type: formData.type,
         interval: formData.interval,
         timeout: formData.timeout,
         max_retries: formData.max_retries,
         description: formData.description || null,
-        active: true,
       };
 
       if (formData.type === "http" || formData.type === "keyword") {
@@ -138,19 +125,15 @@ export default function NewMonitorPage() {
         monitorData.hostname = formData.hostname;
       }
 
-      const { data, error: insertError } = await supabase
-        .from("monitors")
-        .insert([monitorData] as unknown as never)
-        .select()
-        .single();
+      const result = await createMonitor(monitorData);
 
-      if (insertError) throw insertError;
+      if (result.error) {
+        throw new Error(result.error);
+      }
 
       setSuccess(true);
       setTimeout(() => {
-        router.push(
-          `/dashboard/monitors/${(data as unknown as { id: string }).id}`,
-        );
+        router.push(`/dashboard/monitors/${result.monitor?.id}`);
       }, 500);
     } catch (err) {
       console.error("Error creating monitor:", err);
