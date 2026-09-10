@@ -35,20 +35,30 @@ export function sanitizeHtml(input: string): string {
 import * as dns from "dns/promises";
 import ipaddr from "ipaddr.js";
 
-const BLOCKED_HOSTNAME_SUFFIXES = [".local", ".internal"];
+const BLOCKED_HOSTNAME_SUFFIXES = [
+  ".local",
+  ".internal",
+  ".lan",
+  ".home.arpa",
+  "metadata.google.internal",
+];
 
 /**
  * Validates whether an IP address is safe to connect to.
  * Blocks private, loopback, link-local, multicast, and unspecified IPs.
+ * Automatically unwraps IPv4-mapped IPv6 addresses.
  */
 function isSafeIp(ipString: string): boolean {
   try {
-    const addr = ipaddr.parse(ipString);
+    let addr = ipaddr.parse(ipString);
+
+    // If it's an IPv4-mapped IPv6 address (e.g. ::ffff:127.0.0.1), unwrap it to IPv4
+    if (addr.kind() === "ipv6" && (addr as ipaddr.IPv6).isIPv4MappedAddress()) {
+      addr = (addr as ipaddr.IPv6).toIPv4Address();
+    }
+
     const range = addr.range();
 
-    // Allow public IPs (unicast). ipaddr.js classifies public as "unicast".
-    // Some versions classify it differently, but generally private/loopback
-    // are explicitly named.
     const blockedRanges = [
       "unspecified",
       "broadcast",
@@ -66,11 +76,33 @@ function isSafeIp(ipString: string): boolean {
     if (blockedRanges.includes(range)) {
       return false;
     }
+
+    // Explicitly block cloud instance metadata addresses and 0.0.0.0/8
+    const rawIp = addr.toString();
+    if (
+      rawIp === "169.254.169.254" ||
+      rawIp === "fd00:ec2::254" ||
+      rawIp.startsWith("0.")
+    ) {
+      return false;
+    }
+
     return true;
   } catch {
     // If we can't parse it as an IP, assume it's unsafe (fail closed)
     return false;
   }
+}
+
+/**
+ * Formats a host or IP for use in URLs (e.g., wraps IPv6 addresses in brackets).
+ */
+export function formatHostForUrl(host: string): string {
+  if (!host) return "";
+  if (host.includes(":") && !host.startsWith("[") && !host.endsWith("]")) {
+    return `[${host}]`;
+  }
+  return host;
 }
 
 /**
@@ -87,8 +119,8 @@ export async function resolveAndValidateHost(
 
   const lowerHostname = hostname.toLowerCase();
   for (const suffix of BLOCKED_HOSTNAME_SUFFIXES) {
-    if (lowerHostname.endsWith(suffix)) {
-      throw new Error(`Blocked domain suffix: ${suffix}`);
+    if (lowerHostname === suffix || lowerHostname.endsWith(suffix)) {
+      throw new Error(`Blocked domain suffix or host: ${suffix}`);
     }
   }
 
@@ -135,8 +167,6 @@ export async function resolveAndValidateUrl(
 
     const resolvedIp = await resolveAndValidateHost(parsed.hostname);
 
-    // We return the resolved IP so the caller can use it for the actual connection
-    // to strictly prevent the time-of-check to time-of-use (TOCTOU) DNS Rebinding race.
     return { safeUrl: url, resolvedIp };
   } catch (error: unknown) {
     throw new Error(`URL Validation failed: ${(error as Error).message}`);

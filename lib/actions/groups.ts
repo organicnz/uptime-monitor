@@ -2,7 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
-import { z } from "zod/v4";
+import { z } from "zod";
 
 const groupSchema = z.object({
   name: z.string().min(1, "Name is required").max(100),

@@ -2,7 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
-import { z } from "zod/v4";
+import { z } from "zod";
 import { INCIDENT_STATUS } from "@/lib/constants";
 
 const incidentSchema = z.object({
@@ -121,6 +121,14 @@ export async function updateIncidentStatus(
     .eq("id", id);
 
   if (error) {
+    if (error.code === "42501") {
+      console.error(
+        `[RLS AUDIT] User ${user?.id || "unknown"} attempted to perform an action but was denied by RLS policies.`,
+        error,
+      );
+    } else {
+      console.error("Action error:", error);
+    }
     return {
       success: false,
       error: "An unexpected error occurred. Please try again.",
@@ -184,6 +192,14 @@ export async function updateIncident(
     .eq("id", id);
 
   if (error) {
+    if (error.code === "42501") {
+      console.error(
+        `[RLS AUDIT] User ${user?.id || "unknown"} attempted to perform an action but was denied by RLS policies.`,
+        error,
+      );
+    } else {
+      console.error("Action error:", error);
+    }
     return {
       success: false,
       error: "An unexpected error occurred. Please try again.",
@@ -223,6 +239,14 @@ export async function deleteIncident(id: string): Promise<IncidentFormState> {
   const { error } = await supabase.from("incidents").delete().eq("id", id);
 
   if (error) {
+    if (error.code === "42501") {
+      console.error(
+        `[RLS AUDIT] User ${user?.id || "unknown"} attempted to perform an action but was denied by RLS policies.`,
+        error,
+      );
+    } else {
+      console.error("Action error:", error);
+    }
     return {
       success: false,
       error: "An unexpected error occurred. Please try again.",

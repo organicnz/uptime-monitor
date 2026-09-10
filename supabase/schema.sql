@@ -248,3 +248,18 @@ CREATE POLICY "Users can view own monitor notifs" ON monitor_notifications FOR S
 CREATE POLICY "Users can manage own monitor notifs" ON monitor_notifications FOR ALL USING (
   EXISTS (SELECT 1 FROM monitors WHERE monitors.id = monitor_notifications.monitor_id AND monitors.user_id = auth.uid())
 );
+
+-- Incidents
+CREATE POLICY "Users can view own incidents" ON incidents FOR SELECT USING (
+  EXISTS (SELECT 1 FROM monitors WHERE monitors.id = incidents.monitor_id AND monitors.user_id = auth.uid())
+);
+CREATE POLICY "Users can insert own incidents" ON incidents FOR INSERT WITH CHECK (
+  EXISTS (SELECT 1 FROM monitors WHERE monitors.id = incidents.monitor_id AND monitors.user_id = auth.uid())
+);
+CREATE POLICY "Users can update own incidents" ON incidents FOR UPDATE USING (
+  EXISTS (SELECT 1 FROM monitors WHERE monitors.id = incidents.monitor_id AND monitors.user_id = auth.uid())
+);
+CREATE POLICY "Users can delete own incidents" ON incidents FOR DELETE USING (
+  EXISTS (SELECT 1 FROM monitors WHERE monitors.id = incidents.monitor_id AND monitors.user_id = auth.uid())
+);
+

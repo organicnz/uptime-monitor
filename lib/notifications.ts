@@ -1,5 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
+import { track } from "@vercel/analytics/server";
+import { resolveAndValidateUrl } from "@/lib/security";
 
 export interface TelegramConfig {
   bot_token: string;
@@ -82,6 +84,7 @@ ${escapeMarkdown(payload.message)}${payload.monitorName ? `\n\n📍 *Monitor:* $
           parse_mode: "MarkdownV2",
           disable_web_page_preview: true,
         }),
+        signal: AbortSignal.timeout(10000),
       },
     );
 
@@ -142,6 +145,7 @@ export async function sendDiscordNotification(
           },
         ],
       }),
+      signal: AbortSignal.timeout(10000),
     });
 
     if (!response.ok) {
@@ -193,6 +197,7 @@ export async function sendSlackNotification(
           },
         ],
       }),
+      signal: AbortSignal.timeout(10000),
     });
 
     if (!response.ok) {
@@ -234,6 +239,7 @@ export async function sendPushoverNotification(
     const response = await fetch("https://api.pushover.net/1/messages.json", {
       method: "POST",
       body: formData,
+      signal: AbortSignal.timeout(10000),
     });
 
     const data = await response.json();
@@ -296,6 +302,7 @@ export async function sendTeamsNotification(
           },
         ],
       }),
+      signal: AbortSignal.timeout(10000),
     });
 
     if (!response.ok) {
@@ -316,6 +323,20 @@ export async function sendWebhookNotification(
   config: WebhookConfig,
   payload: NotificationPayload,
 ): Promise<{ success: boolean; error?: string }> {
+  if (!config.url) {
+    return { success: false, error: "Missing webhook URL" };
+  }
+
+  // Pre-flight SSRF protection on generic webhook endpoints
+  try {
+    await resolveAndValidateUrl(config.url);
+  } catch (error) {
+    return {
+      success: false,
+      error: `Webhook blocked by SSRF filter: ${(error as Error).message}`,
+    };
+  }
+
   try {
     const response = await fetch(config.url, {
       method: config.method || "POST",
@@ -324,6 +345,7 @@ export async function sendWebhookNotification(
         ...config.headers,
       },
       body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(10000),
     });
 
     if (!response.ok) {
@@ -447,6 +469,10 @@ export async function notifyMonitor(
         console.error(
           `[notifyMonitor] Failed to send to ${channel.name}: ${result.error}`,
         );
+      } else if (payload.status === "down") {
+        track("Downtime Alert Triggered", { channel: channel.type });
+      } else if (payload.status === "up") {
+        track("Recovery Alert Triggered", { channel: channel.type });
       }
       return { channel: channel.name, ...result };
     }),
@@ -494,6 +520,11 @@ export async function notifyUser(
         channel.config,
         payload,
       );
+      if (result.success && payload.status === "down") {
+        track("Downtime Alert Triggered", { channel: channel.type });
+      } else if (result.success && payload.status === "up") {
+        track("Recovery Alert Triggered", { channel: channel.type });
+      }
       return { channel: channel.name, ...result };
     }),
   );

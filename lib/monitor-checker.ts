@@ -1,6 +1,10 @@
 import { createServiceClient } from "@/lib/supabase/service";
 import { notifyMonitor } from "@/lib/notifications";
-import { resolveAndValidateUrl, resolveAndValidateHost } from "@/lib/security";
+import {
+  resolveAndValidateUrl,
+  resolveAndValidateHost,
+  formatHostForUrl,
+} from "@/lib/security";
 import {
   checkSslCertificate,
   shouldWarnSslExpiry,
@@ -81,6 +85,53 @@ function createTimeoutController(timeoutSeconds: number) {
   return { controller, clear: () => clearTimeout(timeoutId) };
 }
 
+/**
+ * Custom fetch with manual redirect handling to protect against SSRF via redirects.
+ * Validates each hop's destination against SSRF filters.
+ */
+async function fetchWithSsrfProtection(
+  initialUrl: string,
+  options: RequestInit & { maxRedirects?: number } = {},
+): Promise<Response> {
+  const maxRedirects = options.maxRedirects ?? 5;
+  let currentUrl = initialUrl;
+  let redirectCount = 0;
+
+  while (redirectCount <= maxRedirects) {
+    // Validate current URL before making the request
+    await resolveAndValidateUrl(currentUrl);
+
+    const response = await fetch(currentUrl, {
+      ...options,
+      redirect: "manual",
+    });
+
+    // Check if response is a redirect (301, 302, 303, 307, 308)
+    if ([301, 302, 303, 307, 308].includes(response.status)) {
+      const location = response.headers.get("location");
+      if (!location) {
+        return response; // No location header, return as is
+      }
+
+      // Resolve relative redirect URLs against current URL
+      const targetUrl = new URL(location, currentUrl).toString();
+      currentUrl = targetUrl;
+      redirectCount++;
+
+      if (redirectCount > maxRedirects) {
+        throw new Error(
+          `Too many redirects (exceeded limit of ${maxRedirects})`,
+        );
+      }
+      continue;
+    }
+
+    return response;
+  }
+
+  throw new Error(`Too many redirects (exceeded limit of ${maxRedirects})`);
+}
+
 // HTTP/HTTPS check
 async function checkHttp(monitor: Monitor): Promise<CheckResult> {
   const startTime = Date.now();
@@ -95,18 +146,6 @@ async function checkHttp(monitor: Monitor): Promise<CheckResult> {
     };
   }
 
-  let safeUrl = monitor.url;
-  try {
-    const validated = await resolveAndValidateUrl(monitor.url);
-    safeUrl = validated.safeUrl;
-  } catch (error: unknown) {
-    return {
-      status: HEARTBEAT_STATUS.DOWN,
-      ping: null,
-      msg: `SSRF Blocked: ${(error as Error).message}`,
-    };
-  }
-
   const { controller, clear } = createTimeoutController(timeout);
 
   try {
@@ -115,12 +154,11 @@ async function checkHttp(monitor: Monitor): Promise<CheckResult> {
       ...(monitor.headers || {}),
     };
 
-    const response = await fetch(safeUrl, {
+    const response = await fetchWithSsrfProtection(monitor.url, {
       method: monitor.method || "GET",
       headers,
       body: monitor.body || undefined,
       signal: controller.signal,
-      redirect: "follow",
     });
 
     clear();
@@ -215,7 +253,8 @@ async function checkTcp(monitor: Monitor): Promise<CheckResult> {
   const { controller, clear } = createTimeoutController(timeout);
 
   try {
-    const url = `http://${safeHostname}:${monitor.port}`;
+    const formattedHost = formatHostForUrl(safeHostname);
+    const url = `http://${formattedHost}:${monitor.port}`;
     await fetch(url, { method: "HEAD", signal: controller.signal });
     clear();
 
@@ -284,9 +323,10 @@ async function checkPing(monitor: Monitor): Promise<CheckResult> {
   const { controller, clear } = createTimeoutController(timeout);
 
   try {
+    const formattedHost = formatHostForUrl(safeHostname);
     const url = monitor.hostname?.startsWith("http")
       ? monitor.hostname
-      : `https://${safeHostname}`;
+      : `https://${formattedHost}`;
 
     const response = await fetch(url, {
       method: "HEAD",
@@ -329,8 +369,9 @@ async function checkDns(monitor: Monitor): Promise<CheckResult> {
   const { controller, clear } = createTimeoutController(timeout);
 
   try {
+    const encodedHostname = encodeURIComponent(monitor.hostname || "");
     const response = await fetch(
-      `https://dns.google/resolve?name=${monitor.hostname}&type=A`,
+      `https://dns.google/resolve?name=${encodedHostname}&type=A`,
       { signal: controller.signal },
     );
     clear();

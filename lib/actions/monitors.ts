@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import { track } from "@vercel/analytics/server";
 
 type Monitor = {
   id: string;
@@ -83,12 +84,20 @@ export async function duplicateMonitor(
     .single();
 
   if (insertError) {
-    console.error("Failed to duplicate monitor:", insertError);
+    if (insertError.code === "42501") {
+      console.error(
+        `[RLS AUDIT] User ${user.id} attempted to duplicate monitor ${monitorId} but was denied by RLS policies.`,
+      );
+    } else {
+      console.error("Failed to duplicate monitor:", insertError);
+    }
     return {
       success: false,
       error: "Failed to duplicate monitor. Please try again.",
     };
   }
+
+  track("Monitor Duplicated", { type: original.type });
 
   revalidatePath("/dashboard");
   revalidatePath("/dashboard/monitors");
@@ -159,9 +168,18 @@ export async function createMonitor(payload: unknown) {
     .single();
 
   if (error) {
-    console.error("Create monitor error:", error);
+    if (error.code === "42501") {
+      console.error(
+        `[RLS AUDIT] User ${user.id} attempted to create monitor but was denied by RLS policies. payload:`,
+        parsed.data,
+      );
+    } else {
+      console.error("Create monitor error:", error);
+    }
     return { error: "Failed to create monitor. Please try again." };
   }
+
+  track("Monitor Created", { type: parsed.data.type });
 
   revalidatePath("/dashboard");
   revalidatePath("/dashboard/monitors");
@@ -197,9 +215,18 @@ export async function updateMonitor(id: string, payload: unknown) {
     .eq("user_id", user.id);
 
   if (error) {
-    console.error("Update monitor error:", error);
+    if (error.code === "42501") {
+      console.error(
+        `[RLS AUDIT] User ${user.id} attempted to update monitor ${id} but was denied by RLS policies. payload:`,
+        parsed.data,
+      );
+    } else {
+      console.error("Update monitor error:", error);
+    }
     return { error: "Failed to update monitor. Please try again." };
   }
+
+  track("Monitor Updated", { type: parsed.data.type });
 
   revalidatePath("/dashboard");
   revalidatePath(`/dashboard/monitors/${id}`);
@@ -223,9 +250,17 @@ export async function deleteMonitor(id: string) {
     .eq("user_id", user.id);
 
   if (error) {
-    console.error("Delete monitor error:", error);
+    if (error.code === "42501") {
+      console.error(
+        `[RLS AUDIT] User ${user.id} attempted to delete monitor ${id} but was denied by RLS policies.`,
+      );
+    } else {
+      console.error("Delete monitor error:", error);
+    }
     return { error: "Failed to delete monitor. Please try again." };
   }
+
+  track("Monitor Deleted");
 
   revalidatePath("/dashboard");
   revalidatePath("/dashboard/monitors");

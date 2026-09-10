@@ -3,7 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { z } from "zod/v4";
+import { z } from "zod";
 
 const maintenanceSchema = z.object({
   title: z.string().min(1, "Title is required").max(100),
@@ -204,6 +204,14 @@ export async function deleteMaintenance(
     .eq("user_id", user.id);
 
   if (error) {
+    if (error.code === "42501") {
+      console.error(
+        `[RLS AUDIT] User ${user?.id || "unknown"} attempted to perform an action but was denied by RLS policies.`,
+        error,
+      );
+    } else {
+      console.error("Action error:", error);
+    }
     return {
       success: false,
       error: "An unexpected error occurred. Please try again.",
