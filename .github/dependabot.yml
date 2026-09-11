@@ -1,13 +1,8 @@
 version: 2
 updates:
-  - package-ecosystem: "bun"
-    directory: "/"
-    schedule:
-      interval: "weekly"
-    open-pull-requests-limit: 5
-    labels:
-      - "dependencies"
-
+  # NOTE: no `bun` ecosystem entry — Dependabot's bun updater only supports
+  # bun.lock lockfileVersion 1, but this repo uses lockfileVersion 2
+  # (Bun >= 1.2). Re-add once upstream supports v2 lockfiles.
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
