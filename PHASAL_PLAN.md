@@ -67,7 +67,9 @@ Deeply componentize and modularize the uptime-monitor codebase using bleeding ed
   - Production builds
   - Linting enforcement
   - Automated test suite (`bun run test`)
-- Deployment verification: pending
+- Deployment verification: production `https://uptime-monitor-next.vercel.app` responds 200
+  (per-deploy check needs Vercel dashboard/token — no `VERCEL_TOKEN` configured locally,
+  stale `.vercel/project.json` link, no Vercel commit statuses on GitHub)
 
 ### Phase 6: Final Polish
 
