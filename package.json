@@ -12,6 +12,7 @@
     "format:check": "prettier --check .",
     "typecheck": "tsc --noEmit",
     "test": "bun test",
+    "audit": "bun audit",
     "prepare": "[ -d .git ] && lefthook install || true",
     "hooks:install": "[ -d .git ] && lefthook install || true",
     "hooks:uninstall": "[ -d .git ] && lefthook uninstall || true",

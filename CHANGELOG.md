@@ -17,6 +17,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   - `__tests__/setup.ts` - DOM globals + `next/navigation` / server-action mocks (preloaded via `bunfig.toml`)
   - `test.yml` - GitHub Actions workflow running the suite on push/PR to `main`
 - **Accessibility Roles**: Queryable ARIA roles on all new components (`article`/`group`/`status`/`img`) alongside existing `aria-label`s
+- **Security Audit Gate**: `audit.yml` workflow + `bun run audit` script (fails CI on known vulnerabilities)
+- **Editor Config**: VS Code format-on-save with Prettier default, ESLint fix on save, recommended extensions
+
+### Fixed
+
+- **Critical Next.js RCEs**: Upgraded `next` 16.3.2 → 16.3.3 (GHSA-p293-qw3h-jr36, GHSA-2xp9-vwfh-vxw4)
+- **Transitive vulnerabilities**: `sharp`, `fast-uri`, `js-yaml` upgraded via `bun audit fix` (0 vulnerabilities remaining)
 
 ## [0.2.0] - 2026-09-10
 
