@@ -112,10 +112,10 @@ Deeply componentize and modularize the uptime-monitor codebase using bleeding ed
 ## CI/CD Status
 
 ```
-✅ typecheck: passed (strict mode, 0 errors)
-✅ test: passed (22 pass, 0 fail)
-✅ lint: passed (0 errors, 1 pre-existing svgo warning)
-✅ build: passed (production Next.js build)
+✅ typecheck: passed on main (strict mode, 0 errors)
+✅ test: passed on main (22 pass, 0 fail)
+✅ lint: passed on main (0 errors, 1 pre-existing svgo warning)
+✅ build: passed on main (production Next.js build)
 ```
 
-All checks passed on `main` branch after push to `https://github.com/organicnz/uptime-monitor.git`
+All checks green on `main` after push to `https://github.com/organicnz/uptime-monitor.git`
