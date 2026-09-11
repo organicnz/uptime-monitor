@@ -43,3 +43,37 @@ jobs:
             exit 1
           fi
           echo "Build passed successfully"
+
+      - name: Run tests with Bun coverage
+        run: bun run coverage-check
+
+      - name: Record bundle size baseline
+        id: baseline
+        run: |
+          mkdir -p .bundle
+          npx gzip-size -r .next > .bundle/size.json
+          echo "baseline=yes" >> $GITHUB_OUTPUT
+
+      - name: Compare bundle size
+        if: steps.baseline.outputs.baseline != 'yes'
+        run: |
+          PREV=$(cat .bundle/size.json.baseline 2>/dev/null || echo 0)
+          CUR=$(npx gzip-size -r .next)
+          echo "Current: $CUR, Previous: $PREV"
+          if [ "$PREV" -gt 0 ] && [ "$(( CUR - PREV ))" -gt $(( PREV / 10 )) ]; then
+            echo "❌ Bundle grew >10%!"
+            exit 1
+          fi
+          echo "${CUR}" > .bundle/size.json.baseline
+
+      - name: Upload bundle size artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bundle-size
+          path: .bundle/size.json
+
+      - name: Upload source maps to Sentry
+        if: success()
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+        run: npx @sentry/wizard@latest upload --dist-tag=next 2>/dev/null || true

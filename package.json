@@ -13,6 +13,7 @@
     "typecheck": "tsc --noEmit",
     "test": "bun test",
     "audit": "bun audit",
+    "coverage-check": "bash scripts/coverage-check.sh",
     "prepare": "[ -d .git ] && lefthook install || true",
     "hooks:install": "[ -d .git ] && lefthook install || true",
     "hooks:uninstall": "[ -d .git ] && lefthook uninstall || true",
