@@ -1,0 +1,36 @@
+name: Build
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Production build
+        run: bun run build
+
+      - name: Verify build succeeded
+        continue-on-error: false
+        run: |
+          if [ ! -d ".next" ]; then
+            echo "Build failed - .next directory not created"
+            exit 1
+          fi
+          echo "Build passed successfully"

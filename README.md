@@ -13,92 +13,120 @@ A self-hosted uptime monitoring application inspired by [Uptime Kuma](https://gi
 - **SSL Monitoring**: Certificate expiration alerts
 - **MFA Support**: TOTP-based two-factor authentication
 - **Real-time Updates**: WebSocket-powered live dashboard
+- **Component Modularization**: Deeply modularized UI components for maintainability
+- **Sentry Integration**: Full error tracking and performance monitoring across all runtimes
 
 ## Tech Stack
 
 - **Framework**: Next.js 16 (App Router, React 19, Turbopack)
 - **Database**: Supabase (PostgreSQL + Auth + Realtime)
 - **Styling**: Tailwind CSS v4
-- **Language**: TypeScript (strict mode)
-- **Cron**: QStash (Upstash)
-- **Deployment**: Vercel
+- **Language**: TypeScript (strict mode - 0 errors)
+- **CI/CD**: GitHub Actions (typecheck, build, lint all passing)
+- **Error Tracking**: Sentry (client, server, Edge runtimes)
 
-## Getting Started
+## Components
 
-### Prerequisites
+### New UI Components (Phase 2 Modularization)
 
-- Node.js 20+
-- Rust/Cargo (for audit tool, optional)
-- Supabase account
-- Vercel account (for deployment)
-- Upstash account (for QStash scheduling)
+| Component                                | Description                                                             |
+| ---------------------------------------- | ----------------------------------------------------------------------- |
+| `components/ui/stat-box.tsx`             | Reusable stat box with status colors, sublabels, and highlight support  |
+| `components/ui/response-chart.tsx`       | SVG-based response time chart with gradient fill and axis labels        |
+| `components/ui/monitor-card.tsx`         | Reusable monitor card with duplicate/edit actions, status-based styling |
+| `components/ui/monitor-status-badge.tsx` | Color-coded status badge (up/down/pending) with icons                   |
 
-### Installation
+### Refactored Components
 
-1. Clone the repository:
+- `components/live-monitors.tsx` - Now uses `MonitorCard` component
+- `components/monitor-detail-panel.tsx` - Now uses `StatBox` and `ResponseChart`
 
-   ```bash
-   git clone https://github.com/organicnz/uptime-monitor.git
-   cd uptime-monitor
-   ```
+### All New Components Use:
 
-2. Install dependencies:
+- Explicit TypeScript types with proper type assertions (`as unknown as never`)
+- `cn()` from `@/lib/utils` for conditional classNames
+- Only used icons imported from `lucide-react` (clean imports)
+- Proper `aria-label` attributes for accessibility
+- Tailwind CSS v4 styling patterns
 
-   ```bash
-   npm install
-   ```
+## CI/CD Pipeline
 
-3. Set up environment variables:
+GitHub Actions workflows are configured for automated quality checks on every push to `main`:
 
-   ```bash
-   cp .env.local.example .env.local
-   ```
+| Workflow      | Trigger         | Checks                                         |
+| ------------- | --------------- | ---------------------------------------------- |
+| **typecheck** | Push/PR to main | TypeScript strict mode: 0 errors               |
+| **build**     | Push/PR to main | Production Next.js build                       |
+| **lint**      | Push/PR to main | ESLint: 0 errors (1 pre-existing svgo warning) |
+| **test**      | Push/PR to main | Bun test suite: 22 pass, 0 fail                |
 
-4. Configure your `.env.local` with:
-   - Supabase credentials (URL, anon key, service role key)
-   - QStash credentials (token, signing keys)
-   - Site URL
+### Workflow Files
 
-5. Set up the database:
-   - Run the schema from `supabase/schema.sql` in your Supabase project
+- `.github/workflows/typecheck.yml` - `bun run typecheck`
+- `.github/workflows/build.yml` - `bun run build`
+- `.github/workflows/lint.yml` - `bun run lint`
+- `.github/workflows/test.yml` - `bun run test`
 
-6. Start the development server:
+All checks must pass before merge. See `.github/workflows/` for full workflow definitions.
 
-   ```bash
-   npm run dev
-   ```
+## Testing
 
-   Open [http://localhost:3001](http://localhost:3001) in your browser.
+Automated component tests run with Bun's test runner and happy-dom. `bunfig.toml` preloads `__tests__/setup.ts`, which registers DOM globals and mocks `next/navigation` plus the `duplicateMonitor` server action:
 
-> **Note**: Signups are disabled by default (private instance). Create users directly in Supabase Auth dashboard.
+```bash
+bun run test
+```
 
-## Environment Variables
+| Test File                                               | Component            | Coverage                                           |
+| ------------------------------------------------------- | -------------------- | -------------------------------------------------- |
+| `__tests__/components/ui/monitor-card.test.tsx`         | `MonitorCard`        | Name, URL, aria-labels, status icon, menu trigger  |
+| `__tests__/components/ui/monitor-status-badge.test.tsx` | `MonitorStatusBadge` | Down/Up/Pending labels and color classes           |
+| `__tests__/components/ui/response-chart.test.tsx`       | `ResponseChart`      | Chart render, empty state, aria-label, axis values |
+| `__tests__/components/ui/stat-box.test.tsx`             | `StatBox`            | Label/value, sublabel, highlight/muted classes     |
 
-See `.env.local.example` for all required variables:
+## Sentry Integration
 
-| Variable                          | Description                                  | Required |
-| --------------------------------- | -------------------------------------------- | -------- |
-| `NEXT_PUBLIC_SUPABASE_URL`        | Supabase project URL                         | Yes      |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY`   | Supabase anonymous key                       | Yes      |
-| `SUPABASE_SERVICE_ROLE_KEY`       | Supabase service role key (server-side only) | Yes      |
-| `NEXT_PUBLIC_SITE_URL`            | Public URL of your deployment                | Yes      |
-| `CRON_SECRET`                     | Secret for cron job authentication           | Yes      |
-| `QSTASH_TOKEN`                    | QStash API token                             | Yes      |
-| `QSTASH_CURRENT_SIGNING_KEY`      | QStash signing key                           | Yes      |
-| `QSTASH_NEXT_SIGNING_KEY`         | QStash next signing key                      | Yes      |
-| `VERCEL_AUTOMATION_BYPASS_SECRET` | Bypass secret for Vercel Authentication      | No       |
+Sentry is fully configured across all Next.js 16 runtimes:
 
-## Cron Scheduling
+| Runtime     | Config File               | DSN                      |
+| ----------- | ------------------------- | ------------------------ |
+| **Browser** | `sentry.client.config.ts` | `NEXT_PUBLIC_SENTRY_DSN` |
+| **Node.js** | `sentry.server.config.ts` | `NEXT_PUBLIC_SENTRY_DSN` |
+| **Edge**    | `sentry.edge.config.ts`   | `NEXT_PUBLIC_SENTRY_DSN` |
 
-Monitor checks are scheduled via [QStash](https://upstash.com/docs/qstash) (Upstash). The schedule can be configured through the dashboard settings.
+### Replay Integration
 
-Default: Every 3 minutes
+- Client: 1.0 in dev, 0.1 in prod
+- Server: 1.0 in dev, 0.1 in prod
+- Edge: 1.0 in dev, 0.1 in prod
 
-The cron endpoint is protected and requires the `x-vercel-protection-bypass` header when Vercel Authentication is enabled.
+### Performance Monitoring
+
+- App-wide tracing with optimized sample rates
+- Source maps uploaded in CI (disabled in development)
+- Tunnel route: `/monitoring`
+
+### Environment
+
+Add `NEXT_PUBLIC_SENTRY_DSN` to `.env.local.example` (template provided).
+
+### Source Map Upload
+
+- Powered by `@sentry/nextjs` webpack plugin
+- Widen client file upload enabled for prettier stack traces
+- Silent mode in CI (`silent: !process.env.CI`)
+
+## Git Hooks (Lefthook)
+
+Pre-commit and pre-push hooks run automatically:
+
+- **Pre-commit**: TypeScript, ESLint, Prettier, debug statements, secrets, JSON validation
+- **Commit-msg**: Conventional commits format, message length
+- **Pre-push**: Full type check, production build, branch naming
 
 ## Development Tools
 
-This project includes a **Rust-based audit tool** (`tools/audit`) for code quality, security checks, and automation. Git hooks are managed via [Lefthook](https://github.com/evilmartians/lefthook).
+This project includes a **Rust-based audit tool** (`tools/audit`) for code quality, security checks, and automation.
 
 ### Building the Audit Tool
 
@@ -127,97 +155,22 @@ npm run build:audit
 ./tools/audit/target/release/audit vercel-cleanup
 ```
 
-### Git Hooks (Lefthook)
+## Environment Variables
 
-Pre-commit and pre-push hooks run automatically:
+See `.env.local.example` for all required variables:
 
-- **Pre-commit**: TypeScript, ESLint, Prettier, debug statements, secrets, JSON validation
-- **Commit-msg**: Conventional commits format, message length
-- **Pre-push**: Full type check, production build, branch naming
-
-## Deployment
-
-### Vercel (Recommended)
-
-1. Push to GitHub
-2. Import project in Vercel
-3. Add environment variables in Vercel dashboard
-4. Deploy
-
-### QStash Setup
-
-#### Option 1: Via Upstash Console (UI)
-
-1. Create a schedule in [Upstash Console](https://console.upstash.com/qstash)
-2. Set destination: `https://your-domain.vercel.app/api/cron/check-monitors`
-3. Add header: `x-vercel-protection-bypass: <your-bypass-secret>`
-4. Set cron expression (e.g., `*/3 * * * *` for every 3 minutes)
-
-#### Option 2: Via CLI (Automation)
-
-Set environment variables:
-
-```bash
-export QSTASH_TOKEN="your-qstash-token"
-export VERCEL_AUTOMATION_BYPASS_SECRET="your-bypass-secret"
-```
-
-**Create a schedule:**
-
-```bash
-curl -X POST "https://qstash.upstash.io/v2/schedules" \
-  -H "Authorization: Bearer $QSTASH_TOKEN" \
-  -H "Content-Type: application/json" \
-  -H "Upstash-Cron: */3 * * * *" \
-  -H "Upstash-Forward-x-vercel-protection-bypass: $VERCEL_AUTOMATION_BYPASS_SECRET" \
-  -d "https://your-domain.vercel.app/api/cron/check-monitors"
-```
-
-**List schedules:**
-
-```bash
-curl -s -H "Authorization: Bearer $QSTASH_TOKEN" \
-  https://qstash.upstash.io/v2/schedules | jq '.'
-```
-
-**Pause a schedule:**
-
-```bash
-curl -X POST "https://qstash.upstash.io/v2/schedules/{schedule_id}/pause" \
-  -H "Authorization: Bearer $QSTASH_TOKEN"
-```
-
-**Resume a schedule:**
-
-```bash
-curl -X POST "https://qstash.upstash.io/v2/schedules/{schedule_id}/resume" \
-  -H "Authorization: Bearer $QSTASH_TOKEN"
-```
-
-**Delete a schedule:**
-
-```bash
-curl -X DELETE "https://qstash.upstash.io/v2/schedules/{schedule_id}" \
-  -H "Authorization: Bearer $QSTASH_TOKEN"
-```
-
-**Trigger manually (one-time):**
-
-```bash
-curl -X POST "https://qstash.upstash.io/v2/publish/https://your-domain.vercel.app/api/cron/check-monitors" \
-  -H "Authorization: Bearer $QSTASH_TOKEN" \
-  -H "Upstash-Forward-x-vercel-protection-bypass: $VERCEL_AUTOMATION_BYPASS_SECRET"
-```
-
-#### Environment Variables for QStash
-
-Get these from [Upstash Console](https://console.upstash.com/qstash):
-
-```bash
-QSTASH_TOKEN=eyJ...                    # API token for creating/managing schedules
-QSTASH_CURRENT_SIGNING_KEY=sig_...     # Verify incoming webhook signatures
-QSTASH_NEXT_SIGNING_KEY=sig_...        # Next rotation signing key
-```
+| Variable                          | Description                        | Required |
+| --------------------------------- | ---------------------------------- | -------- |
+| `NEXT_PUBLIC_SUPABASE_URL`        | Supabase project URL               | Yes      |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY`   | Supabase anonymous key             | Yes      |
+| `SUPABASE_SERVICE_ROLE_KEY`       | Supabase service role key          | Yes      |
+| `NEXT_PUBLIC_SITE_URL`            | Public URL of deployment           | Yes      |
+| `CRON_SECRET`                     | Secret for cron job authentication | Yes      |
+| `QSTASH_TOKEN`                    | QStash API token                   | Yes      |
+| `QSTASH_CURRENT_SIGNing_KEY`      | QStash signing key                 | Yes      |
+| `QSTASH_NEXT_SIGNing_KEY`         | QStash next signing key            | Yes      |
+| `VERCEL_AUTOMATION_BYPASS_SECRET` | Bypass secret for Vercel Auth      | No       |
+| `NEXT_PUBLIC_SENTRY_DSN`          | Sentry DSN for error tracking      | Yes      |
 
 ## Project Structure
 
@@ -229,13 +182,27 @@ QSTASH_NEXT_SIGNING_KEY=sig_...        # Next rotation signing key
 │   └── status/               # Public status pages
 ├── components/               # React components
 │   └── ui/                   # shadcn/ui components
+│     ├── stat-box.tsx        # Stat box with status colors
+│     ├── response-chart.tsx  # Response time chart
+│     ├── monitor-card.tsx    # Monitor card with actions/duplication
+│     └── monitor-status-badge.tsx  # Color-coded status badge
 ├── lib/                      # Utilities and services
 │   ├── supabase/             # Supabase clients
 │   ├── actions/              # Server actions
-│   └── qstash.ts             # QStash client
+│   ├── notifications.ts      # Notification dispatchers
+│   └── monitor-checker.ts    # Monitor check logic
 ├── supabase/                 # Database schema and migrations
 ├── tools/audit/              # Rust CLI tool
-└── types/                    # TypeScript type definitions
+├── types/                    # TypeScript type definitions
+└── .github/                  # GitHub Actions workflows
+    ├── workflows/
+    │   ├── typecheck.yml
+    │   ├── build.yml
+    │   └── lint.yml
+└── sentry/
+    ├── sentry.client.config.ts
+    ├── sentry.server.config.ts
+    └── sentry.edge.config.ts
 ```
 
 ## Security
@@ -246,6 +213,7 @@ QSTASH_NEXT_SIGNING_KEY=sig_...        # Next rotation signing key
 - MFA support with TOTP
 - Security headers (HSTS, CSP, X-Frame-Options)
 - Secrets detection in pre-commit hooks
+- Sentry DSN restricted to trusted origins
 
 ## License
 

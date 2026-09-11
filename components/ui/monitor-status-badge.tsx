@@ -25,19 +25,29 @@ const statusConfig = {
   },
 };
 
+const statusLabels: Record<number, string> = {
+  0: "Down",
+  1: "Up",
+  2: "Pending",
+};
+
 export function MonitorStatusBadge({ status }: { status: number }) {
   const config =
     statusConfig[status as keyof typeof statusConfig] || statusConfig[0];
   const Icon = config.icon;
+  const label =
+    statusLabels[status as keyof typeof statusLabels] || config.label;
 
   return (
     <span
+      role="status"
       className={cn(
         "inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium border",
         config.bg,
         config.color,
         config.border,
       )}
+      aria-label={`${config.label} - ${label}`}
     >
       <Icon className="h-3 w-3" />
       {config.label}

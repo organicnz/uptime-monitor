@@ -107,8 +107,17 @@ export function MonitorCard({ monitor }: MonitorCardProps) {
   };
 
   return (
-    <div key={monitor.id} className="relative group">
-      <Link href={`/dashboard/monitors/${monitor.id}`} className="block">
+    <div
+      key={monitor.id}
+      role="article"
+      className="relative group"
+      aria-label={`Monitor: ${monitor.name}`}
+    >
+      <Link
+        href={`/dashboard/monitors/${monitor.id}`}
+        className="block"
+        aria-label={`View monitor details for ${monitor.name}`}
+      >
         <Card
           className={cn(
             "bg-neutral-900/40 backdrop-blur-xl border-white/5 hover:bg-neutral-900/60 transition-all duration-300 h-full",
@@ -121,6 +130,8 @@ export function MonitorCard({ monitor }: MonitorCardProps) {
             {/* Header */}
             <div className="flex items-start justify-between mb-4">
               <div
+                role="img"
+                aria-label={statusDisplay.label}
                 className={cn(
                   "relative p-2.5 rounded-xl transition-transform group-hover:scale-110",
                   statusDisplay.bgColor,
@@ -143,10 +154,18 @@ export function MonitorCard({ monitor }: MonitorCardProps) {
             </div>
 
             {/* Name & URL */}
-            <h3 className="font-semibold text-foreground group-hover:text-primary transition-colors truncate mb-1">
+            <h3
+              className="font-semibold text-foreground group-hover:text-primary transition-colors truncate mb-1"
+              aria-label={`${monitor.name} monitor`}
+            >
               {monitor.name}
             </h3>
-            <p className="text-sm text-muted-foreground truncate mb-4">
+            <p
+              className="text-sm text-muted-foreground truncate mb-4"
+              aria-label={`${
+                monitor.url || monitor.hostname || "No endpoint"
+              } endpoint`}
+            >
               {monitor.url || monitor.hostname || "No endpoint"}
             </p>
 

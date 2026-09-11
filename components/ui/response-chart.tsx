@@ -1,12 +1,20 @@
 type ResponseChartProps = {
   heartbeats: { ping: number | null; time: string }[];
   maxPing: number;
+  "aria-label"?: string;
 };
 
-export function ResponseChart({ heartbeats, maxPing }: ResponseChartProps) {
+export function ResponseChart({
+  heartbeats,
+  maxPing,
+  "aria-label": ariaLabel,
+}: ResponseChartProps) {
   if (heartbeats.length < 2) {
     return (
-      <div className="h-[80px] flex items-center justify-center text-neutral-500 text-sm">
+      <div
+        role="status"
+        className="h-[80px] flex items-center justify-center text-neutral-500 text-sm"
+      >
         Not enough data for chart
       </div>
     );
@@ -14,6 +22,7 @@ export function ResponseChart({ heartbeats, maxPing }: ResponseChartProps) {
 
   const points = heartbeats.slice(0, 100).reverse();
   const chartMax = Math.max(maxPing * 1.1, 100);
+  const chartAriaLabel = ariaLabel || "Response time chart";
 
   return (
     <div className="h-[80px]">
@@ -27,9 +36,11 @@ export function ResponseChart({ heartbeats, maxPing }: ResponseChartProps) {
         {/* Chart */}
         <div className="ml-10 h-[56px]">
           <svg
+            role="img"
             className="w-full h-[40px]"
             preserveAspectRatio="none"
             viewBox="0 0 100 100"
+            aria-label={chartAriaLabel}
           >
             {/* Grid */}
             <line

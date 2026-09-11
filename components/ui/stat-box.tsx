@@ -7,6 +7,7 @@ export interface StatBoxProps {
   highlight?: boolean;
   muted?: boolean;
   className?: string;
+  "aria-label"?: string;
 }
 
 export function StatBox({
@@ -16,13 +17,17 @@ export function StatBox({
   highlight,
   muted,
   className,
+  "aria-label": ariaLabel,
 }: StatBoxProps) {
+  const ariaLabelValue = ariaLabel || ` ${label}: ${value}`;
   return (
     <div
+      role="group"
       className={cn(
         "py-3 sm:py-5 px-2 sm:px-4 text-center border-b border-white/5 sm:border-r last:border-r-0",
         className,
       )}
+      aria-label={ariaLabelValue}
     >
       <div className="text-xs sm:text-sm text-neutral-400 mb-0.5 sm:mb-1">
         {label}
