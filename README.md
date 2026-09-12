@@ -85,6 +85,8 @@ bun run test
 | `__tests__/components/ui/monitor-status-badge.test.tsx` | `MonitorStatusBadge` | Down/Up/Pending labels and color classes           |
 | `__tests__/components/ui/response-chart.test.tsx`       | `ResponseChart`      | Chart render, empty state, aria-label, axis values |
 | `__tests__/components/ui/stat-box.test.tsx`             | `StatBox`            | Label/value, sublabel, highlight/muted classes     |
+| `__tests__/components/ui/card.test.tsx`                 | `Card/*`             | Slots, custom classes, muted/semibold styling      |
+| `__tests__/components/ui/dropdown-menu.test.tsx`        | `DropdownMenu/*`     | Trigger open, items, inset, separator, classes     |
 | `__tests__/lib/security.test.ts`                        | `lib/security`       | Timing-safe compare, XSS sanitize, SSRF guards     |
 
 ### Security Audits
