@@ -81,7 +81,7 @@ bun run test
 
 | Test File                                               | Component            | Coverage                                           |
 | ------------------------------------------------------- | -------------------- | -------------------------------------------------- |
-| `__tests__/components/ui/monitor-card.test.tsx`         | `MonitorCard`        | Name, URL, aria-labels, status icon, menu trigger  |
+| `__tests__/components/ui/monitor-card.test.tsx`         | `MonitorCard`        | Name, URL, labels, icon, menu, states, error toast |
 | `__tests__/components/ui/monitor-status-badge.test.tsx` | `MonitorStatusBadge` | Down/Up/Pending labels and color classes           |
 | `__tests__/components/ui/response-chart.test.tsx`       | `ResponseChart`      | Chart render, empty state, aria-label, axis values |
 | `__tests__/components/ui/stat-box.test.tsx`             | `StatBox`            | Label/value, sublabel, highlight/muted classes     |

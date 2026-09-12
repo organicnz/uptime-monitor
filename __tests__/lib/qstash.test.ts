@@ -61,4 +61,8 @@ describe("cronToTimezone", () => {
     expect(cronToTimezone("*/5 * * * *")).toBe("UTC");
     expect(cronToTimezone("* * * * *")).toBe("UTC");
   });
+
+  it("defaults to UTC for a prefix without an expression", () => {
+    expect(cronToTimezone("CRON_TZ=")).toBe("UTC");
+  });
 });

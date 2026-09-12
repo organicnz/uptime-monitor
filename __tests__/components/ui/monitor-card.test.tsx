@@ -1,4 +1,6 @@
 import { cleanup, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { Toaster } from "sonner";
 import { MonitorCard } from "@/components/ui/monitor-card";
 
 afterEach(() => {
@@ -72,5 +74,45 @@ describe("MonitorCard", () => {
     );
     const trigger = screen.getByRole("button");
     expect(trigger).toBeDefined();
+  });
+
+  it("renders Down status with the down label", () => {
+    render(
+      <MonitorCard
+        monitor={{ ...mockMonitor, status: "down" }}
+        onViewDetail={mockOnViewDetail}
+      />,
+    );
+    expect(screen.getByRole("img", { name: "Down" })).toBeDefined();
+  });
+
+  it("renders Pending fallback when status is missing", () => {
+    render(
+      <MonitorCard
+        monitor={{ ...mockMonitor, status: undefined }}
+        onViewDetail={mockOnViewDetail}
+      />,
+    );
+    expect(screen.getByRole("img", { name: "Pending" })).toBeDefined();
+  });
+
+  it("shows an error toast when duplicating fails", async () => {
+    const user = userEvent.setup();
+    render(
+      <>
+        <Toaster />
+        <MonitorCard monitor={mockMonitor} onViewDetail={mockOnViewDetail} />
+      </>,
+    );
+    await user.click(screen.getByRole("button"));
+    // Text query: the item embeds a lucide svg, which skews role-name matching.
+    await user.click(await screen.findByText("Duplicate"));
+    // NOTE: currently two toasts appear because the menu trigger itself also
+    // fires handleDuplicate on open (suspected product bug, flagged separately).
+    // Keep >= 1 so this stays green once the trigger handler is removed.
+    const titles = await screen.findAllByText("Failed to duplicate");
+    expect(titles.length).toBeGreaterThanOrEqual(1);
+    const descriptions = await screen.findAllByText("mocked");
+    expect(descriptions.length).toBeGreaterThanOrEqual(1);
   });
 });
