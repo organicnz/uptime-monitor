@@ -134,6 +134,14 @@ pre-push:
         NODE_OPTIONS: ""
       fail_text: "❌ Build failed. Fix errors before pushing."
 
+    # Bundle-size guard (fast; .next was just built above)
+    bundle-size:
+      priority: 2
+      run: bun run bundle-size
+      env:
+        FORCE_COLOR: "0"
+      fail_text: "❌ Bundle grew >10%. Run 'bun run bundle-size:update' if intentional."
+
     # Branch naming convention
     branch-name:
       priority: 0
