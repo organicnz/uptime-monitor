@@ -23,3 +23,7 @@ png = "0.17"
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "time"] }
 reqwest = { version = "0.12", features = ["json"] }
 chrono = "0.4"
+url = "2.5"
+
+# Concurrent IP checking
+crossbeam = "0.8"

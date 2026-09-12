@@ -3,6 +3,7 @@ mod config;
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand, ValueEnum};
 use colored::*;
+use url::Url;
 use config::{Config, OutputFormat};
 use rayon::prelude::*;
 use regex::Regex;
@@ -80,8 +81,11 @@ enum Commands {
         /// Files to check
         files: Vec<String>,
     },
-    /// Check dependencies
-    DepsCheck { old_head: String, new_head: String },
+    /// Check URLs for SSRF vulnerabilities
+    SsrfCheck {
+        /// URLs to check
+        urls: Vec<String>,
+    },
     /// Reminder to check dependencies
     DepsReminder,
     /// Manage Vercel deployments (cleanup old/error deployments)
@@ -213,7 +217,7 @@ fn main() {
         Commands::CommitMsgLength { file } => check_commit_msg_length(file),
         Commands::JsonValidate { files } => validate_json(files, &config),
         Commands::FileSize { files } => check_file_size(files, &config),
-        Commands::DepsCheck { old_head, new_head } => check_deps(old_head, new_head),
+        Commands::SsrfCheck { urls } => check_ssrf(urls.to_vec(), &config),
         Commands::DepsReminder => remind_deps(),
         Commands::VercelCleanup { delete, errors_only } => vercel_cleanup(*delete, *errors_only),
         Commands::GenerateFavicons { svg_path, output_dir } => generate_favicons(svg_path, output_dir),
@@ -398,6 +402,136 @@ fn check_secrets(files: &[String], config: &Config) -> Result<CheckResult> {
                 }
             }
             file_violations
+        })
+        .collect();
+
+    for v in violations {
+        result.add_violation(v);
+    }
+
+    Ok(result)
+}
+
+fn check_ssrf(urls: Vec<String>, config: &Config) -> Result<CheckResult> {
+    let mut result = CheckResult::new("ssrf-check");
+
+    // Blocked hostname suffixes for SSRF prevention
+    const BLOCKED_HOSTNAME_SUFFIXES: &[&str] = &[
+        ".local",
+        ".internal",
+        ".lan",
+        ".home.arpa",
+        "metadata.google.internal",
+    ];
+
+    // SSRF secret patterns (also used in secrets check)
+    const SECRET_PATTERNS: &[&str] = &[
+        r#"api[_-]?key\s*[:=]\s*['"][a-zA-Z0-9]"#,
+        r#"api[_-]?secret\s*[:=]\s*['"][a-zA-Z0-9]"#,
+        r#"access[_-]?token\s*[:=]\s*['"][a-zA-Z0-9]"#,
+        r#"auth[_-]?token\s*[:=]\s*['"][a-zA-Z0-9]"#,
+        r"bearer\s+[a-zA-Z0-9_-]{20,}",
+        r"AKIA[0-9A-Z]{16}",
+        r"aws[_-]?secret",
+        r"sbp_[a-zA-Z0-9]{30,}",
+        r"sb_secret_[a-zA-Z0-9_-]{20,}",
+        r"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9\.",
+        r#"QSTASH_TOKEN\s*[:=]\s*['"]eyJ"#,
+        r"sig_[a-zA-Z0-9]{20,}",
+        r"-----BEGIN (RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----",
+        r"-----BEGIN PGP PRIVATE KEY BLOCK-----",
+        r#"password\s*[:=]\s*['"][^'"]{8,}"#,
+        r"postgres://[^:]+:[^@]+@",
+        r"mysql://[^:]+:[^@]+@",
+        r"mongodb://[^:]+:[^@]+@",
+        r#"secret[_-]?key\s*[:=]\s*['"][a-zA-Z0-9]"#,
+    ];
+
+    // IP safety check
+    fn is_safe_ip(ip: &str) -> bool {
+        // Block unspecified, loopback, link-local, multicast
+        if ip == "0.0.0.0" || ip == "::" {
+            return false;
+        }
+        // Block 127.x.x.x (loopback)
+        if ip.starts_with("127.") {
+            return false;
+        }
+        // Block link-local (169.254.x.x, fe80::)
+        if ip.starts_with("169.254.") || ip.starts_with("fe80:") {
+            return false;
+        }
+        // Block private ranges
+        // IPv4: 10.x.x.x, 172.16-31.x.x, 192.168.x.x
+        // IPv6: fc00::/7 (unique local)
+        let is_private = ip.starts_with("10.") 
+            || ip.starts_with("172.16.") || ip.starts_with("172.17.") || ip.starts_with("172.18.") 
+            || ip.starts_with("172.19.") || ip.starts_with("172.20.") || ip.starts_with("172.21.") 
+            || ip.starts_with("172.22.") || ip.starts_with("172.23.") || ip.starts_with("172.24.") 
+            || ip.starts_with("172.25.") || ip.starts_with("172.26.") || ip.starts_with("172.27.") 
+            || ip.starts_with("172.28.") || ip.starts_with("172.29.") || ip.starts_with("172.30.") 
+            || ip.starts_with("172.31.") || ip.starts_with("192.168.");
+        if is_private {
+            return false;
+        }
+        // Block multicast (224.0.0.0/4, ff00::/8)
+        if ip.starts_with("224.") || ip.starts_with("ff") {
+            return false;
+        }
+        true
+    }
+
+    let violations: Vec<Violation> = urls
+        .par_iter()
+        .filter(|url| !url.contains("/target/"))
+        .filter_map(|url| {
+            // Try to parse as URL
+            let parsed = Url::parse(url).ok()?;
+
+            // Check protocol - only allow http/https
+            let protocol = parsed.scheme();
+            if !["http", "https"].contains(&protocol) {
+                return Some(Violation {
+                    file: url.clone(),
+                    line: None,
+                    message: format!("Unsupported protocol: {}. Only HTTP/HTTPS allowed", protocol),
+                    pattern: None,
+                });
+            }
+
+            // Check hostname suffixes
+            if let Some(hostname) = parsed.host() {
+                let hostname_str = hostname.to_string();
+                let hostname_lower = hostname_str.to_lowercase();
+                for suffix in BLOCKED_HOSTNAME_SUFFIXES {
+                    if hostname_lower == suffix.to_lowercase()
+                        || hostname_lower.ends_with(suffix)
+                    {
+                        return Some(Violation {
+                            file: url.clone(),
+                            line: None,
+                            message: format!("Blocked hostname suffix: {}", suffix),
+                            pattern: None,
+                        });
+                    }
+                }
+
+            }
+
+            // Check for secret patterns in the URL
+            for pattern_str in SECRET_PATTERNS {
+                let pattern = Regex::new(pattern_str).expect("Invalid regex pattern");
+                if pattern.is_match(url) {
+                    return Some(Violation {
+                        file: url.clone(),
+                        line: None,
+                        message: "Potential secret in URL".to_string(),
+                        pattern: Some(pattern_str.to_string()),
+                    });
+                }
+            }
+
+            None
         })
         .collect();
 
