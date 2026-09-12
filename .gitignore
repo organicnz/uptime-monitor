@@ -17,6 +17,10 @@
 /.next/
 /out/
 
+# Regenerable CI artifacts (baseline.json stays tracked as the guard reference)
+.bundle/size.json
+.bundle/coverage-summary.json
+
 # production
 /build
 

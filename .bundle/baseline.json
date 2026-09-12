@@ -1,60 +1,7 @@
 {
-  "gzipBytes": 13849690,
-  "rawBytes": 55816740,
+  "gzipBytes": 13849724,
+  "rawBytes": 55816236,
   "files": 894,
-  "at": "2026-09-12T01:51:10.462Z",
-  "top": [
-    {
-      "file": "server/chunks/ssr/_1l35w2-._.js.map",
-      "raw": 7279527,
-      "gzip": 1723444
-    },
-    {
-      "file": "server/chunks/node_modules_0j2ikld._.js.map",
-      "raw": 7236861,
-      "gzip": 1711131
-    },
-    {
-      "file": "server/chunks/[root-of-the-server]__14_qotf._.js.map",
-      "raw": 2904987,
-      "gzip": 696948
-    },
-    {
-      "file": "server/edge/chunks/_0264s3_._.js.map",
-      "raw": 2366717,
-      "gzip": 493178
-    },
-    {
-      "file": "server/chunks/ssr/_05n62_s._.js.map",
-      "raw": 2043769,
-      "gzip": 469499
-    },
-    {
-      "file": "server/chunks/ssr/_1l35w2-._.js",
-      "raw": 1591939,
-      "gzip": 432972
-    },
-    {
-      "file": "server/chunks/node_modules_0j2ikld._.js",
-      "raw": 1583754,
-      "gzip": 429157
-    },
-    {
-      "file": "server/chunks/ssr/_1j6l_yv._.js.map",
-      "raw": 1669116,
-      "gzip": 387138
-    },
-    {
-      "file": "server/chunks/ssr/_1a-0c_d._.js.map",
-      "raw": 1565389,
-      "gzip": 363233
-    },
-    {
-      "file": "server/chunks/node_modules_@supabase_supabase-js_dist_index_mjs_0u-n9p7._.js.map",
-      "raw": 1505845,
-      "gzip": 348403
-    }
-  ],
   "byFile": {
     "BUILD_ID": {
       "raw": 21,
@@ -66,7 +13,7 @@
     },
     "build-manifest.json": {
       "raw": 721,
-      "gzip": 347
+      "gzip": 352
     },
     "build/chunks/[root-of-the-server]__05i36w1._.js": {
       "raw": 17795,
@@ -170,7 +117,7 @@
     },
     "fallback-build-manifest.json": {
       "raw": 366,
-      "gzip": 209
+      "gzip": 212
     },
     "images-manifest.json": {
       "raw": 1193,
@@ -298,7 +245,7 @@
     },
     "required-server-files.json": {
       "raw": 17095,
-      "gzip": 4634
+      "gzip": 4635
     },
     "routes-manifest.json": {
       "raw": 10657,
@@ -318,7 +265,7 @@
     },
     "server/app/(auth)/forgot-password/page.js.nft.json": {
       "raw": 31870,
-      "gzip": 8578
+      "gzip": 8581
     },
     "server/app/(auth)/forgot-password/page/app-paths-manifest.json": {
       "raw": 74,
@@ -326,7 +273,7 @@
     },
     "server/app/(auth)/forgot-password/page/build-manifest.json": {
       "raw": 573,
-      "gzip": 293
+      "gzip": 294
     },
     "server/app/(auth)/forgot-password/page/next-font-manifest.json": {
       "raw": 278,
@@ -362,7 +309,7 @@
     },
     "server/app/(auth)/login/page/build-manifest.json": {
       "raw": 573,
-      "gzip": 293
+      "gzip": 294
     },
     "server/app/(auth)/login/page/next-font-manifest.json": {
       "raw": 268,
@@ -390,7 +337,7 @@
     },
     "server/app/(auth)/mfa/page.js.nft.json": {
       "raw": 31753,
-      "gzip": 8548
+      "gzip": 8549
     },
     "server/app/(auth)/mfa/page/app-paths-manifest.json": {
       "raw": 50,
@@ -398,7 +345,7 @@
     },
     "server/app/(auth)/mfa/page/build-manifest.json": {
       "raw": 573,
-      "gzip": 293
+      "gzip": 294
     },
     "server/app/(auth)/mfa/page/next-font-manifest.json": {
       "raw": 266,
@@ -426,7 +373,7 @@
     },
     "server/app/(auth)/reset-password/page.js.nft.json": {
       "raw": 31869,
-      "gzip": 8576
+      "gzip": 8577
     },
     "server/app/(auth)/reset-password/page/app-paths-manifest.json": {
       "raw": 72,
@@ -434,7 +381,7 @@
     },
     "server/app/(auth)/reset-password/page/build-manifest.json": {
       "raw": 573,
-      "gzip": 293
+      "gzip": 294
     },
     "server/app/(auth)/reset-password/page/next-font-manifest.json": {
       "raw": 277,
@@ -462,7 +409,7 @@
     },
     "server/app/(auth)/signup/page.js.nft.json": {
       "raw": 31565,
-      "gzip": 8475
+      "gzip": 8476
     },
     "server/app/(auth)/signup/page/app-paths-manifest.json": {
       "raw": 56,
@@ -470,7 +417,7 @@
     },
     "server/app/(auth)/signup/page/build-manifest.json": {
       "raw": 573,
-      "gzip": 293
+      "gzip": 294
     },
     "server/app/(auth)/signup/page/next-font-manifest.json": {
       "raw": 269,
@@ -498,7 +445,7 @@
     },
     "server/app/(dashboard)/dashboard/incidents/[id]/edit/page.js.nft.json": {
       "raw": 35176,
-      "gzip": 8850
+      "gzip": 8851
     },
     "server/app/(dashboard)/dashboard/incidents/[id]/edit/page/app-paths-manifest.json": {
       "raw": 112,
@@ -506,7 +453,7 @@
     },
     "server/app/(dashboard)/dashboard/incidents/[id]/edit/page/build-manifest.json": {
       "raw": 573,
-      "gzip": 293
+      "gzip": 294
     },
     "server/app/(dashboard)/dashboard/incidents/[id]/edit/page/next-font-manifest.json": {
       "raw": 297,
@@ -534,7 +481,7 @@
     },
     "server/app/(dashboard)/dashboard/incidents/new/page.js.nft.json": {
       "raw": 34121,
-      "gzip": 8774
+      "gzip": 8775
     },
     "server/app/(dashboard)/dashboard/incidents/new/page/app-paths-manifest.json": {
       "raw": 100,
@@ -542,7 +489,7 @@
     },
     "server/app/(dashboard)/dashboard/incidents/new/page/build-manifest.json": {
       "raw": 573,
-      "gzip": 293
+      "gzip": 294
     },
     "server/app/(dashboard)/dashboard/incidents/new/page/next-font-manifest.json": {
       "raw": 291,
@@ -570,7 +517,7 @@
     },
     "server/app/(dashboard)/dashboard/incidents/page.js.nft.json": {
       "raw": 33328,
-      "gzip": 8790
+      "gzip": 8791
     },
     "server/app/(dashboard)/dashboard/incidents/page/app-paths-manifest.json": {
       "raw": 92,
@@ -578,7 +525,7 @@
     },
     "server/app/(dashboard)/dashboard/incidents/page/build-manifest.json": {
       "raw": 573,
-      "gzip": 293
+      "gzip": 294
     },
     "server/app/(dashboard)/dashboard/incidents/page/next-font-manifest.json": {
       "raw": 287,
@@ -606,7 +553,7 @@
     },
     "server/app/(dashboard)/dashboard/maintenance/[id]/edit/page.js.nft.json": {
       "raw": 34938,
-      "gzip": 8767
+      "gzip": 8769
     },
     "server/app/(dashboard)/dashboard/maintenance/[id]/edit/page/app-paths-manifest.json": {
       "raw": 116,
@@ -614,7 +561,7 @@
     },
     "server/app/(dashboard)/dashboard/maintenance/[id]/edit/page/build-manifest.json": {
       "raw": 573,
-      "gzip": 293
+      "gzip": 294
     },
     "server/app/(dashboard)/dashboard/maintenance/[id]/edit/page/next-font-manifest.json": {
       "raw": 299,
@@ -642,7 +589,7 @@
     },
     "server/app/(dashboard)/dashboard/maintenance/new/page.js.nft.json": {
       "raw": 33819,
-      "gzip": 8677
+      "gzip": 8679
     },
     "server/app/(dashboard)/dashboard/maintenance/new/page/app-paths-manifest.json": {
       "raw": 104,
@@ -650,7 +597,7 @@
     },
     "server/app/(dashboard)/dashboard/maintenance/new/page/build-manifest.json": {
       "raw": 573,
-      "gzip": 293
+      "gzip": 294
     },
     "server/app/(dashboard)/dashboard/maintenance/new/page/next-font-manifest.json": {
       "raw": 293,
@@ -678,7 +625,7 @@
     },
     "server/app/(dashboard)/dashboard/maintenance/page.js.nft.json": {
       "raw": 32910,
-      "gzip": 8650
+      "gzip": 8652
     },
     "server/app/(dashboard)/dashboard/maintenance/page/app-paths-manifest.json": {
       "raw": 96,
@@ -686,7 +633,7 @@
     },
     "server/app/(dashboard)/dashboard/maintenance/page/build-manifest.json": {
       "raw": 573,
-      "gzip": 293
+      "gzip": 294
     },
     "server/app/(dashboard)/dashboard/maintenance/page/next-font-manifest.json": {
       "raw": 289,
@@ -714,7 +661,7 @@
     },
     "server/app/(dashboard)/dashboard/monitors/[id]/edit/page.js.nft.json": {
       "raw": 35177,
-      "gzip": 8872
+      "gzip": 8873
     },
     "server/app/(dashboard)/dashboard/monitors/[id]/edit/page/app-paths-manifest.json": {
       "raw": 110,
@@ -722,7 +669,7 @@
     },
     "server/app/(dashboard)/dashboard/monitors/[id]/edit/page/build-manifest.json": {
       "raw": 573,
-      "gzip": 293
+      "gzip": 294
     },
     "server/app/(dashboard)/dashboard/monitors/[id]/edit/page/next-font-manifest.json": {
       "raw": 296,
@@ -750,7 +697,7 @@
     },
     "server/app/(dashboard)/dashboard/monitors/[id]/page.js.nft.json": {
       "raw": 34031,
-      "gzip": 8750
+      "gzip": 8751
     },
     "server/app/(dashboard)/dashboard/monitors/[id]/page/app-paths-manifest.json": {
       "raw": 100,
@@ -758,7 +705,7 @@
     },
     "server/app/(dashboard)/dashboard/monitors/[id]/page/build-manifest.json": {
       "raw": 573,
-      "gzip": 293
+      "gzip": 294
     },
     "server/app/(dashboard)/dashboard/monitors/[id]/page/next-font-manifest.json": {
       "raw": 291,
@@ -794,7 +741,7 @@
     },
     "server/app/(dashboard)/dashboard/monitors/new/page/build-manifest.json": {
       "raw": 573,
-      "gzip": 293
+      "gzip": 294
     },
     "server/app/(dashboard)/dashboard/monitors/new/page/next-font-manifest.json": {
       "raw": 290,
@@ -822,7 +769,7 @@
     },
     "server/app/(dashboard)/dashboard/monitors/page.js.nft.json": {
       "raw": 32787,
-      "gzip": 8620
+      "gzip": 8622
     },
     "server/app/(dashboard)/dashboard/monitors/page/app-paths-manifest.json": {
       "raw": 90,
@@ -830,7 +777,7 @@
     },
     "server/app/(dashboard)/dashboard/monitors/page/build-manifest.json": {
       "raw": 573,
-      "gzip": 293
+      "gzip": 294
     },
     "server/app/(dashboard)/dashboard/monitors/page/next-font-manifest.json": {
       "raw": 286,
@@ -858,7 +805,7 @@
     },
     "server/app/(dashboard)/dashboard/notifications/[id]/edit/page.js.nft.json": {
       "raw": 34694,
-      "gzip": 8729
+      "gzip": 8731
     },
     "server/app/(dashboard)/dashboard/notifications/[id]/edit/page/app-paths-manifest.json": {
       "raw": 120,
@@ -866,7 +813,7 @@
     },
     "server/app/(dashboard)/dashboard/notifications/[id]/edit/page/build-manifest.json": {
       "raw": 573,
-      "gzip": 293
+      "gzip": 294
     },
     "server/app/(dashboard)/dashboard/notifications/[id]/edit/page/next-font-manifest.json": {
       "raw": 301,
@@ -894,7 +841,7 @@
     },
     "server/app/(dashboard)/dashboard/notifications/new/page.js.nft.json": {
       "raw": 33688,
-      "gzip": 8659
+      "gzip": 8661
     },
     "server/app/(dashboard)/dashboard/notifications/new/page/app-paths-manifest.json": {
       "raw": 108,
@@ -902,7 +849,7 @@
     },
     "server/app/(dashboard)/dashboard/notifications/new/page/build-manifest.json": {
       "raw": 573,
-      "gzip": 293
+      "gzip": 294
     },
     "server/app/(dashboard)/dashboard/notifications/new/page/next-font-manifest.json": {
       "raw": 295,
@@ -930,7 +877,7 @@
     },
     "server/app/(dashboard)/dashboard/notifications/page.js.nft.json": {
       "raw": 32856,
-      "gzip": 8651
+      "gzip": 8652
     },
     "server/app/(dashboard)/dashboard/notifications/page/app-paths-manifest.json": {
       "raw": 100,
@@ -938,7 +885,7 @@
     },
     "server/app/(dashboard)/dashboard/notifications/page/build-manifest.json": {
       "raw": 573,
-      "gzip": 293
+      "gzip": 294
     },
     "server/app/(dashboard)/dashboard/notifications/page/next-font-manifest.json": {
       "raw": 291,
@@ -966,7 +913,7 @@
     },
     "server/app/(dashboard)/dashboard/page.js.nft.json": {
       "raw": 32756,
-      "gzip": 8882
+      "gzip": 8884
     },
     "server/app/(dashboard)/dashboard/page/app-paths-manifest.json": {
       "raw": 72,
@@ -974,7 +921,7 @@
     },
     "server/app/(dashboard)/dashboard/page/build-manifest.json": {
       "raw": 573,
-      "gzip": 293
+      "gzip": 294
     },
     "server/app/(dashboard)/dashboard/page/next-font-manifest.json": {
       "raw": 277,
@@ -1010,7 +957,7 @@
     },
     "server/app/(dashboard)/dashboard/settings/page/build-manifest.json": {
       "raw": 573,
-      "gzip": 293
+      "gzip": 294
     },
     "server/app/(dashboard)/dashboard/settings/page/next-font-manifest.json": {
       "raw": 286,
@@ -1038,7 +985,7 @@
     },
     "server/app/(dashboard)/dashboard/status-pages/[id]/page.js.nft.json": {
       "raw": 33996,
-      "gzip": 8734
+      "gzip": 8736
     },
     "server/app/(dashboard)/dashboard/status-pages/[id]/page/app-paths-manifest.json": {
       "raw": 108,
@@ -1046,7 +993,7 @@
     },
     "server/app/(dashboard)/dashboard/status-pages/[id]/page/build-manifest.json": {
       "raw": 573,
-      "gzip": 293
+      "gzip": 294
     },
     "server/app/(dashboard)/dashboard/status-pages/[id]/page/next-font-manifest.json": {
       "raw": 295,
@@ -1074,7 +1021,7 @@
     },
     "server/app/(dashboard)/dashboard/status-pages/new/page.js.nft.json": {
       "raw": 33996,
-      "gzip": 8737
+      "gzip": 8739
     },
     "server/app/(dashboard)/dashboard/status-pages/new/page/app-paths-manifest.json": {
       "raw": 106,
@@ -1082,7 +1029,7 @@
     },
     "server/app/(dashboard)/dashboard/status-pages/new/page/build-manifest.json": {
       "raw": 573,
-      "gzip": 293
+      "gzip": 294
     },
     "server/app/(dashboard)/dashboard/status-pages/new/page/next-font-manifest.json": {
       "raw": 294,
@@ -1110,7 +1057,7 @@
     },
     "server/app/(dashboard)/dashboard/status-pages/page.js.nft.json": {
       "raw": 32781,
-      "gzip": 8624
+      "gzip": 8625
     },
     "server/app/(dashboard)/dashboard/status-pages/page/app-paths-manifest.json": {
       "raw": 98,
@@ -1118,7 +1065,7 @@
     },
     "server/app/(dashboard)/dashboard/status-pages/page/build-manifest.json": {
       "raw": 573,
-      "gzip": 293
+      "gzip": 294
     },
     "server/app/(dashboard)/dashboard/status-pages/page/next-font-manifest.json": {
       "raw": 290,
@@ -1138,7 +1085,7 @@
     },
     "server/app/_global-error.html": {
       "raw": 9472,
-      "gzip": 2707
+      "gzip": 2710
     },
     "server/app/_global-error.meta": {
       "raw": 421,
@@ -1146,19 +1093,19 @@
     },
     "server/app/_global-error.rsc": {
       "raw": 4947,
-      "gzip": 1843
+      "gzip": 1847
     },
     "server/app/_global-error.segments/__PAGE__.segment.rsc": {
       "raw": 4652,
-      "gzip": 1788
+      "gzip": 1791
     },
     "server/app/_global-error.segments/_full.segment.rsc": {
       "raw": 4947,
-      "gzip": 1843
+      "gzip": 1847
     },
     "server/app/_global-error.segments/_tree.segment.rsc": {
       "raw": 195,
-      "gzip": 157
+      "gzip": 160
     },
     "server/app/_global-error/page.js": {
       "raw": 642,
@@ -1178,7 +1125,7 @@
     },
     "server/app/_global-error/page/build-manifest.json": {
       "raw": 573,
-      "gzip": 293
+      "gzip": 294
     },
     "server/app/_global-error/page/next-font-manifest.json": {
       "raw": 94,
@@ -1198,7 +1145,7 @@
     },
     "server/app/_not-found.html": {
       "raw": 12326,
-      "gzip": 2962
+      "gzip": 2967
     },
     "server/app/_not-found.meta": {
       "raw": 517,
@@ -1206,19 +1153,19 @@
     },
     "server/app/_not-found.rsc": {
       "raw": 7459,
-      "gzip": 1988
+      "gzip": 1992
     },
     "server/app/_not-found.segments/_full.segment.rsc": {
       "raw": 7459,
-      "gzip": 1988
+      "gzip": 1992
     },
     "server/app/_not-found.segments/_not-found/__PAGE__.segment.rsc": {
       "raw": 6254,
-      "gzip": 1921
+      "gzip": 1925
     },
     "server/app/_not-found.segments/_tree.segment.rsc": {
       "raw": 381,
-      "gzip": 234
+      "gzip": 235
     },
     "server/app/_not-found/page.js": {
       "raw": 909,
@@ -1238,7 +1185,7 @@
     },
     "server/app/_not-found/page/build-manifest.json": {
       "raw": 573,
-      "gzip": 293
+      "gzip": 294
     },
     "server/app/_not-found/page/next-font-manifest.json": {
       "raw": 266,
@@ -1454,7 +1401,7 @@
     },
     "server/app/auth/auth-code-error.html": {
       "raw": 17080,
-      "gzip": 4042
+      "gzip": 4047
     },
     "server/app/auth/auth-code-error.meta": {
       "raw": 672,
@@ -1462,19 +1409,19 @@
     },
     "server/app/auth/auth-code-error.rsc": {
       "raw": 9978,
-      "gzip": 2908
+      "gzip": 2912
     },
     "server/app/auth/auth-code-error.segments/_full.segment.rsc": {
       "raw": 9978,
-      "gzip": 2908
+      "gzip": 2912
     },
     "server/app/auth/auth-code-error.segments/_tree.segment.rsc": {
       "raw": 684,
-      "gzip": 327
+      "gzip": 331
     },
     "server/app/auth/auth-code-error.segments/auth/auth-code-error/__PAGE__.segment.rsc": {
       "raw": 8404,
-      "gzip": 2712
+      "gzip": 2716
     },
     "server/app/auth/auth-code-error/page.js": {
       "raw": 1054,
@@ -1486,7 +1433,7 @@
     },
     "server/app/auth/auth-code-error/page.js.nft.json": {
       "raw": 31668,
-      "gzip": 8491
+      "gzip": 8492
     },
     "server/app/auth/auth-code-error/page/app-paths-manifest.json": {
       "raw": 70,
@@ -1494,7 +1441,7 @@
     },
     "server/app/auth/auth-code-error/page/build-manifest.json": {
       "raw": 573,
-      "gzip": 293
+      "gzip": 294
     },
     "server/app/auth/auth-code-error/page/next-font-manifest.json": {
       "raw": 276,
@@ -1570,7 +1517,7 @@
     },
     "server/app/auth/verify-email.html": {
       "raw": 14290,
-      "gzip": 3742
+      "gzip": 3747
     },
     "server/app/auth/verify-email.meta": {
       "raw": 660,
@@ -1578,19 +1525,19 @@
     },
     "server/app/auth/verify-email.rsc": {
       "raw": 7706,
-      "gzip": 2165
+      "gzip": 2168
     },
     "server/app/auth/verify-email.segments/_full.segment.rsc": {
       "raw": 7706,
-      "gzip": 2165
+      "gzip": 2168
     },
     "server/app/auth/verify-email.segments/_tree.segment.rsc": {
       "raw": 681,
-      "gzip": 329
+      "gzip": 331
     },
     "server/app/auth/verify-email.segments/auth/verify-email/__PAGE__.segment.rsc": {
       "raw": 6137,
-      "gzip": 1990
+      "gzip": 1993
     },
     "server/app/auth/verify-email/page.js": {
       "raw": 1082,
@@ -1610,7 +1557,7 @@
     },
     "server/app/auth/verify-email/page/build-manifest.json": {
       "raw": 573,
-      "gzip": 293
+      "gzip": 294
     },
     "server/app/auth/verify-email/page/next-font-manifest.json": {
       "raw": 273,
@@ -1658,7 +1605,7 @@
     },
     "server/app/forgot-password.html": {
       "raw": 17766,
-      "gzip": 4543
+      "gzip": 4549
     },
     "server/app/forgot-password.meta": {
       "raw": 678,
@@ -1666,23 +1613,23 @@
     },
     "server/app/forgot-password.rsc": {
       "raw": 8977,
-      "gzip": 2273
+      "gzip": 2276
     },
     "server/app/forgot-password.segments/!KGF1dGgp/forgot-password/__PAGE__.segment.rsc": {
       "raw": 7275,
-      "gzip": 2102
+      "gzip": 2106
     },
     "server/app/forgot-password.segments/_full.segment.rsc": {
       "raw": 8977,
-      "gzip": 2273
+      "gzip": 2276
     },
     "server/app/forgot-password.segments/_tree.segment.rsc": {
       "raw": 686,
-      "gzip": 335
+      "gzip": 337
     },
     "server/app/index.html": {
       "raw": 51889,
-      "gzip": 8074
+      "gzip": 8080
     },
     "server/app/index.meta": {
       "raw": 362,
@@ -1690,23 +1637,23 @@
     },
     "server/app/index.rsc": {
       "raw": 27667,
-      "gzip": 5501
+      "gzip": 5504
     },
     "server/app/index.segments/__PAGE__.segment.rsc": {
       "raw": 26288,
-      "gzip": 5317
+      "gzip": 5320
     },
     "server/app/index.segments/_full.segment.rsc": {
       "raw": 27667,
-      "gzip": 5501
+      "gzip": 5504
     },
     "server/app/index.segments/_tree.segment.rsc": {
       "raw": 531,
-      "gzip": 308
+      "gzip": 310
     },
     "server/app/login.html": {
       "raw": 16055,
-      "gzip": 3994
+      "gzip": 4000
     },
     "server/app/login.meta": {
       "raw": 638,
@@ -1714,23 +1661,23 @@
     },
     "server/app/login.rsc": {
       "raw": 8947,
-      "gzip": 2262
+      "gzip": 2265
     },
     "server/app/login.segments/!KGF1dGgp/login/__PAGE__.segment.rsc": {
       "raw": 7275,
-      "gzip": 2101
+      "gzip": 2105
     },
     "server/app/login.segments/_full.segment.rsc": {
       "raw": 8947,
-      "gzip": 2262
+      "gzip": 2265
     },
     "server/app/login.segments/_tree.segment.rsc": {
       "raw": 676,
-      "gzip": 328
+      "gzip": 331
     },
     "server/app/mfa.html": {
       "raw": 16380,
-      "gzip": 4137
+      "gzip": 4142
     },
     "server/app/mfa.meta": {
       "raw": 630,
@@ -1738,19 +1685,19 @@
     },
     "server/app/mfa.rsc": {
       "raw": 8608,
-      "gzip": 2153
+      "gzip": 2156
     },
     "server/app/mfa.segments/!KGF1dGgp/mfa/__PAGE__.segment.rsc": {
       "raw": 6997,
-      "gzip": 2024
+      "gzip": 2029
     },
     "server/app/mfa.segments/_full.segment.rsc": {
       "raw": 8608,
-      "gzip": 2153
+      "gzip": 2156
     },
     "server/app/mfa.segments/_tree.segment.rsc": {
       "raw": 674,
-      "gzip": 326
+      "gzip": 329
     },
     "server/app/page.js": {
       "raw": 1043,
@@ -1762,7 +1709,7 @@
     },
     "server/app/page.js.nft.json": {
       "raw": 30086,
-      "gzip": 8493
+      "gzip": 8494
     },
     "server/app/page/app-paths-manifest.json": {
       "raw": 28,
@@ -1770,7 +1717,7 @@
     },
     "server/app/page/build-manifest.json": {
       "raw": 573,
-      "gzip": 293
+      "gzip": 294
     },
     "server/app/page/next-font-manifest.json": {
       "raw": 255,
@@ -1790,7 +1737,7 @@
     },
     "server/app/reset-password.html": {
       "raw": 18638,
-      "gzip": 4479
+      "gzip": 4484
     },
     "server/app/reset-password.meta": {
       "raw": 674,
@@ -1798,23 +1745,23 @@
     },
     "server/app/reset-password.rsc": {
       "raw": 8975,
-      "gzip": 2270
+      "gzip": 2274
     },
     "server/app/reset-password.segments/!KGF1dGgp/reset-password/__PAGE__.segment.rsc": {
       "raw": 7275,
-      "gzip": 2100
+      "gzip": 2103
     },
     "server/app/reset-password.segments/_full.segment.rsc": {
       "raw": 8975,
-      "gzip": 2270
+      "gzip": 2274
     },
     "server/app/reset-password.segments/_tree.segment.rsc": {
       "raw": 685,
-      "gzip": 334
+      "gzip": 337
     },
     "server/app/signup.html": {
       "raw": 10932,
-      "gzip": 2629
+      "gzip": 2634
     },
     "server/app/signup.meta": {
       "raw": 710,
@@ -1822,19 +1769,19 @@
     },
     "server/app/signup.rsc": {
       "raw": 8118,
-      "gzip": 2124
+      "gzip": 2128
     },
     "server/app/signup.segments/!KGF1dGgp/signup/__PAGE__.segment.rsc": {
       "raw": 6574,
-      "gzip": 1985
+      "gzip": 1988
     },
     "server/app/signup.segments/_full.segment.rsc": {
       "raw": 8118,
-      "gzip": 2124
+      "gzip": 2128
     },
     "server/app/signup.segments/_tree.segment.rsc": {
       "raw": 677,
-      "gzip": 329
+      "gzip": 331
     },
     "server/app/status/[slug]/page.js": {
       "raw": 1077,
@@ -1854,7 +1801,7 @@
     },
     "server/app/status/[slug]/page/build-manifest.json": {
       "raw": 573,
-      "gzip": 293
+      "gzip": 294
     },
     "server/app/status/[slug]/page/next-font-manifest.json": {
       "raw": 269,
@@ -2134,7 +2081,7 @@
     },
     "server/chunks/node_modules_0j2ikld._.js.map": {
       "raw": 7236861,
-      "gzip": 1711131
+      "gzip": 1711133
     },
     "server/chunks/node_modules_@supabase_supabase-js_dist_index_mjs_0u-n9p7._.js": {
       "raw": 204363,
@@ -2786,7 +2733,7 @@
     },
     "server/chunks/ssr/_1l35w2-._.js": {
       "raw": 1591939,
-      "gzip": 432972
+      "gzip": 432973
     },
     "server/chunks/ssr/_1l35w2-._.js.map": {
       "raw": 7279527,
@@ -3258,7 +3205,7 @@
     },
     "server/edge/chunks/_0264s3_._.js": {
       "raw": 133168,
-      "gzip": 43893
+      "gzip": 43892
     },
     "server/edge/chunks/_0264s3_._.js.map": {
       "raw": 2366717,
@@ -3306,7 +3253,7 @@
     },
     "server/middleware-build-manifest.js": {
       "raw": 753,
-      "gzip": 374
+      "gzip": 377
     },
     "server/middleware-manifest.json": {
       "raw": 83,
@@ -3342,11 +3289,11 @@
     },
     "server/pages/404.html": {
       "raw": 12326,
-      "gzip": 2962
+      "gzip": 2967
     },
     "server/pages/500.html": {
       "raw": 9472,
-      "gzip": 2707
+      "gzip": 2710
     },
     "server/prefetch-hints.json": {
       "raw": 2895,
@@ -3360,15 +3307,15 @@
       "raw": 11720,
       "gzip": 1423
     },
-    "static/WiygUAY9-f1lvhAfbiTGt/_buildManifest.js": {
+    "static/D9YjGPVNE5_wTKl2LZ1DP/_buildManifest.js": {
       "raw": 976,
       "gzip": 282
     },
-    "static/WiygUAY9-f1lvhAfbiTGt/_clientMiddlewareManifest.js": {
+    "static/D9YjGPVNE5_wTKl2LZ1DP/_clientMiddlewareManifest.js": {
       "raw": 457,
       "gzip": 273
     },
-    "static/WiygUAY9-f1lvhAfbiTGt/_ssgManifest.js": {
+    "static/D9YjGPVNE5_wTKl2LZ1DP/_ssgManifest.js": {
       "raw": 80,
       "gzip": 64
     },
@@ -3411,10 +3358,6 @@
     "static/chunks/0u_yb1nay_t0k.js": {
       "raw": 13902,
       "gzip": 5529
-    },
-    "static/chunks/0y3xkoazndcgf.js": {
-      "raw": 438263,
-      "gzip": 137276
     },
     "static/chunks/0ylgcnss9ue9v.js": {
       "raw": 14241,
@@ -3552,9 +3495,13 @@
       "raw": 11218,
       "gzip": 4091
     },
-    "static/chunks/turbopack-2nn4oaxr1tj29.js": {
+    "static/chunks/44r_6_2m-4pj4.js": {
+      "raw": 438263,
+      "gzip": 137274
+    },
+    "static/chunks/turbopack-1a9gpfez6h870.js": {
       "raw": 10123,
-      "gzip": 4044
+      "gzip": 4043
     },
     "static/media/4fa387ec64143e14-s.2tuy5pz7dlieh.woff2": {
       "raw": 12872,
@@ -3605,12 +3552,12 @@
       "gzip": 7275
     },
     "trace": {
-      "raw": 18282,
-      "gzip": 2792
+      "raw": 17988,
+      "gzip": 2614
     },
     "trace-build": {
-      "raw": 1727,
-      "gzip": 581
+      "raw": 1517,
+      "gzip": 530
     },
     "turbopack": {
       "raw": 0,

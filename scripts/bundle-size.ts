@@ -62,14 +62,19 @@ console.log(
 const sortedFiles = [...files.entries()].sort(([a], [b]) =>
   a < b ? -1 : a > b ? 1 : 0,
 );
+const byFile = Object.fromEntries(sortedFiles);
+// Full snapshot for the CI artifact (human triage + trend data).
 const snapshot = {
   gzipBytes,
   rawBytes,
   files: files.size,
   at: new Date().toISOString(),
   top: top.map(([file, s]) => ({ file, ...s })),
-  byFile: Object.fromEntries(sortedFiles),
+  byFile,
 };
+// Slim committed baseline: totals + per-file map only (no timestamps or
+// derivable top-lists, so diffs stay meaningful).
+const baselineSnapshot = { gzipBytes, rawBytes, files: files.size, byFile };
 
 await mkdir(BUNDLE_DIR, { recursive: true });
 await writeFile(SIZE_PATH, `${JSON.stringify(snapshot, null, 2)}\n`);
@@ -89,7 +94,10 @@ async function summarize(extra: string) {
 
 const baselineRaw = await readFile(BASELINE_PATH, "utf8").catch(() => null);
 if (UPDATE || !baselineRaw) {
-  await writeFile(BASELINE_PATH, `${JSON.stringify(snapshot, null, 2)}\n`);
+  await writeFile(
+    BASELINE_PATH,
+    `${JSON.stringify(baselineSnapshot, null, 2)}\n`,
+  );
   console.log(
     baselineRaw
       ? "📌 Baseline updated — commit `.bundle/baseline.json`."
