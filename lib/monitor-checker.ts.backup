@@ -1,0 +1,993 @@
+import { createServiceClient } from "@/lib/supabase/service";
+import { notifyMonitor } from "@/lib/notifications";
+import {
+  resolveAndValidateUrl,
+  resolveAndValidateHost,
+  formatHostForUrl,
+} from "@/lib/security";
+import {
+  checkSslCertificate,
+  shouldWarnSslExpiry,
+  SSL_DAYS_REMAINING_UNKNOWN,
+} from "@/lib/ssl-utils";
+
+// Status constants (matching Uptime Kuma)
+export const HEARTBEAT_STATUS = {
+  DOWN: 0,
+  UP: 1,
+  PENDING: 2,
+  MAINTENANCE: 3,
+  DEGRADED: 4,
+} as const;
+
+export const INCIDENT_STATUS = {
+  OPEN: 0,
+  RESOLVED: 1,
+  INVESTIGATING: 2,
+};
+
+export const MONITOR_STATUS = {
+  ONLINE: "online",
+  OFFLINE: "offline",
+  MAINTENANCE: "maintenance",
+  DEGRADED: "degraded",
+} as const;
+
+// Anomaly detection types
+type AnomalyType = "response_time_spike" | "response_time_drop" | "frequency_change" | "status_flip-flop" | "consecutive_failures" | "ssl_degradation";
+
+interface AnomalyDetection {
+  monitorId: string;
+  anomalyType: AnomalyType;
+  severity: "low" | "medium" | "high" | "critical";
+  description: string;
+  currentValue: number | string;
+  baselineValue: number | string;
+  trend: "improving" | "stable" | "degrading";
+  detectedAt: string;
+  resolvedAt?: string;
+}
+
+// Config
+const DEFAULT_TIMEOUT_SECONDS = 48;
+const USER_AGENT = "Uptime-Monitor/1.0";
+
+// Types
+type Monitor = {
+  id: string;
+  user_id: string;
+  name: string;
+  type: "http" | "tcp" | "ping" | "keyword" | "dns" | "docker" | "steam";
+  url: string | null;
+  hostname: string | null;
+  port: number | null;
+  method: string | null;
+  keyword: string | null;
+  headers: Record<string, string> | null;
+  body: string | null;
+  interval: number;
+  retry_interval: number;
+  timeout: number;
+  max_retries: number;
+  ignore_tls: boolean;
+  upside_down: boolean;
+  active: boolean;
+};
+
+type Heartbeat = {
+  id: string;
+  monitor_id: string;
+  status: number;
+  msg: string | null;
+  ping: number | null;
+  duration: number | null;
+  down_count: number;
+  time: string;
+};
+
+type CheckResult = {
+  status: number;
+  ping: number | null;
+  msg: string;
+};
+
+type HeartbeatInsert = {
+  monitor_id: string;
+  status: number;
+  msg: string;
+  ping: number | null;
+  duration: number;
+  down_count: number;
+  time: string;
+};
+
+// Timeout helper
+function createTimeoutController(timeoutSeconds: number) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutSeconds * 1000);
+  return { controller, clear: () => clearTimeout(timeoutId) };
+}
+
+/**
+ * Custom fetch with manual redirect handling to protect against SSRF via redirects.
+ * Validates each hop's destination against SSRF filters.
+ */
+async function fetchWithSsrfProtection(
+  initialUrl: string,
+  options: RequestInit & { maxRedirects?: number } = {},
+): Promise<Response> {
+  const maxRedirects = options.maxRedirects ?? 5;
+  let currentUrl = initialUrl;
+  let redirectCount = 0;
+
+  while (redirectCount <= maxRedirects) {
+    // Validate current URL before making the request
+    await resolveAndValidateUrl(currentUrl);
+
+    const response = await fetch(currentUrl, {
+      ...options,
+      redirect: "manual",
+    });
+
+    // Check if response is a redirect (301, 302, 303, 307, 308)
+    if ([301, 302, 303, 307, 308].includes(response.status)) {
+      const location = response.headers.get("location");
+      if (!location) {
+        return response; // No location header, return as is
+      }
+
+      // Resolve relative redirect URLs against current URL
+      const targetUrl = new URL(location, currentUrl).toString();
+      currentUrl = targetUrl;
+      redirectCount++;
+
+      if (redirectCount > maxRedirects) {
+        throw new Error(
+          `Too many redirects (exceeded limit of ${maxRedirects})`,
+        );
+      }
+      continue;
+    }
+
+    return response;
+  }
+
+  throw new Error(`Too many redirects (exceeded limit of ${maxRedirects})`);
+}
+
+// HTTP/HTTPS check
+async function checkHttp(monitor: Monitor): Promise<CheckResult> {
+  const startTime = Date.now();
+  const timeout = monitor.timeout || DEFAULT_TIMEOUT_SECONDS;
+
+  // SSRF protection - validate URL before making request
+  if (!monitor.url) {
+    return {
+      status: HEARTBEAT_STATUS.DOWN,
+      ping: null,
+      msg: "Missing URL",
+    };
+  }
+
+  const { controller, clear } = createTimeoutController(timeout);
+
+  try {
+    const headers: Record<string, string> = {
+      "User-Agent": USER_AGENT,
+      ...(monitor.headers || {}),
+    };
+
+    const response = await fetchWithSsrfProtection(monitor.url, {
+      method: monitor.method || "GET",
+      headers,
+      body: monitor.body || undefined,
+      signal: controller.signal,
+    });
+
+    clear();
+    const ping = Date.now() - startTime;
+
+    // Keyword check
+    if (monitor.type === "keyword" && monitor.keyword) {
+      const text = await response.text();
+      const keywordFound = text.includes(monitor.keyword);
+      const success = monitor.upside_down ? !keywordFound : keywordFound;
+
+      if (!success) {
+        return {
+          status: HEARTBEAT_STATUS.DOWN,
+          ping,
+          msg: monitor.upside_down
+            ? `Keyword "${monitor.keyword}" found (upside down mode)`
+            : `Keyword "${monitor.keyword}" not found`,
+        };
+      }
+    }
+
+    // HTTP status check
+    const isSuccess = monitor.upside_down ? !response.ok : response.ok;
+
+    let msg = `${response.status} - ${response.statusText}`;
+
+    // Enrich message for common blocking scenarios
+    if (response.status === 429 || response.status === 403) {
+      const server = response.headers.get("server")?.toLowerCase() || "";
+      const mitigated = response.headers.get("x-vercel-mitigated");
+
+      if (server.includes("vercel") || mitigated) {
+        msg +=
+          " (Vercel Protection detected - try adding x-vercel-protection-bypass header)";
+      } else if (server.includes("cloudflare")) {
+        msg += " (Cloudflare detected - try whitelisting monitor IP)";
+      }
+    }
+
+    return {
+      status: isSuccess ? HEARTBEAT_STATUS.UP : HEARTBEAT_STATUS.DOWN,
+      ping,
+      msg,
+    };
+  } catch (error) {
+    clear();
+    const ping = Date.now() - startTime;
+
+    if (error instanceof Error && error.name === "AbortError") {
+      return {
+        status: HEARTBEAT_STATUS.DOWN,
+        ping,
+        msg: `Timeout after ${timeout}s`,
+      };
+    }
+
+    return {
+      status: HEARTBEAT_STATUS.DOWN,
+      ping,
+      msg:
+        error instanceof Error ? (error as Error).message : "Connection failed",
+    };
+  }
+}
+
+// TCP check (simplified - uses HTTP HEAD as proxy in serverless)
+async function checkTcp(monitor: Monitor): Promise<CheckResult> {
+  const startTime = Date.now();
+  const timeout = monitor.timeout || DEFAULT_TIMEOUT_SECONDS;
+
+  // SSRF protection - validate hostname
+  if (!monitor.hostname) {
+    return {
+      status: HEARTBEAT_STATUS.DOWN,
+      ping: null,
+      msg: "Missing hostname",
+    };
+  }
+
+  let safeHostname = monitor.hostname;
+  try {
+    safeHostname = await resolveAndValidateHost(monitor.hostname);
+  } catch (error: unknown) {
+    return {
+      status: HEARTBEAT_STATUS.DOWN,
+      ping: null,
+      msg: `SSRF Blocked: ${(error as Error).message}`,
+    };
+  }
+
+  const { controller, clear } = createTimeoutController(timeout);
+
+  try {
+    const formattedHost = formatHostForUrl(safeHostname);
+    const url = `http://${formattedHost}:${monitor.port}`;
+    await fetch(url, { method: "HEAD", signal: controller.signal });
+    clear();
+
+    const ping = Date.now() - startTime;
+    const success = !monitor.upside_down;
+
+    return {
+      status: success ? HEARTBEAT_STATUS.UP : HEARTBEAT_STATUS.DOWN,
+      ping,
+      msg: success
+        ? "Connection successful"
+        : "Connection successful (upside down)",
+    };
+  } catch (error) {
+    clear();
+    const ping = Date.now() - startTime;
+    const success = monitor.upside_down;
+
+    if (error instanceof Error && error.name === "AbortError") {
+      return {
+        status: success ? HEARTBEAT_STATUS.UP : HEARTBEAT_STATUS.DOWN,
+        ping,
+        msg: `Timeout after ${timeout}s`,
+      };
+    }
+
+    return {
+      status: success ? HEARTBEAT_STATUS.UP : HEARTBEAT_STATUS.DOWN,
+      ping,
+      msg:
+        error instanceof Error ? (error as Error).message : "Connection failed",
+    };
+  }
+}
+
+// Ping check (uses HTTP HEAD as substitute in serverless)
+async function checkPing(monitor: Monitor): Promise<CheckResult> {
+  const startTime = Date.now();
+  const timeout = monitor.timeout || DEFAULT_TIMEOUT_SECONDS;
+
+  // SSRF protection - validate hostname
+  if (!monitor.hostname) {
+    return {
+      status: HEARTBEAT_STATUS.DOWN,
+      ping: null,
+      msg: "Missing hostname",
+    };
+  }
+
+  let safeHostname = monitor.hostname;
+  try {
+    // If it's a URL in ping (rare, but possible due to UI), parse out the hostname
+    const hostToResolve = monitor.hostname.startsWith("http")
+      ? new URL(monitor.hostname).hostname
+      : monitor.hostname;
+
+    safeHostname = await resolveAndValidateHost(hostToResolve);
+  } catch (error: unknown) {
+    return {
+      status: HEARTBEAT_STATUS.DOWN,
+      ping: null,
+      msg: `SSRF Blocked: ${(error as Error).message}`,
+    };
+  }
+
+  const { controller, clear } = createTimeoutController(timeout);
+
+  try {
+    const formattedHost = formatHostForUrl(safeHostname);
+    const url = monitor.hostname?.startsWith("http")
+      ? monitor.hostname
+      : `https://${formattedHost}`;
+
+    const response = await fetch(url, {
+      method: "HEAD",
+      signal: controller.signal,
+    });
+    clear();
+
+    const ping = Date.now() - startTime;
+    const isReachable = response.ok || response.status < 500;
+    const success = monitor.upside_down ? !isReachable : isReachable;
+
+    return {
+      status: success ? HEARTBEAT_STATUS.UP : HEARTBEAT_STATUS.DOWN,
+      ping,
+      msg: `${ping}ms`,
+    };
+  } catch (error) {
+    clear();
+    const ping = Date.now() - startTime;
+    const success = monitor.upside_down;
+
+    return {
+      status: success ? HEARTBEAT_STATUS.UP : HEARTBEAT_STATUS.DOWN,
+      ping,
+      msg:
+        error instanceof Error ? (error as Error).message : "Host unreachable",
+    };
+  }
+}
+
+// DNS check
+type DnsResponse = {
+  Status: number;
+  Answer?: Array<{ data: string }>;
+};
+
+async function checkDns(monitor: Monitor): Promise<CheckResult> {
+  const startTime = Date.now();
+  const timeout = monitor.timeout || DEFAULT_TIMEOUT_SECONDS;
+  const { controller, clear } = createTimeoutController(timeout);
+
+  try {
+    const encodedHostname = encodeURIComponent(monitor.hostname || "");
+    const response = await fetch(
+      `https://dns.google/resolve?name=${encodedHostname}&type=A`,
+      { signal: controller.signal },
+    );
+    clear();
+
+    const data: DnsResponse = await response.json();
+    const ping = Date.now() - startTime;
+    const resolved =
+      data.Status === 0 && Array.isArray(data.Answer) && data.Answer.length > 0;
+    const success = monitor.upside_down ? !resolved : resolved;
+
+    if (success && resolved) {
+      return {
+        status: HEARTBEAT_STATUS.UP,
+        ping,
+        msg: `Resolved: ${data.Answer![0].data}`,
+      };
+    }
+
+    return {
+      status: success ? HEARTBEAT_STATUS.UP : HEARTBEAT_STATUS.DOWN,
+      ping,
+      msg: resolved ? "Resolved (upside down)" : "DNS resolution failed",
+    };
+  } catch (error) {
+    clear();
+    const ping = Date.now() - startTime;
+
+    return {
+      status: monitor.upside_down ? HEARTBEAT_STATUS.UP : HEARTBEAT_STATUS.DOWN,
+      ping,
+      msg:
+        error instanceof Error ? (error as Error).message : "DNS query failed",
+    };
+  }
+}
+
+// Main check dispatcher
+export async function checkMonitor(monitor: Monitor): Promise<CheckResult> {
+  switch (monitor.type) {
+    case "http":
+    case "keyword":
+      return checkHttp(monitor);
+    case "tcp":
+      return checkTcp(monitor);
+    case "ping":
+      return checkPing(monitor);
+    case "dns":
+      return checkDns(monitor);
+    default:
+      return {
+        status: HEARTBEAT_STATUS.PENDING,
+        ping: null,
+        msg: `Unsupported monitor type: ${monitor.type}`,
+      };
+  }
+}
+
+// Get previous heartbeat for a monitor
+async function getPreviousHeartbeat(
+  supabase: ReturnType<typeof createServiceClient>,
+  monitorId: string,
+): Promise<Heartbeat | null> {
+  const { data } = await supabase
+    .from("heartbeats")
+    .select("*")
+    .eq("monitor_id", monitorId)
+    .order("time", { ascending: false })
+    .limit(1)
+    .single();
+
+  return data as Heartbeat | null;
+}
+
+// Check if monitor is under maintenance
+async function isUnderMaintenance(
+  supabase: ReturnType<typeof createServiceClient>,
+  monitorId: string,
+): Promise<boolean> {
+  const now = new Date().toISOString();
+
+  const { data } = await supabase
+    .from("maintenance_monitors")
+    .select(
+      `
+      maintenance:maintenance_id (
+        active,
+        start_date,
+        end_date
+      )
+    `,
+    )
+    .eq("monitor_id", monitorId);
+
+  if (!data || data.length === 0) return false;
+
+  return (
+    data as unknown as Array<{
+      maintenance: { active: boolean; start_date: string; end_date: string };
+    }>
+  ).some((item) => {
+    const m = item.maintenance;
+    return m?.active && m.start_date <= now && m.end_date >= now;
+  });
+}
+
+// Get monitor status summary for analytics
+type MonitorStatusSummary = {
+  status: number;
+  statusLabel: string;
+  consecutive_uptime: number;
+  success_rate: number;
+  last_check: Date | null;
+  avg_response_time: number;
+};
+
+// Calculate monitor status summary
+function calculateMonitorStatus(
+  heartbeats: Array<{ status: number; time: string; rtt_ms?: number }>,
+  now: Date,
+  interval: number
+): MonitorStatusSummary {
+  if (heartbeats.length === 0) {
+    return {
+      status: HEARTBEAT_STATUS.PENDING,
+      statusLabel: "Never checked",
+      consecutive_uptime: 0,
+      success_rate: 0,
+      last_check: null,
+      avg_response_time: 0,
+    };
+  }
+
+  // Sort by time, most recent first
+  const sorted = heartbeats.sort(
+    (a, b) => new Date(b.time).getTime() - new Date(a.time).getTime()
+  );
+
+  const latest = sorted[0];
+  const allUp = sorted.every((h) => h.status === HEARTBEAT_STATUS.UP);
+  const allDown = sorted.every((h) => h.status === HEARTBEAT_STATUS.DOWN);
+
+  // Calculate consecutive uptime from the end of the array
+  let consecutiveUptime = 0;
+  for (const hb of sorted) {
+    if (hb.status === HEARTBEAT_STATUS.UP) {
+      consecutiveUptime++;
+    } else {
+      break;
+    }
+  }
+
+  // Calculate success rate
+  const upCount = sorted.filter((h) => h.status === HEARTBEAT_STATUS.UP).length;
+  const successRate = Math.round((upCount / sorted.length) * 100);
+
+  // Determine status label
+  let statusLabel: string;
+  if (latest.status === HEARTBEAT_STATUS.MAINTENANCE) {
+    statusLabel = "Under maintenance";
+  } else if (latest.status === HEARTBEAT_STATUS.DEGRADED) {
+    statusLabel = "Degraded";
+  } else if (allUp) {
+    statusLabel = "Online";
+  } else if (allDown) {
+    statusLabel = "Offline";
+  } else if (consecutiveUptime > 0) {
+    statusLabel = "Recovering";
+  } else {
+    statusLabel = "Unstable";
+  }
+
+  // Calculate average response time
+  const avgResponseTime =
+    sorted.reduce((sum, h) => sum + (h.rtt_ms || 0), 0) / sorted.length;
+
+  return {
+    status: latest.status,
+    statusLabel,
+    consecutive_uptime: consecutiveUptime,
+    success_rate: successRate,
+    last_check: new Date(latest.time),
+    avg_response_time: Math.round(avgResponseTime),
+  };
+}
+
+// Detect anomalies in monitor check history
+function detectAnomalies(
+  monitorId: string,
+  recentHeartbeats: Array<{ status: number; rtt_ms?: number; time: string }>,
+  currentCheck: { status: number; rtt_ms?: number }
+): AnomalyDetection[] {
+  const anomalies: AnomalyDetection[] = [];
+  const now = new Date();
+  
+  if (recentHeartbeats.length < 3) return anomalies;
+
+  // Sort by time, most recent first
+  const sorted = recentHeartbeats.sort(
+    (a, b) => new Date(b.time).getTime() - new Date(a.time).getTime()
+  );
+
+  // 1. Response time spike detection
+  const rttValues = sorted
+    .filter((h) => h.rtt_ms !== undefined)
+    .map((h) => h.rtt_ms!);
+  
+  if (rttValues.length >= 3) {
+    const avgRTT = rttValues.reduce((a, b) => a + b, 0) / rttValues.length;
+    const latestRTT = currentCheck.rtt_ms ?? 0;
+    
+    // If current check is > 2x the average, it's a spike
+    if (latestRTT > avgRTT * 2 && avgRTT > 0) {
+      const spikeRate = Math.round((latestRTT / avgRTT) * 100);
+      anomalies.push({
+        monitorId,
+        anomalyType: "response_time_spike",
+        severity: latestRTT > avgRTT * 5 ? "critical" : "high",
+        description: `Response time spike: ${latestRTT}ms (${spikeRate}% above average ${Math.round(avgRTT)}ms)`,
+        currentValue: latestRTT,
+        baselineValue: Math.round(avgRTT),
+        trend: "degrading",
+        detectedAt: now.toISOString(),
+      });
+    }
+    
+    // 2. Response time drop detection
+    if (latestRTT < avgRTT * 0.5 && avgRTT > 0) {
+      const dropRate = Math.round((1 - latestRTT / avgRTT) * 100);
+      anomalies.push({
+        monitorId,
+        anomalyType: "response_time_drop",
+        severity: "medium",
+        description: `Response time drop: ${latestRTT}ms (${dropRate}% below average ${Math.round(avgRTT)}ms)`,
+        currentValue: latestRTT,
+        baselineValue: Math.round(avgRTT),
+        trend: "improving",
+        detectedAt: now.toISOString(),
+      });
+    }
+  }
+
+  // 3. Status flip-flop detection (unstable status)
+  const statuses = sorted.map((h) => h.status);
+  const statusCounts: Record<number, number> = {};
+  statuses.forEach((s) => { statusCounts[s] = (statusCounts[s] || 0) + 1; });
+  
+  // If status is alternating frequently, it's unstable
+  const uniqueStatuses = Object.keys(statusCounts).length;
+  if (uniqueStatuses >= 3 && recentHeartbeats.length >= 5) {
+    anomalies.push({
+      monitorId,
+      anomalyType: "status_flip-flop",
+      severity: "high",
+      description: `Unstable status pattern detected - ${uniqueStatuses} different statuses in recent checks`,
+      currentValue: uniqueStatuses,
+      baselineValue: 1,
+      trend: "degrading",
+      detectedAt: now.toISOString(),
+    });
+  }
+
+  // 4. Consecutive failures trend
+  let consecutiveDowns = 0;
+  for (let i = sorted.length - 1; i >= 0; i--) {
+    if (sorted[i].status === HEARTBEAT_STATUS.DOWN) {
+      consecutiveDowns++;
+    } else {
+      break;
+    }
+  }
+  
+  if (consecutiveDowns >= 3) {
+    anomalies.push({
+      monitorId,
+      anomalyType: "consecutive_failures",
+      severity: consecutiveDowns >= 5 ? "critical" : "high",
+      description: ` ${consecutiveDowns} consecutive failures detected`,
+      currentValue: consecutiveDowns,
+      baselineValue: monitor.max_retries || 1,
+      trend: "degrading",
+      detectedAt: now.toISOString(),
+    });
+  }
+
+  // 5. SSL degradation (if SSL data available)
+  const sslChecks = sorted.filter((h) => h.status !== HEARTBEAT_STATUS.DOWN && h.rtt_ms !== undefined);
+  if (sslChecks.length > 0) {
+    const sslRTTs = sslChecks.map((h) => h.rtt_ms!).sort((a, b) => a - b);
+    const recentSSLRTT = sslRTTs[sslRTTs.length - 1]; // Latest SSL check
+    const historicalAvg = sslRTTs.reduce((a, b) => a + b, 0) / sslRTTs.length;
+    
+    if (historicalAvg > 0 && recentSSLRTT > historicalAvg * 1.5) {
+      anomalies.push({
+        monitorId,
+        anomalyType: "ssl_degradation",
+        severity: "medium",
+        description: `SSL response time degradation: ${recentSSLRTT}ms (${Math.round(recentSSLRTT/historicalAvg*100)}% above historical avg ${Math.round(historicalAvg)}ms)`,
+        currentValue: recentSSLRTT,
+        baselineValue: Math.round(historicalAvg),
+        trend: "degrading",
+        detectedAt: now.toISOString(),
+      });
+    }
+  }
+
+  return anomalies;
+}
+
+// Record heartbeat (Uptime Kuma style)
+async function recordHeartbeat(
+  supabase: ReturnType<typeof createServiceClient>,
+  heartbeat: HeartbeatInsert,
+): Promise<void> {
+  await supabase.from("heartbeats").insert(heartbeat);
+}
+
+// Handle status change notifications and incidents
+async function handleStatusChange(
+  supabase: ReturnType<typeof createServiceClient>,
+  monitor: Monitor,
+  previousStatus: number | null,
+  currentStatus: number,
+  msg: string,
+): Promise<void> {
+  // No change or first heartbeat with UP status - no notification needed
+  if (previousStatus === currentStatus) return;
+  if (previousStatus === null && currentStatus === HEARTBEAT_STATUS.UP) return;
+
+  const isDown = currentStatus === HEARTBEAT_STATUS.DOWN;
+  const isRecovery =
+    previousStatus === HEARTBEAT_STATUS.DOWN &&
+    currentStatus === HEARTBEAT_STATUS.UP;
+
+  if (isDown) {
+    // Create incident if none exists
+    const { data: existingIncident } = await supabase
+      .from("incidents")
+      .select("id")
+      .eq("monitor_id", monitor.id)
+      .eq("status", INCIDENT_STATUS.OPEN)
+      .limit(1)
+      .single();
+
+    if (!existingIncident) {
+      await supabase.from("incidents").insert({
+        monitor_id: monitor.id,
+        title: `${monitor.name} is down`,
+        content: msg,
+        status: INCIDENT_STATUS.OPEN,
+        started_at: new Date().toISOString(),
+      });
+    }
+
+    // Send DOWN notification
+    try {
+      await notifyMonitor(monitor.id, monitor.user_id, {
+        title: `🔴 ${monitor.name} is DOWN`,
+        message: msg,
+        monitorName: monitor.name,
+        monitorUrl: monitor.url || monitor.hostname || undefined,
+        status: "down",
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      console.error(
+        `[${monitor.name}] Failed to send DOWN notification:`,
+        error,
+      );
+    }
+  }
+
+  if (isRecovery) {
+    // Resolve open incidents
+    await supabase
+      .from("incidents")
+      .update({
+        status: INCIDENT_STATUS.RESOLVED,
+        resolved_at: new Date().toISOString(),
+      })
+      .eq("monitor_id", monitor.id)
+      .eq("status", INCIDENT_STATUS.OPEN);
+
+    // Send UP notification
+    try {
+      await notifyMonitor(monitor.id, monitor.user_id, {
+        title: `✅ ${monitor.name} is UP`,
+        message: "Service has recovered",
+        monitorName: monitor.name,
+        monitorUrl: monitor.url || monitor.hostname || undefined,
+        status: "up",
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      console.error(`[${monitor.name}] Failed to send UP notification:`, error);
+    }
+  }
+}
+
+/**
+ * Process a single monitor check (Uptime Kuma style)
+ *
+ * Key behaviors:
+ * 1. Tracks down_count for consecutive failures
+ * 2. Only marks as DOWN after max_retries consecutive failures
+ * 3. Respects maintenance windows
+ * 4. Only notifies on actual status changes
+ * 5. Supports upside_down mode (inverts success/failure)
+ * 6. Updates monitor analytics fields (status, down_count, avg_response_time, success_rate)
+ * 6. Provides detailed status labeling (online, offline, degraded, maintaining)
+ */
+export async function processMonitorCheck(monitor: Monitor): Promise<void> {
+  const supabase = createServiceClient();
+  const checkStartTime = Date.now();
+
+  // Check maintenance status first
+  const inMaintenance = await isUnderMaintenance(supabase, monitor.id);
+  if (inMaintenance) {
+    await recordHeartbeat(supabase, {
+      monitor_id: monitor.id,
+      status: HEARTBEAT_STATUS.MAINTENANCE,
+      msg: "Under maintenance",
+      ping: null,
+      duration: 0,
+      down_count: 0,
+      time: new Date().toISOString(),
+    });
+    return;
+  }
+
+  // Get previous heartbeat for down_count tracking
+  const previousHeartbeat = await getPreviousHeartbeat(supabase, monitor.id);
+  const previousDownCount = previousHeartbeat?.down_count ?? 0;
+  const previousStatus = previousHeartbeat?.status ?? null;
+
+  // Perform the actual check
+  const result = await checkMonitor(monitor);
+  const duration = Date.now() - checkStartTime;
+
+  // Calculate new down_count and effective status (Uptime Kuma logic)
+  let downCount = 0;
+  let effectiveStatus = result.status;
+
+  if (result.status === HEARTBEAT_STATUS.DOWN) {
+    downCount = previousDownCount + 1;
+
+    // Only mark as DOWN after max_retries consecutive failures
+    // Until then, keep previous status (or PENDING if first check)
+    if (downCount <= monitor.max_retries) {
+      effectiveStatus = previousStatus ?? HEARTBEAT_STATUS.PENDING;
+    }
+  } else if (result.status === HEARTBEAT_STATUS.UP && previousStatus === HEARTBEAT_STATUS.DOWN) {
+    // Recovery detected - reset down count
+    downCount = 0;
+  } else if (result.status === HEARTBEAT_STATUS.DEGRADED) {
+    // Monitor is up but with issues (slow response, SSL warnings, etc.)
+    effectiveStatus = HEARTBEAT_STATUS.DEGRADED;
+    downCount = 0;
+  } else {
+    // Status unchanged or PENDING
+    downCount = previousDownCount;
+    if (previousStatus !== null) {
+      effectiveStatus = previousStatus;
+    }
+  }
+
+  // Record the heartbeat with enhanced analytics
+  await recordHeartbeat(supabase, {
+    monitor_id: monitor.id,
+    status: effectiveStatus,
+    msg: result.msg,
+    ping: result.ping,
+    duration,
+    down_count: downCount,
+    time: new Date().toISOString(),
+  });
+
+  // Update monitor's status tracking fields in the monitors table
+  // This runs via service client so we can directly update
+  const statusLabel =
+    effectiveStatus === HEARTBEAT_STATUS.MAINTENANCE
+      ? "Under maintenance"
+      : effectiveStatus === HEARTBEAT_STATUS.DEGRADED
+        ? "Degraded"
+        : effectiveStatus === HEARTBEAT_STATUS.UP
+          ? "Online"
+          : "Offline";
+
+  try {
+    await supabase
+      .from("monitors")
+      .update({
+        status: effectiveStatus,
+        down_count: downCount,
+        last_check_at: new Date().toISOString(),
+        last_status_change_at:
+          effectiveStatus !== previousStatus ? new Date().toISOString() : undefined,
+        avg_response_time_ms: result.ping ? Math.round(result.ping) : undefined,
+        success_rate_percent: Math.max(0, Math.min(100, 100 - downCount)),
+      })
+      .eq("id", monitor.id);
+  } catch (error) {
+    console.error(
+      `[${monitor.name}] Failed to update monitor status:`,
+      error
+    );
+  }
+
+  // Handle status change notifications and incidents
+  // Only notify on actual status changes (not on every check)
+  const statusChanged =
+    effectiveStatus !== previousStatus ||
+    (previousStatus === null && effectiveStatus === HEARTBEAT_STATUS.DOWN);
+
+  if (statusChanged) {
+    await handleStatusChange(
+      supabase,
+      monitor,
+      previousStatus,
+      effectiveStatus,
+      result.msg,
+    );
+  }
+}
+
+/**
+ * Check SSL certificate and update monitor record
+ * Also sends notifications for expiring certificates
+ */
+async function checkAndUpdateSsl(
+  supabase: ReturnType<typeof createServiceClient>,
+  monitor: Monitor,
+): Promise<void> {
+  if (!monitor.url) return;
+
+  try {
+    const sslResult = await checkSslCertificate(monitor.url);
+
+    if (sslResult.success && sslResult.info) {
+      const { info } = sslResult;
+
+      // Get current SSL info from monitor to check if we need to send warning
+      const { data: currentMonitor } = await supabase
+        .from("monitors")
+        .select("ssl_expiry")
+        .eq("id", monitor.id)
+        .single();
+
+      const monitorData = currentMonitor as {
+        ssl_expiry: string | null;
+      } | null;
+      const previousExpiry = monitorData?.ssl_expiry
+        ? new Date(monitorData.ssl_expiry)
+        : null;
+      const previousDaysRemaining = previousExpiry
+        ? Math.floor(
+            (previousExpiry.getTime() - Date.now()) / (1000 * 60 * 60 * 24),
+          )
+        : undefined;
+
+      // Update monitor with SSL info
+      if (info.validTo && info.daysRemaining !== -1) {
+        await supabase
+          .from("monitors")
+          .update({
+            ssl_expiry: new Date(info.validTo).toISOString(),
+            ssl_issuer: info.issuer,
+          })
+          .eq("id", monitor.id);
+      }
+
+      // Check if we should send SSL expiry warning (now only for actual expiration)
+      if (
+        info.daysRemaining !== SSL_DAYS_REMAINING_UNKNOWN &&
+        info.daysRemaining < 0 &&
+        shouldWarnSslExpiry(info.daysRemaining, previousDaysRemaining)
+      ) {
+        // Send SSL expiry warning notification
+        try {
+          await notifyMonitor(monitor.id, monitor.user_id, {
+            title: `🔴 SSL Certificate Expired: ${monitor.name}`,
+            message: `Certificate has expired! (${info.daysRemaining} days ago, on ${info.validTo})`,
+            monitorName: monitor.name,
+            monitorUrl: monitor.url,
+            status: info.daysRemaining <= 7 ? "down" : "degraded",
+            timestamp: new Date().toISOString(),
+          });
+        } catch (error) {
+          console.error(`[${monitor.name}] Failed to send SSL warning:`, error);
+        }
+      }
+    }
+  } catch (error) {
+    // SSL check failures are non-critical, just log
+    console.error(`[${monitor.name}] SSL check failed:`, error);
+  }
+}
