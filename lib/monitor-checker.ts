@@ -17,12 +17,20 @@ export const HEARTBEAT_STATUS = {
   UP: 1,
   PENDING: 2,
   MAINTENANCE: 3,
+  DEGRADED: 4,
 } as const;
 
 export const INCIDENT_STATUS = {
   OPEN: 0,
   RESOLVED: 1,
   INVESTIGATING: 2,
+} as const;
+
+export const MONITOR_STATUS = {
+  ONLINE: "online",
+  OFFLINE: "offline",
+  MAINTENANCE: "maintenance",
+  DEGRADED: "degraded",
 } as const;
 
 // Config

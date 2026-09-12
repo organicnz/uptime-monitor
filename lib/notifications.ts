@@ -58,7 +58,7 @@ export interface NotificationPayload {
   timestamp?: string;
 }
 
-// Send Telegram notification
+// Send Telegram notification with retry logic
 export async function sendTelegramNotification(
   config: TelegramConfig,
   payload: NotificationPayload,
@@ -72,38 +72,53 @@ export async function sendTelegramNotification(
 
 ${escapeMarkdown(payload.message)}${payload.monitorName ? `\n\n📍 *Monitor:* ${escapeMarkdown(payload.monitorName)}` : ""}${payload.monitorUrl ? `\n🔗 *URL:* ${escapeMarkdown(payload.monitorUrl)}` : ""}${payload.timestamp ? `\n🕐 *Time:* ${escapeMarkdown(payload.timestamp)}` : ""}`;
 
-  try {
-    const response = await fetch(
-      `https://api.telegram.org/bot${bot_token}/sendMessage`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          chat_id,
-          text,
-          parse_mode: "MarkdownV2",
-          disable_web_page_preview: true,
-        }),
-        signal: AbortSignal.timeout(10000),
-      },
-    );
+  const MAX_RETRIES = 3;
+  const RETRY_DELAY = 1000;
 
-    const data = await response.json();
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const response = await fetch(
+        `https://api.telegram.org/bot${bot_token}/sendMessage`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            chat_id,
+            text,
+            parse_mode: "MarkdownV2",
+            disable_web_page_preview: true,
+          }),
+          signal: AbortSignal.timeout(10000),
+        },
+      );
 
-    if (!response.ok || !data.ok) {
+      const data = await response.json();
+
+      if (!response.ok || !data.ok) {
+        if (attempt < MAX_RETRIES) {
+          await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY));
+          continue;
+        }
+        return {
+          success: false,
+          error: data.description || "Failed to send Telegram message",
+        };
+      }
+
+      return { success: true };
+    } catch (error) {
+      if (attempt < MAX_RETRIES) {
+        await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY));
+        continue;
+      }
       return {
         success: false,
-        error: data.description || "Failed to send Telegram message",
+        error: error instanceof Error ? error.message : "Unknown error",
       };
     }
-
-    return { success: true };
-  } catch (error) {
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Unknown error",
-    };
   }
+
+  return { success: false, error: "Max retries exceeded" };
 }
 
 // Escape special characters for Telegram MarkdownV2
@@ -111,7 +126,7 @@ function escapeMarkdown(text: string): string {
   return text.replace(/([_*\[\]()~`>#+\-=|{}.!\\])/g, "\\$1");
 }
 
-// Send Discord notification
+// Send Discord notification with retry logic
 export async function sendDiscordNotification(
   config: DiscordConfig,
   payload: NotificationPayload,
@@ -123,42 +138,64 @@ export async function sendDiscordNotification(
         ? 0xff0000
         : 0xffff00;
 
-  try {
-    const response = await fetch(config.webhook_url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        embeds: [
-          {
-            title: payload.title,
-            description: payload.message,
-            color,
-            fields: [
-              payload.monitorName
-                ? { name: "Monitor", value: payload.monitorName, inline: true }
-                : null,
-              payload.monitorUrl
-                ? { name: "URL", value: payload.monitorUrl, inline: true }
-                : null,
-            ].filter(Boolean),
-            timestamp: payload.timestamp || new Date().toISOString(),
-          },
-        ],
-      }),
-      signal: AbortSignal.timeout(10000),
-    });
+  const MAX_RETRIES = 3;
+  const RETRY_DELAY = 1000;
 
-    if (!response.ok) {
-      return { success: false, error: `Discord API error: ${response.status}` };
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const response = await fetch(config.webhook_url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          embeds: [
+            {
+              title: payload.title,
+              description: payload.message,
+              color,
+              fields: [
+                payload.monitorName
+                  ? {
+                      name: "Monitor",
+                      value: payload.monitorName,
+                      inline: true,
+                    }
+                  : null,
+                payload.monitorUrl
+                  ? { name: "URL", value: payload.monitorUrl, inline: true }
+                  : null,
+              ].filter(Boolean),
+              timestamp: payload.timestamp || new Date().toISOString(),
+            },
+          ],
+        }),
+        signal: AbortSignal.timeout(10000),
+      });
+
+      if (!response.ok) {
+        if (attempt < MAX_RETRIES) {
+          await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY));
+          continue;
+        }
+        return {
+          success: false,
+          error: `Discord API error: ${response.status}`,
+        };
+      }
+
+      return { success: true };
+    } catch (error) {
+      if (attempt < MAX_RETRIES) {
+        await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY));
+        continue;
+      }
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error",
+      };
     }
-
-    return { success: true };
-  } catch (error) {
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Unknown error",
-    };
   }
+
+  return { success: false, error: "Max retries exceeded" };
 }
 
 // Send Slack notification
@@ -318,7 +355,7 @@ export async function sendTeamsNotification(
   }
 }
 
-// Send webhook notification
+// Send webhook notification with retry logic
 export async function sendWebhookNotification(
   config: WebhookConfig,
   payload: NotificationPayload,
@@ -337,28 +374,45 @@ export async function sendWebhookNotification(
     };
   }
 
-  try {
-    const response = await fetch(config.url, {
-      method: config.method || "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...config.headers,
-      },
-      body: JSON.stringify(payload),
-      signal: AbortSignal.timeout(10000),
-    });
+  const MAX_RETRIES = 3;
+  const RETRY_DELAY = 1000; // 1 second
 
-    if (!response.ok) {
-      return { success: false, error: `Webhook error: ${response.status}` };
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const response = await fetch(config.url, {
+        method: config.method || "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...config.headers,
+        },
+        body: JSON.stringify(payload),
+        signal: AbortSignal.timeout(10000),
+      });
+
+      if (!response.ok) {
+        // Retry on server errors (5xx)
+        if (attempt < MAX_RETRIES && response.status >= 500) {
+          await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY));
+          continue;
+        }
+        return { success: false, error: `Webhook error: ${response.status}` };
+      }
+
+      return { success: true };
+    } catch (error) {
+      // Retry on network errors
+      if (attempt < MAX_RETRIES) {
+        await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY));
+        continue;
+      }
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error",
+      };
     }
-
-    return { success: true };
-  } catch (error) {
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Unknown error",
-    };
   }
+
+  return { success: false, error: "Max retries exceeded" };
 }
 
 // Main dispatcher function
@@ -458,8 +512,13 @@ export async function notifyMonitor(
     return { sent: 0, failed: 0, errors: [] };
   }
 
+  // Rate limiting: max 5 notifications per second per channel
+  const RATE_LIMIT_MS = 200;
   const results = await Promise.all(
     channels.map(async (channel) => {
+      // Rate limit within this call
+      await new Promise((resolve) => setTimeout(resolve, RATE_LIMIT_MS));
+
       const result = await sendNotification(
         channel.type,
         channel.config,
