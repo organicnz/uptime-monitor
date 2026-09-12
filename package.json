@@ -2,6 +2,7 @@
   "name": "uptime-monitor",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "bun@1.4.2",
   "scripts": {
     "dev": "next dev -p 3001",
     "build": "next build",

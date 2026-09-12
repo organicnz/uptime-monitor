@@ -53,20 +53,20 @@ A self-hosted uptime monitoring application inspired by [Uptime Kuma](https://gi
 
 GitHub Actions workflows are configured for automated quality checks on every push to `main`:
 
-| Workflow      | Trigger         | Checks                                         |
-| ------------- | --------------- | ---------------------------------------------- |
-| **typecheck** | Push/PR to main | TypeScript strict mode: 0 errors               |
-| **build**     | Push/PR to main | Production Next.js build                       |
-| **lint**      | Push/PR to main | ESLint: 0 errors (1 pre-existing svgo warning) |
-| **test**      | Push/PR to main | Bun test suite: 22 pass, 0 fail                |
-| **audit**     | Push/PR to main | `bun audit`: 0 vulnerabilities                 |
+| Workflow      | Trigger                | Checks                                           |
+| ------------- | ---------------------- | ------------------------------------------------ |
+| **typecheck** | Push/PR to main        | TypeScript strict mode: 0 errors                 |
+| **build**     | Push/PR to main        | Production build + bundle-size guard (10% limit) |
+| **lint**      | Push/PR to main        | ESLint: 0 errors (1 pre-existing svgo warning)   |
+| **test**      | Push/PR to main        | Bun coverage gate: 70% funcs / 80% lines         |
+| **audit**     | Push/PR + weekly (Mon) | `bun audit`: 0 vulnerabilities                   |
 
 ### Workflow Files
 
 - `.github/workflows/typecheck.yml` - `bun run typecheck`
-- `.github/workflows/build.yml` - `bun run build`
+- `.github/workflows/build.yml` - `bun run build` + `bun run bundle-size`
 - `.github/workflows/lint.yml` - `bun run lint` + `bun run format:check`
-- `.github/workflows/test.yml` - `bun run test`
+- `.github/workflows/test.yml` - `bun run coverage-check`
 - `.github/workflows/audit.yml` - `bun run audit`
 
 All checks must pass before merge. See `.github/workflows/` for full workflow definitions.
