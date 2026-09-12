@@ -50,10 +50,11 @@ pre-commit:
       run: bunx prettier --check {staged_files}
       fail_text: "❌ Formatting issues found. Run 'npx prettier --write .' to fix."
 
-    # Check for debug statements
+    # Check for debug statements (CI tooling in scripts/ intentionally logs)
     no-debug:
       priority: 3
       glob: "*.{ts,tsx,js,jsx}"
+      exclude: "scripts/*"
       run: tools/audit/target/release/audit no-debug {staged_files}
       fail_text: "❌ Debug statements found. Remove console.log, debugger, etc."
 
@@ -115,6 +116,14 @@ pre-push:
         FORCE_COLOR: "0"
         NODE_OPTIONS: ""
       fail_text: "❌ TypeScript errors. Fix before pushing."
+
+    # Bun test suite with coverage thresholds (fast, ~1s)
+    coverage:
+      priority: 1
+      run: bun run coverage-check
+      env:
+        FORCE_COLOR: "0"
+      fail_text: "❌ Coverage below threshold. Add tests before pushing."
 
     # Production build test
     build:

@@ -27,9 +27,11 @@ export const config = {
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
+     * - monitoring (Sentry tunnel route - must bypass middleware or
+     *   client-side error reporting fails)
      * - public (public files)
      * - api/cron (cron endpoints)
      */
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$|api/cron).*)",
+    "/((?!_next/static|_next/image|favicon.ico|monitoring|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$|api/cron).*)",
   ],
 };
