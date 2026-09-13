@@ -1,7 +1,19 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-export async function updateSession(request: NextRequest) {
+/**
+ * Server Action invocations are POSTs carrying the `next-action` header.
+ * They must receive an RSC response - never a redirect.
+ */
+function isServerAction(request: NextRequest): boolean {
+  return request.method === "POST" && request.headers.has("next-action");
+}
+
+export async function updateSession(
+  request: NextRequest,
+  opts?: { allowRedirect?: boolean },
+) {
+  const allowRedirect = opts?.allowRedirect ?? true;
   let supabaseResponse = NextResponse.next({
     request,
   });
@@ -38,7 +50,16 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   // Protect dashboard routes
-  if (!user && request.nextUrl.pathname.startsWith("/dashboard")) {
+  // NOTE: never redirect Server Action POSTs (identified by the
+  // `next-action` header). The action protocol expects an RSC response;
+  // answering a POST with a 307 breaks action dispatch. Actions enforce
+  // auth themselves and return `{ error: "Unauthorized" }` instead.
+  if (
+    !user &&
+    request.nextUrl.pathname.startsWith("/dashboard") &&
+    allowRedirect &&
+    !isServerAction(request)
+  ) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     return NextResponse.redirect(url);
@@ -50,10 +71,13 @@ export async function updateSession(request: NextRequest) {
       await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
 
     // If user has MFA enrolled but hasn't verified this session, redirect to MFA
+    // (never for Server Action POSTs - see note above).
     if (
       aalData &&
       aalData.nextLevel === "aal2" &&
-      aalData.currentLevel !== "aal2"
+      aalData.currentLevel !== "aal2" &&
+      allowRedirect &&
+      !isServerAction(request)
     ) {
       const url = request.nextUrl.clone();
       url.pathname = "/mfa";
