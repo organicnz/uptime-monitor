@@ -51,78 +51,88 @@ type DuplicateResult =
 export async function duplicateMonitor(
   monitorId: string,
 ): Promise<DuplicateResult> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
-  if (!user) {
-    return { success: false, error: "Unauthorized" };
-  }
-
-  // Fetch the original monitor
-  const { data, error: fetchError } = await supabase
-    .from("monitors")
-    .select("*")
-    .eq("id", monitorId)
-    .eq("user_id", user.id)
-    .single();
-
-  if (fetchError || !data) {
-    return { success: false, error: "Monitor not found" };
-  }
-
-  const original = data;
-  const newName = `${original.name} (Copy)`;
-
-  // Create a copy without id, created_at, updated_at
-  const monitorCopy = {
-    user_id: user.id,
-    name: newName,
-    type: original.type,
-    url: original.url,
-    hostname: original.hostname,
-    port: original.port,
-    method: original.method,
-    keyword: original.keyword,
-    headers: original.headers,
-    body: original.body,
-    interval: original.interval,
-    timeout: original.timeout,
-    max_retries: original.max_retries,
-    ignore_tls: original.ignore_tls,
-    upside_down: original.upside_down,
-    description: original.description,
-    active: false, // Start paused so user can review before activating
-  };
-
-  const { data: newMonitor, error: insertError } = await supabase
-    .from("monitors")
-    .insert([monitorCopy])
-    .select()
-    .single();
-
-  if (insertError) {
-    if (insertError.code === "42501") {
-      console.error(
-        `[RLS AUDIT] User ${user.id} attempted to duplicate monitor ${monitorId} but was denied by RLS policies.`,
-      );
-    } else {
-      console.error("Failed to duplicate monitor:", insertError);
+    if (!user) {
+      return { success: false, error: "Unauthorized" };
     }
+
+    // Fetch the original monitor
+    const { data, error: fetchError } = await supabase
+      .from("monitors")
+      .select("*")
+      .eq("id", monitorId)
+      .eq("user_id", user.id)
+      .single();
+
+    if (fetchError || !data) {
+      return { success: false, error: "Monitor not found" };
+    }
+
+    const original = data;
+    const newName = `${original.name} (Copy)`;
+
+    // Create a copy without id, created_at, updated_at
+    const monitorCopy = {
+      user_id: user.id,
+      name: newName,
+      type: original.type,
+      url: original.url,
+      hostname: original.hostname,
+      port: original.port,
+      method: original.method,
+      keyword: original.keyword,
+      headers: original.headers,
+      body: original.body,
+      interval: original.interval,
+      timeout: original.timeout,
+      max_retries: original.max_retries,
+      ignore_tls: original.ignore_tls,
+      upside_down: original.upside_down,
+      description: original.description,
+      active: false, // Start paused so user can review before activating
+    };
+
+    const { data: newMonitor, error: insertError } = await supabase
+      .from("monitors")
+      .insert([monitorCopy])
+      .select()
+      .single();
+
+    if (insertError) {
+      if (insertError.code === "42501") {
+        console.error(
+          `[RLS AUDIT] User ${user.id} attempted to duplicate monitor ${monitorId} but was denied by RLS policies.`,
+        );
+      } else {
+        console.error("Failed to duplicate monitor:", insertError);
+      }
+      return {
+        success: false,
+        error: "Failed to duplicate monitor. Please try again.",
+      };
+    }
+
+    safeTrack("Monitor Duplicated", { type: original.type });
+
+    revalidatePath("/dashboard");
+    revalidatePath("/dashboard/monitors");
+
+    const newId = (newMonitor as unknown as { id: string }).id;
+    return { success: true, id: newId, name: newName };
+  } catch (err) {
+    // Never leak a 500 to the client: log server-side (Vercel Function
+    // Logs / Sentry) and return a safe message instead.
+    console.error(`[duplicateMonitor] Unhandled error for ${monitorId}:`, err);
     return {
       success: false,
       error: "Failed to duplicate monitor. Please try again.",
     };
   }
-
-  safeTrack("Monitor Duplicated", { type: original.type });
-
-  revalidatePath("/dashboard");
-  revalidatePath("/dashboard/monitors");
-
-  const newId = (newMonitor as unknown as { id: string }).id;
-  return { success: true, id: newId, name: newName };
 }
 
 import { z } from "zod";
@@ -155,133 +165,148 @@ export const MonitorSchema = z
   );
 
 export async function createMonitor(payload: unknown) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
-  if (!user) {
-    return { error: "Unauthorized" };
+    if (!user) {
+      return { error: "Unauthorized" };
+    }
+
+    const parsed = MonitorSchema.safeParse(payload);
+
+    if (!parsed.success) {
+      return { error: parsed.error.issues[0].message };
+    }
+
+    const { data, error } = await supabase
+      .from("monitors")
+      .insert([
+        {
+          user_id: user.id,
+          ...parsed.data,
+          active: true,
+          url: parsed.data.url || null,
+          hostname: parsed.data.hostname || null,
+          keyword: parsed.data.keyword || null,
+          description: parsed.data.description || null,
+        },
+      ] as unknown as never)
+      .select()
+      .single();
+
+    if (error) {
+      if (error.code === "42501") {
+        console.error(
+          `[RLS AUDIT] User ${user.id} attempted to create monitor but was denied by RLS policies. payload:`,
+          parsed.data,
+        );
+      } else {
+        console.error("Create monitor error:", error);
+      }
+      return { error: "Failed to create monitor. Please try again." };
+    }
+
+    safeTrack("Monitor Created", { type: parsed.data.type });
+
+    revalidatePath("/dashboard");
+    revalidatePath("/dashboard/monitors");
+    return { success: true, monitor: data as unknown as Monitor };
+  } catch (err) {
+    console.error("[createMonitor] Unhandled error:", err);
+    return { error: "Failed to create monitor. Please try again." };
   }
+}
 
-  const parsed = MonitorSchema.safeParse(payload);
+export async function updateMonitor(id: string, payload: unknown) {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
-  if (!parsed.success) {
-    return { error: parsed.error.issues[0].message };
-  }
+    if (!user) {
+      return { error: "Unauthorized" };
+    }
 
-  const { data, error } = await supabase
-    .from("monitors")
-    .insert([
-      {
-        user_id: user.id,
+    const parsed = MonitorSchema.safeParse(payload);
+
+    if (!parsed.success) {
+      return { error: parsed.error.issues[0].message };
+    }
+
+    const { error } = await supabase
+      .from("monitors")
+      .update({
         ...parsed.data,
-        active: true,
         url: parsed.data.url || null,
         hostname: parsed.data.hostname || null,
         keyword: parsed.data.keyword || null,
         description: parsed.data.description || null,
-      },
-    ] as unknown as never)
-    .select()
-    .single();
+      } as unknown as never)
+      .eq("id", id)
+      .eq("user_id", user.id);
 
-  if (error) {
-    if (error.code === "42501") {
-      console.error(
-        `[RLS AUDIT] User ${user.id} attempted to create monitor but was denied by RLS policies. payload:`,
-        parsed.data,
-      );
-    } else {
-      console.error("Create monitor error:", error);
+    if (error) {
+      if (error.code === "42501") {
+        console.error(
+          `[RLS AUDIT] User ${user.id} attempted to update monitor ${id} but was denied by RLS policies. payload:`,
+          parsed.data,
+        );
+      } else {
+        console.error("Update monitor error:", error);
+      }
+      return { error: "Failed to update monitor. Please try again." };
     }
-    return { error: "Failed to create monitor. Please try again." };
-  }
 
-  safeTrack("Monitor Created", { type: parsed.data.type });
+    safeTrack("Monitor Updated", { type: parsed.data.type });
 
-  revalidatePath("/dashboard");
-  revalidatePath("/dashboard/monitors");
-  return { success: true, monitor: data as unknown as Monitor };
-}
-
-export async function updateMonitor(id: string, payload: unknown) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return { error: "Unauthorized" };
-  }
-
-  const parsed = MonitorSchema.safeParse(payload);
-
-  if (!parsed.success) {
-    return { error: parsed.error.issues[0].message };
-  }
-
-  const { error } = await supabase
-    .from("monitors")
-    .update({
-      ...parsed.data,
-      url: parsed.data.url || null,
-      hostname: parsed.data.hostname || null,
-      keyword: parsed.data.keyword || null,
-      description: parsed.data.description || null,
-    } as unknown as never)
-    .eq("id", id)
-    .eq("user_id", user.id);
-
-  if (error) {
-    if (error.code === "42501") {
-      console.error(
-        `[RLS AUDIT] User ${user.id} attempted to update monitor ${id} but was denied by RLS policies. payload:`,
-        parsed.data,
-      );
-    } else {
-      console.error("Update monitor error:", error);
-    }
+    revalidatePath("/dashboard");
+    revalidatePath(`/dashboard/monitors/${id}`);
+    return { success: true };
+  } catch (err) {
+    console.error(`[updateMonitor] Unhandled error for monitor ${id}:`, err);
     return { error: "Failed to update monitor. Please try again." };
   }
-
-  safeTrack("Monitor Updated", { type: parsed.data.type });
-
-  revalidatePath("/dashboard");
-  revalidatePath(`/dashboard/monitors/${id}`);
-  return { success: true };
 }
 
 export async function deleteMonitor(id: string) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
-  if (!user) {
-    return { error: "Unauthorized" };
-  }
-
-  const { error } = await supabase
-    .from("monitors")
-    .delete()
-    .eq("id", id)
-    .eq("user_id", user.id);
-
-  if (error) {
-    if (error.code === "42501") {
-      console.error(
-        `[RLS AUDIT] User ${user.id} attempted to delete monitor ${id} but was denied by RLS policies.`,
-      );
-    } else {
-      console.error("Delete monitor error:", error);
+    if (!user) {
+      return { error: "Unauthorized" };
     }
+
+    const { error } = await supabase
+      .from("monitors")
+      .delete()
+      .eq("id", id)
+      .eq("user_id", user.id);
+
+    if (error) {
+      if (error.code === "42501") {
+        console.error(
+          `[RLS AUDIT] User ${user.id} attempted to delete monitor ${id} but was denied by RLS policies.`,
+        );
+      } else {
+        console.error("Delete monitor error:", error);
+      }
+      return { error: "Failed to delete monitor. Please try again." };
+    }
+
+    safeTrack("Monitor Deleted");
+
+    revalidatePath("/dashboard");
+    revalidatePath("/dashboard/monitors");
+    return { success: true };
+  } catch (err) {
+    console.error(`[deleteMonitor] Unhandled error for monitor ${id}:`, err);
     return { error: "Failed to delete monitor. Please try again." };
   }
-
-  safeTrack("Monitor Deleted");
-
-  revalidatePath("/dashboard");
-  revalidatePath("/dashboard/monitors");
-  return { success: true };
 }
