@@ -4,6 +4,25 @@ import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { track } from "@vercel/analytics/server";
 
+/**
+ * Fire-and-forget analytics that can never fail a server action.
+ * track() may throw/reject when Web Analytics isn't provisioned for the
+ * project (the dashboard shows "Failed to load script from
+ * /_vercel/insights/script.js" in that case), which would otherwise turn
+ * create/update/duplicate/delete into 500s.
+ */
+function safeTrack(event: string, props?: Parameters<typeof track>[1]) {
+  try {
+    const result = track(event, props) as unknown as
+      Promise<unknown> | undefined;
+    if (result && typeof result.catch === "function") {
+      result.catch(() => {});
+    }
+  } catch {
+    // Analytics must never break monitor mutations.
+  }
+}
+
 type Monitor = {
   id: string;
   user_id: string;
@@ -97,7 +116,7 @@ export async function duplicateMonitor(
     };
   }
 
-  track("Monitor Duplicated", { type: original.type });
+  safeTrack("Monitor Duplicated", { type: original.type });
 
   revalidatePath("/dashboard");
   revalidatePath("/dashboard/monitors");
@@ -179,7 +198,7 @@ export async function createMonitor(payload: unknown) {
     return { error: "Failed to create monitor. Please try again." };
   }
 
-  track("Monitor Created", { type: parsed.data.type });
+  safeTrack("Monitor Created", { type: parsed.data.type });
 
   revalidatePath("/dashboard");
   revalidatePath("/dashboard/monitors");
@@ -226,7 +245,7 @@ export async function updateMonitor(id: string, payload: unknown) {
     return { error: "Failed to update monitor. Please try again." };
   }
 
-  track("Monitor Updated", { type: parsed.data.type });
+  safeTrack("Monitor Updated", { type: parsed.data.type });
 
   revalidatePath("/dashboard");
   revalidatePath(`/dashboard/monitors/${id}`);
@@ -260,7 +279,7 @@ export async function deleteMonitor(id: string) {
     return { error: "Failed to delete monitor. Please try again." };
   }
 
-  track("Monitor Deleted");
+  safeTrack("Monitor Deleted");
 
   revalidatePath("/dashboard");
   revalidatePath("/dashboard/monitors");

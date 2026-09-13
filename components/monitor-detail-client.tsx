@@ -110,6 +110,20 @@ const statusConfig = {
     border: "border-border",
     label: "Pending",
   },
+  degraded: {
+    icon: AlertTriangle,
+    color: "text-amber-500",
+    bg: "bg-amber-500/10",
+    border: "border-amber-500/30",
+    label: "Degraded",
+  },
+  maintenance: {
+    icon: AlertTriangle,
+    color: "text-sky-400",
+    bg: "bg-sky-500/10",
+    border: "border-sky-500/30",
+    label: "Maintenance",
+  },
 };
 
 const typeIcons: Record<string, typeof Globe> = {
@@ -170,7 +184,11 @@ export function MonitorDetailClient({
       ? "up"
       : latestHeartbeat.status === 0
         ? "down"
-        : "pending"
+        : latestHeartbeat.status === 4
+          ? "degraded"
+          : latestHeartbeat.status === 3
+            ? "maintenance"
+            : "pending"
     : "pending";
 
   // Calculate SSL days remaining using date-fns (avoids impure Date.now during render)
@@ -612,7 +630,11 @@ export function MonitorDetailClient({
                     ? "up"
                     : heartbeat.status === 0
                       ? "down"
-                      : "pending";
+                      : heartbeat.status === 4
+                        ? "degraded"
+                        : heartbeat.status === 3
+                          ? "maintenance"
+                          : "pending";
                 const Icon = statusConfig[status].icon;
                 return (
                   <div

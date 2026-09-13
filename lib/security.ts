@@ -8,12 +8,10 @@ export function secureCompare(a: string, b: string): boolean {
     return false;
   }
 
-  const bufA = Buffer.from(a);
-  const bufB = Buffer.from(b);
+  const bufA = Buffer.from(a, "utf8");
+  const bufB = Buffer.from(b, "utf8");
 
   if (bufA.length !== bufB.length) {
-    // Still do comparison to maintain constant time
-    timingSafeEqual(bufA, bufA);
     return false;
   }
 

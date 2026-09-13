@@ -437,6 +437,32 @@ export async function checkMonitor(monitor: Monitor): Promise<CheckResult> {
   }
 }
 
+/**
+ * Determine the effective heartbeat status from a raw check result.
+ *
+ * Uptime Kuma logic:
+ * - A DOWN result only becomes effective after `maxRetries` consecutive
+ *   failures; until then the previous status is kept (PENDING if first check).
+ * - Any non-DOWN result resets the consecutive failure counter.
+ */
+export function determineEffectiveStatus(
+  resultStatus: number,
+  previousStatus: number | null,
+  previousDownCount: number,
+  maxRetries: number,
+): { status: number; downCount: number } {
+  if (resultStatus === HEARTBEAT_STATUS.DOWN) {
+    const downCount = previousDownCount + 1;
+
+    if (downCount <= maxRetries) {
+      return { status: previousStatus ?? HEARTBEAT_STATUS.PENDING, downCount };
+    }
+    return { status: HEARTBEAT_STATUS.DOWN, downCount };
+  }
+
+  return { status: resultStatus, downCount: 0 };
+}
+
 // Get previous heartbeat for a monitor
 async function getPreviousHeartbeat(
   supabase: ReturnType<typeof createServiceClient>,
@@ -509,6 +535,9 @@ async function handleStatusChange(
   const isRecovery =
     previousStatus === HEARTBEAT_STATUS.DOWN &&
     currentStatus === HEARTBEAT_STATUS.UP;
+  const isDegraded =
+    currentStatus === HEARTBEAT_STATUS.DEGRADED &&
+    previousStatus !== HEARTBEAT_STATUS.DOWN;
 
   if (isDown) {
     // Create incident if none exists
@@ -573,6 +602,26 @@ async function handleStatusChange(
       console.error(`[${monitor.name}] Failed to send UP notification:`, error);
     }
   }
+
+  // Handle DEGRADED status notifications
+  if (isDegraded) {
+    // Send DEGRADED notification (e.g., SSL expiry warning, slow response)
+    try {
+      await notifyMonitor(monitor.id, monitor.user_id, {
+        title: `⚠️ ${monitor.name} is DEGRADED`,
+        message: msg || "Service is experiencing issues",
+        monitorName: monitor.name,
+        monitorUrl: monitor.url || monitor.hostname || undefined,
+        status: "degraded",
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      console.error(
+        `[${monitor.name}] Failed to send DEGRADED notification:`,
+        error,
+      );
+    }
+  }
 }
 
 /**
@@ -584,6 +633,7 @@ async function handleStatusChange(
  * 3. Respects maintenance windows
  * 4. Only notifies on actual status changes
  * 5. Supports upside_down mode (inverts success/failure)
+ * 6. Supports DEGRADED status for warning thresholds
  */
 export async function processMonitorCheck(monitor: Monitor): Promise<void> {
   const supabase = createServiceClient();
@@ -614,18 +664,12 @@ export async function processMonitorCheck(monitor: Monitor): Promise<void> {
   const duration = Date.now() - checkStartTime;
 
   // Calculate new down_count and effective status (Uptime Kuma logic)
-  let downCount = 0;
-  let effectiveStatus = result.status;
-
-  if (result.status === HEARTBEAT_STATUS.DOWN) {
-    downCount = previousDownCount + 1;
-
-    // Only mark as DOWN after max_retries consecutive failures
-    // Until then, keep previous status (or PENDING if first check)
-    if (downCount <= monitor.max_retries) {
-      effectiveStatus = previousStatus ?? HEARTBEAT_STATUS.PENDING;
-    }
-  }
+  const { status: effectiveStatus, downCount } = determineEffectiveStatus(
+    result.status,
+    previousStatus,
+    previousDownCount,
+    monitor.max_retries,
+  );
 
   // Record the heartbeat
   await recordHeartbeat(supabase, {

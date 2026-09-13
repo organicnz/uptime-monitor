@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useId } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 
@@ -15,11 +15,30 @@ export type Heartbeat = {
 
 export type MonitorStatus = {
   monitorId: string;
-  status: "up" | "down" | "pending";
+  status: "up" | "down" | "pending" | "degraded" | "maintenance";
   ping: number | null;
   lastCheck: string | null;
   message: string | null;
 };
+
+/**
+ * Map a numeric heartbeat status to a display status.
+ * 0=DOWN, 1=UP, 2=PENDING, 3=MAINTENANCE, 4=DEGRADED
+ */
+export function mapHeartbeatStatus(status: number): MonitorStatus["status"] {
+  switch (status) {
+    case 1:
+      return "up";
+    case 0:
+      return "down";
+    case 4:
+      return "degraded";
+    case 3:
+      return "maintenance";
+    default:
+      return "pending";
+  }
+}
 
 /**
  * Hook to subscribe to real-time heartbeat updates for monitors
@@ -31,18 +50,18 @@ export function useRealtimeMonitors(monitorIds: string[]) {
   );
   const [isConnected, setIsConnected] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
+  const instanceId = useId().replace(/:/g, "");
+
+  // Derived each render (cheap string op for typical list sizes); the
+  // subscription effect below only re-runs when the key actually changes.
+  const idsKey = [...new Set(monitorIds)].sort().join(",");
 
   const updateStatus = useCallback((heartbeat: Heartbeat) => {
     setStatuses((prev) => {
       const newMap = new Map(prev);
       newMap.set(heartbeat.monitor_id, {
         monitorId: heartbeat.monitor_id,
-        status:
-          heartbeat.status === 1
-            ? "up"
-            : heartbeat.status === 0
-              ? "down"
-              : "pending",
+        status: mapHeartbeatStatus(heartbeat.status),
         ping: heartbeat.ping,
         lastCheck: heartbeat.time,
         message: heartbeat.msg,
@@ -53,44 +72,27 @@ export function useRealtimeMonitors(monitorIds: string[]) {
   }, []);
 
   useEffect(() => {
-    if (monitorIds.length === 0) return;
+    if (!idsKey) return;
 
-    const supabase = createClient();
+    let cancelled = false;
     let channel: RealtimeChannel | null = null;
+    const channelName = `heartbeats-realtime-${instanceId}`;
+    const supabase = createClient();
+    const ids = idsKey.split(",");
 
-    const setupRealtimeSubscription = async () => {
-      // Subscribe to heartbeats table for inserts
-      channel = supabase
-        .channel("heartbeats-realtime")
-        .on(
-          "postgres_changes",
-          {
-            event: "INSERT",
-            schema: "public",
-            table: "heartbeats",
-            filter: `monitor_id=in.(${monitorIds.join(",")})`,
-          },
-          (payload) => {
-            const heartbeat = payload.new as Heartbeat;
-            updateStatus(heartbeat);
-          },
-        )
-        .subscribe((status) => {
-          setIsConnected(status === "SUBSCRIBED");
-        });
-    };
-
-    // Fetch initial statuses
-    const fetchInitialStatuses = async () => {
+    const init = async () => {
+      // Fetch initial statuses
       const { data } = await supabase
         .from("heartbeats")
         .select("*")
-        .in("monitor_id", monitorIds)
+        .in("monitor_id", ids)
         .order("time", { ascending: false });
+
+      if (cancelled) return;
 
       if (data) {
         const latestByMonitor = new Map<string, Heartbeat>();
-        data.forEach((hb: Heartbeat) => {
+        (data as Heartbeat[]).forEach((hb: Heartbeat) => {
           if (!latestByMonitor.has(hb.monitor_id)) {
             latestByMonitor.set(hb.monitor_id, hb);
           }
@@ -98,17 +100,56 @@ export function useRealtimeMonitors(monitorIds: string[]) {
 
         latestByMonitor.forEach((hb) => updateStatus(hb));
       }
-    };
 
-    fetchInitialStatuses();
-    setupRealtimeSubscription();
+      if (cancelled) return;
 
-    return () => {
-      if (channel) {
-        supabase.removeChannel(channel);
+      // Subscribe to heartbeats table for inserts.
+      // NOTE: .on() must be called before .subscribe() on a fresh channel.
+      // The per-instance channel name guarantees no other hook instance has
+      // already subscribed this channel object.
+      channel = supabase
+        .channel(channelName)
+        .on(
+          "postgres_changes",
+          {
+            event: "INSERT",
+            schema: "public",
+            table: "heartbeats",
+            filter: `monitor_id=in.(${idsKey})`,
+          },
+          (payload) => {
+            const heartbeat = payload.new as Heartbeat;
+            updateStatus(heartbeat);
+          },
+        )
+        .subscribe((status) => {
+          if (!cancelled) {
+            setIsConnected(status === "SUBSCRIBED");
+          }
+        });
+
+      if (cancelled && channel) {
+        const stale = channel;
+        channel = null;
+        supabase.removeChannel(stale);
       }
     };
-  }, [monitorIds, updateStatus]);
+
+    void init();
+
+    return () => {
+      cancelled = true;
+      setIsConnected(false);
+      if (channel) {
+        supabase.removeChannel(channel);
+      } else {
+        // Subscription setup may still be in flight; remove by name once it
+        // resolves. Best-effort cleanup to avoid leaked channels.
+        const pending = supabase.channel(channelName);
+        supabase.removeChannel(pending);
+      }
+    };
+  }, [idsKey, instanceId, updateStatus]);
 
   return { statuses, isConnected, lastUpdate };
 }
@@ -122,16 +163,55 @@ export function useRealtimeMonitor(monitorId: string) {
     null,
   );
   const [isConnected, setIsConnected] = useState(false);
+  const instanceId = useId().replace(/:/g, "");
 
   useEffect(() => {
     if (!monitorId) return;
 
-    const supabase = createClient();
+    let cancelled = false;
     let channel: RealtimeChannel | null = null;
+    const channelName = `monitor-${monitorId}-${instanceId}`;
+    const supabase = createClient();
 
-    const setupSubscription = async () => {
+    const handleHeartbeat = (heartbeat: Heartbeat) => {
+      setHeartbeats((prev) => [heartbeat, ...prev.slice(0, 99)]);
+      setCurrentStatus({
+        monitorId: heartbeat.monitor_id,
+        status: mapHeartbeatStatus(heartbeat.status),
+        ping: heartbeat.ping,
+        lastCheck: heartbeat.time,
+        message: heartbeat.msg,
+      });
+    };
+
+    const init = async () => {
+      // Fetch initial heartbeats
+      const { data } = await supabase
+        .from("heartbeats")
+        .select("*")
+        .eq("monitor_id", monitorId)
+        .order("time", { ascending: false })
+        .limit(100);
+
+      if (cancelled) return;
+
+      if (data && data.length > 0) {
+        const rows = data as Heartbeat[];
+        setHeartbeats(rows);
+        const latest = rows[0];
+        setCurrentStatus({
+          monitorId: latest.monitor_id,
+          status: mapHeartbeatStatus(latest.status),
+          ping: latest.ping,
+          lastCheck: latest.time,
+          message: latest.msg,
+        });
+      }
+
+      if (cancelled) return;
+
       channel = supabase
-        .channel(`monitor-${monitorId}`)
+        .channel(channelName)
         .on(
           "postgres_changes",
           {
@@ -142,62 +222,35 @@ export function useRealtimeMonitor(monitorId: string) {
           },
           (payload) => {
             const heartbeat = payload.new as Heartbeat;
-            setHeartbeats((prev) => [heartbeat, ...prev.slice(0, 99)]);
-            setCurrentStatus({
-              monitorId: heartbeat.monitor_id,
-              status:
-                heartbeat.status === 1
-                  ? "up"
-                  : heartbeat.status === 0
-                    ? "down"
-                    : "pending",
-              ping: heartbeat.ping,
-              lastCheck: heartbeat.time,
-              message: heartbeat.msg,
-            });
+            handleHeartbeat(heartbeat);
           },
         )
         .subscribe((status) => {
-          setIsConnected(status === "SUBSCRIBED");
+          if (!cancelled) {
+            setIsConnected(status === "SUBSCRIBED");
+          }
         });
-    };
 
-    // Fetch initial heartbeats
-    const fetchInitial = async () => {
-      const { data } = await supabase
-        .from("heartbeats")
-        .select("*")
-        .eq("monitor_id", monitorId)
-        .order("time", { ascending: false })
-        .limit(100);
-
-      if (data && data.length > 0) {
-        setHeartbeats(data as Heartbeat[]);
-        const latest = data[0] as Heartbeat;
-        setCurrentStatus({
-          monitorId: latest.monitor_id,
-          status:
-            latest.status === 1
-              ? "up"
-              : latest.status === 0
-                ? "down"
-                : "pending",
-          ping: latest.ping,
-          lastCheck: latest.time,
-          message: latest.msg,
-        });
+      if (cancelled && channel) {
+        const stale = channel;
+        channel = null;
+        supabase.removeChannel(stale);
       }
     };
 
-    fetchInitial();
-    setupSubscription();
+    void init();
 
     return () => {
+      cancelled = true;
+      setIsConnected(false);
       if (channel) {
         supabase.removeChannel(channel);
+      } else {
+        const pending = supabase.channel(channelName);
+        supabase.removeChannel(pending);
       }
     };
-  }, [monitorId]);
+  }, [monitorId, instanceId]);
 
   return { heartbeats, currentStatus, isConnected };
 }

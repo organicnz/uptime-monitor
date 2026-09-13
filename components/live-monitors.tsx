@@ -16,7 +16,7 @@ import { Button } from "@/components/ui/button";
 import { CheckCircle2, XCircle, AlertCircle } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useTransition } from "react";
+import { useMemo, useTransition } from "react";
 import {
   Wifi,
   WifiOff,
@@ -43,7 +43,7 @@ type LiveMonitorsListProps = {
 export function LiveMonitorsList({ monitors }: LiveMonitorsListProps) {
   const router = useRouter();
   const [isDuplicating, startDuplicateTransition] = useTransition();
-  const monitorIds = monitors.map((m) => m.id);
+  const monitorIds = useMemo(() => monitors.map((m) => m.id), [monitors]);
   const { statuses, isConnected, lastUpdate } = useRealtimeMonitors(monitorIds);
 
   const handleDuplicate = (monitorId: string, e: React.MouseEvent) => {
@@ -103,6 +103,20 @@ export function LiveMonitorsList({ monitors }: LiveMonitorsListProps) {
         borderColor: "border-border",
         icon: AlertCircle,
         label: "Pending",
+      },
+      degraded: {
+        color: "text-amber-500",
+        bgColor: "bg-amber-500/10",
+        borderColor: "border-amber-500/30 hover:border-amber-500/50",
+        icon: AlertCircle,
+        label: "Degraded",
+      },
+      maintenance: {
+        color: "text-sky-400",
+        bgColor: "bg-sky-500/10",
+        borderColor: "border-sky-500/30 hover:border-sky-500/50",
+        icon: AlertCircle,
+        label: "Maintenance",
       },
     };
 

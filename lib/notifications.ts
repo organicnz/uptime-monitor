@@ -3,6 +3,23 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { track } from "@vercel/analytics/server";
 import { resolveAndValidateUrl } from "@/lib/security";
 
+/**
+ * Fire-and-forget analytics that can never fail a notification send.
+ * track() may throw/reject when Web Analytics isn't provisioned for the
+ * project, which would otherwise turn alert dispatch into failures.
+ */
+function safeTrack(event: string, props?: Parameters<typeof track>[1]) {
+  try {
+    const result = track(event, props) as unknown as
+      Promise<unknown> | undefined;
+    if (result && typeof result.catch === "function") {
+      result.catch(() => {});
+    }
+  } catch {
+    // Analytics must never break notifications.
+  }
+}
+
 export interface TelegramConfig {
   bot_token: string;
   chat_id: string;
@@ -529,9 +546,9 @@ export async function notifyMonitor(
           `[notifyMonitor] Failed to send to ${channel.name}: ${result.error}`,
         );
       } else if (payload.status === "down") {
-        track("Downtime Alert Triggered", { channel: channel.type });
+        safeTrack("Downtime Alert Triggered", { channel: channel.type });
       } else if (payload.status === "up") {
-        track("Recovery Alert Triggered", { channel: channel.type });
+        safeTrack("Recovery Alert Triggered", { channel: channel.type });
       }
       return { channel: channel.name, ...result };
     }),
@@ -580,9 +597,9 @@ export async function notifyUser(
         payload,
       );
       if (result.success && payload.status === "down") {
-        track("Downtime Alert Triggered", { channel: channel.type });
+        safeTrack("Downtime Alert Triggered", { channel: channel.type });
       } else if (result.success && payload.status === "up") {
-        track("Recovery Alert Triggered", { channel: channel.type });
+        safeTrack("Recovery Alert Triggered", { channel: channel.type });
       }
       return { channel: channel.name, ...result };
     }),

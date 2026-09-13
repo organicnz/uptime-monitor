@@ -62,9 +62,12 @@ export function MonitorDetailPanel({
   const isUp = currentStatus?.status === "up";
   const isDown = currentStatus?.status === "down";
   const isPaused = !monitor.active;
+  const isDegraded = currentStatus?.status === "degraded";
+  const isMaintenance = currentStatus?.status === "maintenance";
 
-  // Calculate stats - use a stable timestamp for 24h calculation
-  const [statsTimestamp] = useState(() => Date.now());
+  // Anchor the 24h stats window to the latest heartbeat instead of the wall
+  // clock. This keeps server and client renders identical (no hydration
+  // mismatch) without any client-only state.
   const stats = useMemo(() => {
     const validPings = heartbeats.filter((h) => h.ping !== null && h.ping > 0);
     const currentPing = currentStatus?.ping || 0;
@@ -76,9 +79,14 @@ export function MonitorDetailPanel({
           )
         : 0;
 
-    const last24h = heartbeats.filter(
-      (h) => statsTimestamp - new Date(h.time).getTime() < 24 * 60 * 60 * 1000,
-    );
+    const anchor =
+      heartbeats.length > 0 ? new Date(heartbeats[0].time).getTime() : null;
+    const last24h =
+      anchor === null
+        ? heartbeats
+        : heartbeats.filter(
+            (h) => anchor - new Date(h.time).getTime() < 24 * 60 * 60 * 1000,
+          );
     const uptime24h =
       last24h.length > 0
         ? (
@@ -93,7 +101,7 @@ export function MonitorDetailPanel({
         : 100;
 
     return { currentPing, avgPing, uptime24h, maxPing, validPings };
-  }, [heartbeats, currentStatus, statsTimestamp]);
+  }, [heartbeats, currentStatus]);
 
   const toggleActive = async () => {
     const newState = !monitor.active;
@@ -260,6 +268,8 @@ export function MonitorDetailPanel({
                         hb.status === 0 && "bg-red-500 hover:bg-red-400",
                         hb.status === 2 &&
                           "bg-neutral-600 hover:bg-neutral-500",
+                        hb.status === 3 && "bg-sky-500 hover:bg-sky-400",
+                        hb.status === 4 && "bg-amber-500 hover:bg-amber-400",
                       )}
                       title={`${new Date(hb.time).toLocaleString()}\n${hb.ping ? `${hb.ping}ms` : "N/A"}`}
                     />
@@ -284,10 +294,24 @@ export function MonitorDetailPanel({
               !isPaused &&
                 !isUp &&
                 !isDown &&
+                !isDegraded &&
+                !isMaintenance &&
                 "bg-neutral-700 text-neutral-300",
+              !isPaused && isDegraded && "bg-amber-500 text-black",
+              !isPaused && isMaintenance && "bg-sky-500 text-white",
             )}
           >
-            {isPaused ? "Paused" : isUp ? "Up" : isDown ? "Down" : "Pending"}
+            {isPaused
+              ? "Paused"
+              : isUp
+                ? "Up"
+                : isDown
+                  ? "Down"
+                  : isDegraded
+                    ? "Degraded"
+                    : isMaintenance
+                      ? "Maintenance"
+                      : "Pending"}
           </div>
         </div>
         <p className="text-xs sm:text-sm text-neutral-500 mt-2 sm:mt-3 flex items-center gap-1.5">

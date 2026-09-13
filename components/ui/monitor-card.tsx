@@ -26,7 +26,7 @@ type Monitor = {
   type: string;
   interval: number;
   active: boolean;
-  status?: "up" | "down" | "pending";
+  status?: "up" | "down" | "pending" | "degraded" | "maintenance";
   ping?: number | null;
 };
 
@@ -73,6 +73,20 @@ export function MonitorCard({ monitor }: MonitorCardProps) {
         borderColor: "border-border",
         icon: AlertCircle,
         label: "Pending",
+      },
+      degraded: {
+        color: "text-amber-500",
+        bgColor: "bg-amber-500/10",
+        borderColor: "border-amber-500/30 hover:border-amber-500/50",
+        icon: AlertCircle,
+        label: "Degraded",
+      },
+      maintenance: {
+        color: "text-sky-400",
+        bgColor: "bg-sky-500/10",
+        borderColor: "border-sky-500/30 hover:border-sky-500/50",
+        icon: AlertCircle,
+        label: "Maintenance",
       },
     };
 

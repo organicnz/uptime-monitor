@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { MonitorSidebar } from "./monitor-sidebar";
 import { MonitorDetailPanel } from "./monitor-detail-panel";
 import { LiveMonitorsList } from "./live-monitors";
@@ -47,7 +47,7 @@ export function DashboardLayout({ monitors }: DashboardLayoutProps) {
     monitors.length > 0 ? monitors[0].id : null,
   );
 
-  const monitorIds = monitors.map((m) => m.id);
+  const monitorIds = useMemo(() => monitors.map((m) => m.id), [monitors]);
   const { statuses } = useRealtimeMonitors(monitorIds);
 
   const upCount = monitors.filter(
@@ -58,19 +58,17 @@ export function DashboardLayout({ monitors }: DashboardLayoutProps) {
   ).length;
   const pendingCount = monitors.length - upCount - downCount;
 
-  // Validate selection
-  const getValidSelection = (currentId: string | null) => {
+  // Validate selection against the current monitor list. Derived (not synced
+  // via setState) so list changes can never cause render-phase update loops.
+  const validSelectedId = useMemo(() => {
     if (monitors.length === 0) return null;
-    if (currentId && monitors.find((m) => m.id === currentId)) return currentId;
+    if (selectedId && monitors.some((m) => m.id === selectedId)) {
+      return selectedId;
+    }
     return monitors[0].id;
-  };
+  }, [monitors, selectedId]);
 
-  const validSelectedId = getValidSelection(selectedId);
-  if (validSelectedId !== selectedId) {
-    setSelectedId(validSelectedId);
-  }
-
-  const selectedMonitor = monitors.find((m) => m.id === selectedId);
+  const selectedMonitor = monitors.find((m) => m.id === validSelectedId);
 
   // Empty state
   if (monitors.length === 0) {
@@ -216,7 +214,7 @@ export function DashboardLayout({ monitors }: DashboardLayoutProps) {
           >
             <MonitorSidebar
               monitors={monitors}
-              selectedId={selectedId || undefined}
+              selectedId={validSelectedId || undefined}
               onSelect={setSelectedId}
             />
           </div>
@@ -242,7 +240,7 @@ export function DashboardLayout({ monitors }: DashboardLayoutProps) {
             <div className="h-[calc(100%-49px)]">
               <MonitorSidebar
                 monitors={monitors}
-                selectedId={selectedId || undefined}
+                selectedId={validSelectedId || undefined}
                 onSelect={handleSelectMonitor}
               />
             </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useMonitorsWithHistory } from "@/hooks/use-monitors-with-history";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -31,7 +31,7 @@ export function MonitorSidebar({
 }: MonitorSidebarProps) {
   const [search, setSearch] = useState("");
   const listRef = useRef<HTMLDivElement>(null);
-  const monitorIds = monitors.map((m) => m.id);
+  const monitorIds = useMemo(() => monitors.map((m) => m.id), [monitors]);
   const { monitors: monitorData, isConnected } =
     useMonitorsWithHistory(monitorIds);
 
@@ -188,6 +188,8 @@ export function MonitorSidebar({
                             hb.status === 1 && "bg-green-500",
                             hb.status === 0 && "bg-red-500",
                             hb.status === 2 && "bg-neutral-600",
+                            hb.status === 3 && "bg-sky-500",
+                            hb.status === 4 && "bg-amber-500",
                           )}
                         />
                       ))

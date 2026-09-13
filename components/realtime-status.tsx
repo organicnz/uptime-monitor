@@ -49,6 +49,18 @@ export function RealtimeStatus({
       bg: "bg-neutral-500/20",
       label: "Pending",
     },
+    degraded: {
+      icon: AlertCircle,
+      color: "text-amber-400",
+      bg: "bg-amber-500/20",
+      label: "Degraded",
+    },
+    maintenance: {
+      icon: AlertCircle,
+      color: "text-sky-400",
+      bg: "bg-sky-500/20",
+      label: "Maintenance",
+    },
   };
 
   const config = statusConfig[currentStatus.status];
@@ -137,13 +149,17 @@ export function RealtimeHeartbeatChart({
                   ? "bg-green-500"
                   : hb.status === 0
                     ? "bg-red-500"
-                    : "bg-neutral-600";
+                    : hb.status === 4
+                      ? "bg-amber-500"
+                      : hb.status === 3
+                        ? "bg-sky-500"
+                        : "bg-neutral-600";
 
               return (
                 <div
                   key={hb.id || i}
                   className={`w-2 rounded-sm ${height} ${color} transition-all duration-300`}
-                  title={`${hb.status === 1 ? "Up" : hb.status === 0 ? "Down" : "Pending"} - ${hb.ping || 0}ms - ${new Date(hb.time).toLocaleString()}`}
+                  title={`${hb.status === 1 ? "Up" : hb.status === 0 ? "Down" : hb.status === 4 ? "Degraded" : hb.status === 3 ? "Maintenance" : "Pending"} - ${hb.ping || 0}ms - ${new Date(hb.time).toLocaleString()}`}
                 />
               );
             })

@@ -125,6 +125,7 @@ async function fetchCertificateInfo(hostname: string): Promise<SslInfo | null> {
       subject: cert.common_name,
     };
   } catch {
+    // crt.sh is best-effort; fall back to the basic HTTPS check below.
     return null;
   }
 }
