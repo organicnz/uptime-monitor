@@ -176,7 +176,9 @@ CREATE TABLE IF NOT EXISTS status_page_monitors (
 -- ============================================================================
 
 CREATE INDEX IF NOT EXISTS idx_monitors_user_id ON monitors(user_id);
-CREATE INDEX IF NOT EXISTS idx_monitors_group_id ON monitors(group_id);
+-- NOTE: idx_monitors_group_id is created by 20241210_add_monitor_groups.sql
+-- once the group_id column exists (creating it here would fail on re-apply
+-- because this revision of monitors has no group_id column yet).
 CREATE INDEX IF NOT EXISTS idx_monitors_active ON monitors(active);
 CREATE INDEX IF NOT EXISTS idx_monitor_groups_user_id ON monitor_groups(user_id);
 CREATE INDEX IF NOT EXISTS idx_heartbeats_monitor_id ON heartbeats(monitor_id);
@@ -255,69 +257,101 @@ ALTER TABLE status_pages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE status_page_monitors ENABLE ROW LEVEL SECURITY;
 
 -- Profiles
+DROP POLICY IF EXISTS "Users can view own profile" ON profiles;
 CREATE POLICY "Users can view own profile" ON profiles FOR SELECT USING (auth.uid() = id);
+DROP POLICY IF EXISTS "Users can update own profile" ON profiles;
 CREATE POLICY "Users can update own profile" ON profiles FOR UPDATE USING (auth.uid() = id);
 
 -- Monitor Groups
+DROP POLICY IF EXISTS "Users can view own groups" ON monitor_groups;
 CREATE POLICY "Users can view own groups" ON monitor_groups FOR SELECT USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can insert own groups" ON monitor_groups;
 CREATE POLICY "Users can insert own groups" ON monitor_groups FOR INSERT WITH CHECK (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can update own groups" ON monitor_groups;
 CREATE POLICY "Users can update own groups" ON monitor_groups FOR UPDATE USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can delete own groups" ON monitor_groups;
 CREATE POLICY "Users can delete own groups" ON monitor_groups FOR DELETE USING (auth.uid() = user_id);
 
 -- Monitors
+DROP POLICY IF EXISTS "Users can view own monitors" ON monitors;
 CREATE POLICY "Users can view own monitors" ON monitors FOR SELECT USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can insert own monitors" ON monitors;
 CREATE POLICY "Users can insert own monitors" ON monitors FOR INSERT WITH CHECK (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can update own monitors" ON monitors;
 CREATE POLICY "Users can update own monitors" ON monitors FOR UPDATE USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can delete own monitors" ON monitors;
 CREATE POLICY "Users can delete own monitors" ON monitors FOR DELETE USING (auth.uid() = user_id);
 
 -- Heartbeats
+DROP POLICY IF EXISTS "Users view own monitor heartbeats" ON heartbeats;
 CREATE POLICY "Users view own monitor heartbeats" ON heartbeats FOR SELECT USING (
   EXISTS (SELECT 1 FROM monitors WHERE monitors.id = heartbeats.monitor_id AND monitors.user_id = auth.uid())
 );
+DROP POLICY IF EXISTS "System insert heartbeats" ON heartbeats;
 CREATE POLICY "System insert heartbeats" ON heartbeats FOR INSERT WITH CHECK (true);
 
 -- Notification Channels
+DROP POLICY IF EXISTS "Users can view own channels" ON notification_channels;
 CREATE POLICY "Users can view own channels" ON notification_channels FOR SELECT USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can insert own channels" ON notification_channels;
 CREATE POLICY "Users can insert own channels" ON notification_channels FOR INSERT WITH CHECK (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can update own channels" ON notification_channels;
 CREATE POLICY "Users can update own channels" ON notification_channels FOR UPDATE USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can delete own channels" ON notification_channels;
 CREATE POLICY "Users can delete own channels" ON notification_channels FOR DELETE USING (auth.uid() = user_id);
 
 -- Monitor Notifications
+DROP POLICY IF EXISTS "Users can view own monitor notifs" ON monitor_notifications;
 CREATE POLICY "Users can view own monitor notifs" ON monitor_notifications FOR SELECT USING (
   EXISTS (SELECT 1 FROM monitors WHERE monitors.id = monitor_notifications.monitor_id AND monitors.user_id = auth.uid())
 );
+DROP POLICY IF EXISTS "Users can manage own monitor notifs" ON monitor_notifications;
 CREATE POLICY "Users can manage own monitor notifs" ON monitor_notifications FOR ALL USING (
   EXISTS (SELECT 1 FROM monitors WHERE monitors.id = monitor_notifications.monitor_id AND monitors.user_id = auth.uid())
 );
 
 -- Maintenance
+DROP POLICY IF EXISTS "Users can view own maintenance" ON maintenance;
 CREATE POLICY "Users can view own maintenance" ON maintenance FOR SELECT USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can insert own maintenance" ON maintenance;
 CREATE POLICY "Users can insert own maintenance" ON maintenance FOR INSERT WITH CHECK (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can update own maintenance" ON maintenance;
 CREATE POLICY "Users can update own maintenance" ON maintenance FOR UPDATE USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can delete own maintenance" ON maintenance;
 CREATE POLICY "Users can delete own maintenance" ON maintenance FOR DELETE USING (auth.uid() = user_id);
 
 -- Maintenance Monitors
+DROP POLICY IF EXISTS "Users can view own maintenance monitors" ON maintenance_monitors;
 CREATE POLICY "Users can view own maintenance monitors" ON maintenance_monitors FOR SELECT USING (
   EXISTS (SELECT 1 FROM maintenance WHERE maintenance.id = maintenance_monitors.maintenance_id AND maintenance.user_id = auth.uid())
 );
+DROP POLICY IF EXISTS "Users can manage own maintenance monitors" ON maintenance_monitors;
 CREATE POLICY "Users can manage own maintenance monitors" ON maintenance_monitors FOR ALL USING (
   EXISTS (SELECT 1 FROM maintenance WHERE maintenance.id = maintenance_monitors.maintenance_id AND maintenance.user_id = auth.uid())
 );
 
 -- Status Pages
+DROP POLICY IF EXISTS "Users can view own status pages" ON status_pages;
 CREATE POLICY "Users can view own status pages" ON status_pages FOR SELECT USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Public can view public status pages" ON status_pages;
 CREATE POLICY "Public can view public status pages" ON status_pages FOR SELECT USING (is_public = true);
+DROP POLICY IF EXISTS "Users can insert own status pages" ON status_pages;
 CREATE POLICY "Users can insert own status pages" ON status_pages FOR INSERT WITH CHECK (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can update own status pages" ON status_pages;
 CREATE POLICY "Users can update own status pages" ON status_pages FOR UPDATE USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can delete own status pages" ON status_pages;
 CREATE POLICY "Users can delete own status pages" ON status_pages FOR DELETE USING (auth.uid() = user_id);
 
 -- Status Page Monitors
+DROP POLICY IF EXISTS "Users can view own status page monitors" ON status_page_monitors;
 CREATE POLICY "Users can view own status page monitors" ON status_page_monitors FOR SELECT USING (
   EXISTS (SELECT 1 FROM status_pages WHERE status_pages.id = status_page_monitors.status_page_id AND status_pages.user_id = auth.uid())
 );
+DROP POLICY IF EXISTS "Public can view public status page monitors" ON status_page_monitors;
 CREATE POLICY "Public can view public status page monitors" ON status_page_monitors FOR SELECT USING (
   EXISTS (SELECT 1 FROM status_pages WHERE status_pages.id = status_page_monitors.status_page_id AND status_pages.is_public = true)
 );
+DROP POLICY IF EXISTS "Users can manage own status page monitors" ON status_page_monitors;
 CREATE POLICY "Users can manage own status page monitors" ON status_page_monitors FOR ALL USING (
   EXISTS (SELECT 1 FROM status_pages WHERE status_pages.id = status_page_monitors.status_page_id AND status_pages.user_id = auth.uid())
 );

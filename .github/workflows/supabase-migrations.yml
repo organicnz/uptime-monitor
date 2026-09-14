@@ -19,83 +19,45 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v5
+      - name: Setup Python
+        uses: actions/setup-python@v5
         with:
-          node-version: "22"
+          python-version: "3.12"
 
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
-
-      - name: Install dependencies
-        run: bun install --frozen-lockfile
-
-      - name: Install Supabase CLI
-        run: |
-          brew install supabase/tap/supabase || true
-           # Also try apt for Ubuntu
-           sudo apt-get update && sudo apt-get install -y supabase-cli 2>/dev/null || true
-           # Download binary as fallback
-           curl -sL "https://github.com/supabase/cli/releases/latest/download/supabase-$(uname -s)-$(uname -m)" -o /usr/local/bin/supabase
-           chmod +x /usr/local/bin/supabase
-
-      - name: Configure Supabase project
+      - name: Apply database migrations (Management API)
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-        run: |
-          if [ -n "$SUPABASE_ACCESS_TOKEN" ]; then
-            supabase login --access-token "$SUPABASE_ACCESS_TOKEN"
-            supabase link --project-ref ${{ secrets.SUPABASE_PROJECT_REF }} || echo "Project ref not set, will use direct SQL"
-          else
-            echo "SUPABASE_ACCESS_TOKEN not set - skipping CLI link"
-          fi
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+        run: python3 scripts/supabase-migrate.py
 
-      - name: Apply database migrations via Supabase CLI
+      - name: Verify live schema matches expectations
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
-        run: |
-          if [ -n "$SUPABASE_ACCESS_TOKEN" ]; then
-            echo "Applying migrations via Supabase CLI..."
-            supabase db push || echo "supabase db push failed, falling back to direct SQL"
-          else
-            echo "No access token - applying migrations via direct SQL"
-          fi
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+        run: python3 scripts/supabase-verify-schema.py
 
-      - name: Apply migrations via direct SQL (fallback)
+  edge-functions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: migrate
+    # Only run when edge function sources exist; otherwise this is a no-op.
+    if: hashFiles('supabase/functions/**/index.ts') != ''
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Deploy edge functions
         env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
         run: |
-          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
-            echo "Missing Supabase credentials, skipping SQL migration"
-            exit 0
-          fi
-
-          MIGRATION_DIR="supabase/migrations"
-          MIGRATIONS=$(ls "$MIGRATION_DIR"/*.sql | sort -V)
-
-          echo "Found $(echo "$MIGRATIONS" | wc -l) migration files"
-
-          for migration in $MIGRATIONS; do
-            echo "=== Applying: $(basename $migration) ==="
-            SQL=$(cat "$migration")
-            # Execute via the Supabase REST API SQL endpoint
-            RESPONSE=$(curl -s -X POST \
-              "${SUPABASE_URL}/rest/sql" \
-              -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
-              -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
-              -H "Content-Type: application/json" \
-              -d "{\"statement\": \"$SQL\"}" 2>&1)
-
-            # Check for errors
-            if echo "$RESPONSE" | grep -qi "error\|Error"; then
-              echo "WARNING: Potential issue with $(basename $migration): $RESPONSE"
-            else
-              echo "OK: $(basename $migration) applied successfully"
-            fi
-          done
-
-      - name: Confirm migration completion
-        run: |
-          echo "Migration job completed"
+          supabase link --project-ref "$SUPABASE_PROJECT_REF"
+          supabase functions deploy

@@ -3,6 +3,7 @@ import { Receiver } from "@upstash/qstash";
 import { createServiceClient } from "@/lib/supabase/service";
 import { processMonitorCheck } from "@/lib/monitor-checker";
 import { secureCompare } from "@/lib/security";
+import type { Monitor } from "@/types/application";
 
 // Config
 const CONCURRENCY_LIMIT = 10;
@@ -33,27 +34,8 @@ function generateRequestId(): string {
   return `cron_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
-// Local type matching what processMonitorCheck expects
-type MonitorRow = {
-  id: string;
-  user_id: string;
-  name: string;
-  type: "http" | "tcp" | "ping" | "keyword" | "dns" | "docker" | "steam";
-  url: string | null;
-  hostname: string | null;
-  port: number | null;
-  method: string | null;
-  keyword: string | null;
-  headers: Record<string, string> | null;
-  body: string | null;
-  interval: number;
-  retry_interval: number;
-  timeout: number;
-  max_retries: number;
-  ignore_tls: boolean;
-  upside_down: boolean;
-  active: boolean;
-};
+// Canonical Monitor row type (types/application.ts <- types/database.ts).
+// Do not redefine locally so schema changes propagate.
 
 // QStash receiver for signature verification
 const qstashReceiver = new Receiver({
@@ -210,7 +192,7 @@ async function runMonitorChecks(
   }
 
   // Get last heartbeat times in a single query
-  const monitorIds = (monitors as MonitorRow[]).map((m) => m.id);
+  const monitorIds = (monitors as Monitor[]).map((m) => m.id);
   const { data: lastHeartbeats } = await supabase
     .from("heartbeats")
     .select("monitor_id, time")
@@ -229,7 +211,7 @@ async function runMonitorChecks(
   }
 
   // Filter monitors that are due for a check, prioritize by longest wait
-  const monitorsToCheck = (monitors as MonitorRow[])
+  const monitorsToCheck = (monitors as Monitor[])
     .map((monitor) => {
       const lastCheckTime = lastCheckMap.get(monitor.id);
       const secondsSinceLastCheck = lastCheckTime

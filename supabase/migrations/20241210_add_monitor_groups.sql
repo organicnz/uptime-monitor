@@ -32,19 +32,23 @@ CREATE INDEX IF NOT EXISTS idx_monitor_groups_user_id ON monitor_groups(user_id)
 -- Enable RLS on monitor_groups
 ALTER TABLE monitor_groups ENABLE ROW LEVEL SECURITY;
 
--- RLS policies for monitor_groups
+-- RLS policies for monitor_groups (idempotent: safe to re-apply via CI)
+DROP POLICY IF EXISTS "Users can view own groups" ON monitor_groups;
 CREATE POLICY "Users can view own groups"
   ON monitor_groups FOR SELECT
   USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can insert own groups" ON monitor_groups;
 CREATE POLICY "Users can insert own groups"
   ON monitor_groups FOR INSERT
   WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can update own groups" ON monitor_groups;
 CREATE POLICY "Users can update own groups"
   ON monitor_groups FOR UPDATE
   USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can delete own groups" ON monitor_groups;
 CREATE POLICY "Users can delete own groups"
   ON monitor_groups FOR DELETE
   USING (auth.uid() = user_id);

@@ -1,5 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-// Database Types (Auto-generated representation of current schema)
+// Database Types - single source of truth, mirrors supabase/schema.sql.
+// Canonical domain aliases live in types/application.ts - import Monitor,
+// Heartbeat, etc. from there instead of redefining local copies so schema
+// changes propagate everywhere and status drift cannot reoccur.
 export type Json =
   | string
   | number
@@ -7,6 +10,12 @@ export type Json =
   | null
   | { [key: string]: Json | undefined }
   | Json[];
+
+export type MonitorType =
+  "http" | "tcp" | "ping" | "keyword" | "dns" | "docker" | "steam" | "advanced";
+
+export type NotificationChannelType =
+  "email" | "discord" | "slack" | "webhook" | "telegram" | "teams" | "pushover";
 
 export interface Database {
   public: {
@@ -18,8 +27,16 @@ export interface Database {
           full_name: string | null;
           avatar_url: string | null;
           timezone: string | null;
+          last_check_at: string | null;
           created_at: string;
           updated_at: string;
+          email_notifications: boolean;
+          telegram_notifications: boolean;
+          discord_notifications: boolean;
+          slack_notifications: boolean;
+          webhook_notifications: boolean;
+          pushover_notifications: boolean;
+          teams_notifications: boolean;
         };
         Insert: {
           id: string;
@@ -27,8 +44,16 @@ export interface Database {
           full_name?: string | null;
           avatar_url?: string | null;
           timezone?: string | null;
+          last_check_at?: string | null;
           created_at?: string;
           updated_at?: string;
+          email_notifications?: boolean;
+          telegram_notifications?: boolean;
+          discord_notifications?: boolean;
+          slack_notifications?: boolean;
+          webhook_notifications?: boolean;
+          pushover_notifications?: boolean;
+          teams_notifications?: boolean;
         };
         Update: {
           id?: string;
@@ -36,8 +61,16 @@ export interface Database {
           full_name?: string | null;
           avatar_url?: string | null;
           timezone?: string | null;
+          last_check_at?: string | null;
           created_at?: string;
           updated_at?: string;
+          email_notifications?: boolean;
+          telegram_notifications?: boolean;
+          discord_notifications?: boolean;
+          slack_notifications?: boolean;
+          webhook_notifications?: boolean;
+          pushover_notifications?: boolean;
+          teams_notifications?: boolean;
         };
         Relationships: any[];
       };
@@ -45,9 +78,9 @@ export interface Database {
         Row: {
           id: string;
           user_id: string;
+          group_id: string | null;
           name: string;
-          type:
-            "http" | "tcp" | "ping" | "keyword" | "dns" | "docker" | "steam";
+          type: MonitorType;
           active: boolean;
           url: string | null;
           method: string | null;
@@ -65,6 +98,13 @@ export interface Database {
           ignore_tls: boolean;
           upside_down: boolean;
           packet_size: number;
+          status: number;
+          down_count: number;
+          last_check_at: string | null;
+          last_status_change_at: string | null;
+          avg_response_time_ms: number;
+          success_rate_percent: number;
+          consecutive_uptime: number;
           description: string | null;
           parent_id: string | null;
           ssl_expiry: string | null;
@@ -75,9 +115,9 @@ export interface Database {
         Insert: {
           id?: string;
           user_id: string;
+          group_id?: string | null;
           name: string;
-          type:
-            "http" | "tcp" | "ping" | "keyword" | "dns" | "docker" | "steam";
+          type: MonitorType;
           active?: boolean;
           url?: string | null;
           method?: string | null;
@@ -95,6 +135,13 @@ export interface Database {
           ignore_tls?: boolean;
           upside_down?: boolean;
           packet_size?: number;
+          status?: number;
+          down_count?: number;
+          last_check_at?: string | null;
+          last_status_change_at?: string | null;
+          avg_response_time_ms?: number;
+          success_rate_percent?: number;
+          consecutive_uptime?: number;
           description?: string | null;
           parent_id?: string | null;
           ssl_expiry?: string | null;
@@ -105,9 +152,9 @@ export interface Database {
         Update: {
           id?: string;
           user_id?: string;
+          group_id?: string | null;
           name?: string;
-          type?:
-            "http" | "tcp" | "ping" | "keyword" | "dns" | "docker" | "steam";
+          type?: MonitorType;
           active?: boolean;
           url?: string | null;
           method?: string | null;
@@ -125,6 +172,13 @@ export interface Database {
           ignore_tls?: boolean;
           upside_down?: boolean;
           packet_size?: number;
+          status?: number;
+          down_count?: number;
+          last_check_at?: string | null;
+          last_status_change_at?: string | null;
+          avg_response_time_ms?: number;
+          success_rate_percent?: number;
+          consecutive_uptime?: number;
           description?: string | null;
           parent_id?: string | null;
           ssl_expiry?: string | null;
@@ -145,6 +199,12 @@ export interface Database {
           down_count: number | null;
           time: string;
           created_at: string;
+          rtt_ms: number | null;
+          ssl_valid: boolean;
+          error_type: string | null;
+          ip_resolved: string | null;
+          status_reason: string | null;
+          checked_by: string | null;
         };
         Insert: {
           id?: string;
@@ -156,6 +216,12 @@ export interface Database {
           down_count?: number | null;
           time?: string;
           created_at?: string;
+          rtt_ms?: number | null;
+          ssl_valid?: boolean;
+          error_type?: string | null;
+          ip_resolved?: string | null;
+          status_reason?: string | null;
+          checked_by?: string | null;
         };
         Update: {
           id?: string;
@@ -167,6 +233,12 @@ export interface Database {
           down_count?: number | null;
           time?: string;
           created_at?: string;
+          rtt_ms?: number | null;
+          ssl_valid?: boolean;
+          error_type?: string | null;
+          ip_resolved?: string | null;
+          status_reason?: string | null;
+          checked_by?: string | null;
         };
         Relationships: any[];
       };
@@ -177,8 +249,12 @@ export interface Database {
           title: string;
           content: string | null;
           status: number; // 0=OPEN, 1=RESOLVED, 2=INVESTIGATING
+          severity: string;
+          source: string | null;
           started_at: string;
           resolved_at: string | null;
+          resolved_by: string | null;
+          acknowledgment_at: string | null;
           created_at: string;
         };
         Insert: {
@@ -187,8 +263,12 @@ export interface Database {
           title: string;
           content?: string | null;
           status: number;
+          severity?: string;
+          source?: string | null;
           started_at?: string;
           resolved_at?: string | null;
+          resolved_by?: string | null;
+          acknowledgment_at?: string | null;
           created_at?: string;
         };
         Update: {
@@ -197,8 +277,12 @@ export interface Database {
           title?: string;
           content?: string | null;
           status?: number;
+          severity?: string;
+          source?: string | null;
           started_at?: string;
           resolved_at?: string | null;
+          resolved_by?: string | null;
+          acknowledgment_at?: string | null;
           created_at?: string;
         };
         Relationships: [
@@ -214,14 +298,7 @@ export interface Database {
         Row: {
           id: string;
           user_id: string;
-          type:
-            | "email"
-            | "discord"
-            | "slack"
-            | "webhook"
-            | "telegram"
-            | "teams"
-            | "pushover";
+          type: NotificationChannelType;
           name: string;
           config: Json;
           is_default: boolean;
@@ -232,14 +309,7 @@ export interface Database {
         Insert: {
           id?: string;
           user_id: string;
-          type:
-            | "email"
-            | "discord"
-            | "slack"
-            | "webhook"
-            | "telegram"
-            | "teams"
-            | "pushover";
+          type: NotificationChannelType;
           name: string;
           config: Json;
           is_default?: boolean;
@@ -250,14 +320,7 @@ export interface Database {
         Update: {
           id?: string;
           user_id?: string;
-          type:
-            | "email"
-            | "discord"
-            | "slack"
-            | "webhook"
-            | "telegram"
-            | "teams"
-            | "pushover";
+          type?: NotificationChannelType;
           name?: string;
           config?: Json;
           is_default?: boolean;
@@ -364,25 +427,34 @@ export interface Database {
           id: string;
           user_id: string;
           name: string;
+          description: string | null;
+          color: string;
           sort_order: number;
           collapsed: boolean;
           created_at: string;
+          updated_at: string;
         };
         Insert: {
           id?: string;
           user_id: string;
           name: string;
+          description?: string | null;
+          color?: string;
           sort_order?: number;
           collapsed?: boolean;
           created_at?: string;
+          updated_at?: string;
         };
         Update: {
           id?: string;
           user_id?: string;
           name?: string;
+          description?: string | null;
+          color?: string;
           sort_order?: number;
           collapsed?: boolean;
           created_at?: string;
+          updated_at?: string;
         };
         Relationships: any[];
       };

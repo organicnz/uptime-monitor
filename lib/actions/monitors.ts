@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { track } from "@vercel/analytics/server";
+import type { Monitor } from "@/types/application";
 
 /**
  * Fire-and-forget analytics that can never fail a server action.
@@ -23,26 +24,9 @@ function safeTrack(event: string, props?: Parameters<typeof track>[1]) {
   }
 }
 
-type Monitor = {
-  id: string;
-  user_id: string;
-  name: string;
-  type: string;
-  url: string | null;
-  hostname: string | null;
-  port: number | null;
-  method: string | null;
-  keyword: string | null;
-  headers: Record<string, string> | null;
-  body: string | null;
-  interval: number;
-  timeout: number;
-  max_retries: number;
-  ignore_tls: boolean;
-  upside_down: boolean;
-  description: string | null;
-  active: boolean;
-};
+// NOTE: Monitor row type is imported canonically from @/types/application
+// (mirrors types/database.ts <- supabase/schema.sql). Do not redefine it
+// locally so schema changes propagate and drift cannot reoccur.
 
 type DuplicateResult =
   | { success: true; id: string; name: string }

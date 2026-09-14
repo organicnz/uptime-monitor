@@ -5,8 +5,11 @@
 -- metadata, notification preferences) are missing. This migration adds every
 -- column declared in supabase/schema.sql that may not exist yet.
 --
--- Run in the Supabase Dashboard SQL Editor (service_role cannot run DDL
--- over PostgREST, so this cannot be applied from the app itself).
+-- Run in the Supabase Dashboard SQL Editor OR via CI/CD
+-- (.github/workflows/supabase-migrations.yml applies every file in this
+-- directory through the Supabase Management API on each push to main).
+-- Service-role PostgREST cannot run DDL, so this cannot be applied from the
+-- app itself - but CI/CD handles it automatically, no manual steps needed.
 -- All statements are idempotent (IF NOT EXISTS).
 
 -- ============================================================

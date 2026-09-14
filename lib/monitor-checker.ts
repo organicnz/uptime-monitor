@@ -37,27 +37,10 @@ export const MONITOR_STATUS = {
 const DEFAULT_TIMEOUT_SECONDS = 48;
 const USER_AGENT = "Uptime-Monitor/1.0";
 
-// Types
-type Monitor = {
-  id: string;
-  user_id: string;
-  name: string;
-  type: "http" | "tcp" | "ping" | "keyword" | "dns" | "docker" | "steam";
-  url: string | null;
-  hostname: string | null;
-  port: number | null;
-  method: string | null;
-  keyword: string | null;
-  headers: Record<string, string> | null;
-  body: string | null;
-  interval: number;
-  retry_interval: number;
-  timeout: number;
-  max_retries: number;
-  ignore_tls: boolean;
-  upside_down: boolean;
-  active: boolean;
-};
+// Types - canonical domain types live in types/application.ts (which mirrors
+// types/database.ts <- supabase/schema.sql). Import them here so schema
+// changes propagate and local drift cannot reoccur.
+import type { Monitor } from "@/types/application";
 
 type Heartbeat = {
   id: string;
@@ -159,7 +142,7 @@ async function checkHttp(monitor: Monitor): Promise<CheckResult> {
   try {
     const headers: Record<string, string> = {
       "User-Agent": USER_AGENT,
-      ...(monitor.headers || {}),
+      ...((monitor.headers as Record<string, string> | null) || {}),
     };
 
     const response = await fetchWithSsrfProtection(monitor.url, {

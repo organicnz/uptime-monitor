@@ -18,9 +18,9 @@ export type NotificationChannel = Tables<"notification_channels">;
 export type MonitorNotification = Tables<"monitor_notifications">;
 
 // Computed / Joined Types
-export interface MonitorWithStatus extends Monitor {
+export interface MonitorWithStatus extends Omit<Monitor, "status"> {
   latest_heartbeat?: Heartbeat;
-  status: number; // 0=DOWN, 1=UP, 2=PENDING, 3=MAINTENANCE
+  status: number; // 0=DOWN, 1=UP, 2=PENDING, 3=MAINTENANCE, 4=DEGRADED (effective display status)
   latency?: number;
 }
 
