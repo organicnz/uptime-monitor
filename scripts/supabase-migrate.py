@@ -57,6 +57,34 @@ def main() -> int:
         print("No migration files found, nothing to do.")
         return 0
 
+    # Pre-flight: validate the token before attempting any migration so a
+    # bad/expired secret fails fast with an actionable message instead of
+    # per-file 401s.
+    try:
+        req = urllib.request.Request(
+            f"{API_BASE}/projects",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            projects = json.load(resp)
+        refs = {p.get("id") for p in projects}
+        if ref not in refs:
+            print(
+                f"SUPABASE_PROJECT_REF '{ref}' not visible to this token. "
+                f"Check the secret value and project ref.",
+                flush=True,
+            )
+            return 1
+        print(f"Token OK, project '{ref}' accessible.", flush=True)
+    except urllib.error.HTTPError as e:
+        print(
+            f"Token validation failed: HTTP {e.code} "
+            f"{e.read().decode()[:200]}. "
+            f"Rotate SUPABASE_ACCESS_TOKEN secret.",
+            flush=True,
+        )
+        return 1
+
     print(f"Found {len(files)} migration files")
     failures: list[str] = []
     for path in files:
