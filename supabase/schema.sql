@@ -1,6 +1,12 @@
 -- Enable UUID extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
+-- Canonical schema reference for fresh projects (mirrors types/database.ts).
+-- Incremental changes ship as idempotent files in supabase/migrations/ and
+-- are applied to the live database by CI/CD
+-- (.github/workflows/supabase-migrations.yml) - never by manual SQL pastes.
+-- Keep this file in sync when migrations add tables or columns.
+
 -- ============================================================
 -- PROFILES TABLE - User accounts with notification preferences
 -- ============================================================
@@ -27,11 +33,30 @@ CREATE TABLE IF NOT EXISTS profiles (
 CREATE INDEX IF NOT EXISTS idx_profiles_email ON profiles(email);
 
 -- ============================================================
+-- MONITOR GROUPS TABLE - User-defined monitor groupings
+-- ============================================================
+CREATE TABLE IF NOT EXISTS monitor_groups (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  description TEXT,
+  color TEXT DEFAULT '#6366f1',
+  collapsed BOOLEAN DEFAULT false,
+  sort_order INTEGER DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Index for group lookups
+CREATE INDEX IF NOT EXISTS idx_monitor_groups_user_id ON monitor_groups(user_id);
+
+-- ============================================================
 -- MONITORS TABLE - Enhanced for Uptime Kuma parity + analytics
 -- ============================================================
 CREATE TABLE IF NOT EXISTS monitors (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   user_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  group_id UUID REFERENCES monitor_groups(id) ON DELETE SET NULL,
   name TEXT NOT NULL,
   type TEXT NOT NULL CHECK (type IN ('http', 'tcp', 'ping', 'keyword', 'dns', 'docker', 'steam', 'advanced')),
   active BOOLEAN DEFAULT true,
@@ -81,6 +106,7 @@ CREATE TABLE IF NOT EXISTS monitors (
 
 -- Indexes for monitor performance and querying
 CREATE INDEX IF NOT EXISTS idx_monitors_user_id ON monitors(user_id);
+CREATE INDEX IF NOT EXISTS idx_monitors_group_id ON monitors(group_id);
 CREATE INDEX IF NOT EXISTS idx_monitors_active ON monitors(active);
 CREATE INDEX IF NOT EXISTS idx_monitors_type ON monitors(type);
 CREATE INDEX IF NOT EXISTS idx_monitors_status ON monitors(status);
@@ -273,6 +299,9 @@ CREATE TRIGGER update_profiles_updated_at BEFORE UPDATE ON profiles FOR EACH ROW
 DROP TRIGGER IF EXISTS update_monitors_updated_at ON monitors;
 CREATE TRIGGER update_monitors_updated_at BEFORE UPDATE ON monitors FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_monitor_groups_updated_at ON monitor_groups;
+CREATE TRIGGER update_monitor_groups_updated_at BEFORE UPDATE ON monitor_groups FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
 DROP TRIGGER IF EXISTS update_notification_channels_updated_at ON notification_channels;
 CREATE TRIGGER update_notification_channels_updated_at BEFORE UPDATE ON notification_channels FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
@@ -309,6 +338,7 @@ CREATE TRIGGER on_auth_user_created
 -- ENABLE ROW LEVEL SECURITY (RLS) ON ALL TABLES
 -- ============================================================
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE monitor_groups ENABLE ROW LEVEL SECURITY;
 ALTER TABLE monitors ENABLE ROW LEVEL SECURITY;
 ALTER TABLE heartbeats ENABLE ROW LEVEL SECURITY;
 ALTER TABLE incidents ENABLE ROW LEVEL SECURITY;
@@ -326,6 +356,12 @@ ALTER TABLE status_page_monitors ENABLE ROW LEVEL SECURITY;
 -- Profiles
 CREATE POLICY "Users can view own profile" ON profiles FOR SELECT USING (auth.uid() = id);
 CREATE POLICY "Users can update own profile" ON profiles FOR UPDATE USING (auth.uid() = id);
+
+-- Monitor Groups
+CREATE POLICY "Users can view own groups" ON monitor_groups FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can insert own groups" ON monitor_groups FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users can update own groups" ON monitor_groups FOR UPDATE USING (auth.uid() = user_id);
+CREATE POLICY "Users can delete own groups" ON monitor_groups FOR DELETE USING (auth.uid() = user_id);
 
 -- Monitors
 CREATE POLICY "Users can view own monitors" ON monitors FOR SELECT USING (auth.uid() = user_id);

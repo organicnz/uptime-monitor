@@ -1,0 +1,13 @@
+# Supabase CLI configuration for uptime-monitor.
+#
+# Checked in so CI/CD (and fresh clones) can run Supabase commands
+# non-interactively with no manual `supabase init` / `supabase link` steps.
+# Auth comes from the SUPABASE_ACCESS_TOKEN env var (GitHub secret);
+# the target project comes from --project-ref "$SUPABASE_PROJECT_REF".
+# See .github/workflows/supabase-migrations.yml.
+
+project_id = "uptime-monitor"
+
+[functions]
+# Deploys under supabase/functions/* verify JWTs by default.
+verify_jwt = true

@@ -1,0 +1,156 @@
+import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+
+const ROOT = join(import.meta.dir, "..", "..");
+const MIGRATIONS_DIR = join(ROOT, "supabase", "migrations");
+const WORKFLOW_PATH = join(
+  ROOT,
+  ".github",
+  "workflows",
+  "supabase-migrations.yml",
+);
+const CONFIG_PATH = join(ROOT, "supabase", "config.toml");
+const SCHEMA_PATH = join(ROOT, "supabase", "schema.sql");
+const VERIFY_SCRIPT_PATH = join(ROOT, "scripts", "supabase-verify-schema.py");
+
+function migrationFiles(): string[] {
+  return readdirSync(MIGRATIONS_DIR)
+    .filter((f) => f.endsWith(".sql"))
+    .sort();
+}
+
+describe("supabase delivery: migrations", () => {
+  it("has migration files in zero-padded, chronological order", () => {
+    const files = migrationFiles();
+    expect(files.length).toBeGreaterThan(0);
+    expect([...files].sort()).toEqual(files);
+    for (const f of files) {
+      expect(f).toMatch(/^[0-9a-zA-Z_-]+\.sql$/);
+    }
+  });
+
+  it("keeps every migration non-empty and idempotent (safe to re-apply)", () => {
+    const violations: string[] = [];
+    for (const file of migrationFiles()) {
+      const sql = readFileSync(join(MIGRATIONS_DIR, file), "utf-8");
+      if (!sql.trim()) {
+        violations.push(`${file}: empty file`);
+        continue;
+      }
+
+      const drops = (sql.match(/DROP\s+POLICY\s+IF\s+EXISTS/gi) ?? []).length;
+      const creates = (
+        sql.match(/(?<!OR\sREPLACE\s)CREATE\s+POLICY\s+/gi) ?? []
+      ).length;
+      if (creates > drops) {
+        violations.push(
+          `${file}: ${creates} CREATE POLICY but only ${drops} DROP POLICY IF EXISTS`,
+        );
+      }
+
+      sql.split("\n").forEach((line, i) => {
+        const s = line.trim().toUpperCase();
+        const where = `${file}:${i + 1}`;
+        if (/^CREATE\s+TABLE\s+(?!IF\s+NOT\s+EXISTS)/.test(s)) {
+          violations.push(`${where}: bare CREATE TABLE`);
+        }
+        if (
+          /^CREATE\s+(UNIQUE\s+)?INDEX\s+/.test(s) &&
+          !/IF\s+NOT\s+EXISTS/.test(s)
+        ) {
+          violations.push(`${where}: bare CREATE INDEX`);
+        }
+        if (/(^|\s)ADD\s+COLUMN\s+/.test(s) && !/IF\s+NOT\s+EXISTS/.test(s)) {
+          violations.push(`${where}: bare ADD COLUMN`);
+        }
+      });
+    }
+    expect(violations).toEqual([]);
+  });
+
+  it("covers every verify-script EXPECTED column in schema or migrations", () => {
+    const verify = readFileSync(VERIFY_SCRIPT_PATH, "utf-8");
+    const expected = [...verify.matchAll(/"(\w+)":\s*\[([^\]]*)\]/g)].map(
+      (m) => ({
+        table: m[1],
+        cols: [...m[2].matchAll(/"(\w+)"/g)].map((c) => c[1]),
+      }),
+    );
+    expect(expected.length).toBeGreaterThan(0);
+
+    const corpus =
+      readFileSync(SCHEMA_PATH, "utf-8") +
+      migrationFiles()
+        .map((f) => readFileSync(join(MIGRATIONS_DIR, f), "utf-8"))
+        .join("\n");
+
+    const missing = expected.flatMap(({ table, cols }) =>
+      cols
+        .filter((col) => !corpus.includes(col))
+        .map((col) => `${table}.${col}`),
+    );
+    expect(missing).toEqual([]);
+  });
+
+  it("keeps schema.sql in sync with the groups migration", () => {
+    const schema = readFileSync(SCHEMA_PATH, "utf-8");
+    expect(schema).toContain("CREATE TABLE IF NOT EXISTS monitor_groups");
+    expect(schema).toContain("group_id UUID REFERENCES monitor_groups(id)");
+    expect(schema).toContain("idx_monitors_group_id");
+  });
+});
+
+describe("supabase delivery: CI/CD workflow", () => {
+  const workflow = () => readFileSync(WORKFLOW_PATH, "utf-8");
+
+  it("validates on PRs without touching prod", () => {
+    const yml = workflow();
+    expect(yml).toContain("validate:");
+    expect(yml).toContain("pull_request");
+    expect(yml).toContain("github.event_name != 'pull_request'");
+  });
+
+  it("gates migrations and edge deploys to non-PR runs", () => {
+    const yml = workflow();
+    expect(yml).toContain("migrate:");
+    expect(yml).toContain("edge-functions:");
+    const gated = yml.match(/if:\s*github\.event_name\s*!=\s*'pull_request'/g);
+    expect((gated ?? []).length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("deploys edge functions non-interactively with --project-ref", () => {
+    const yml = workflow();
+    expect(yml).toContain(
+      'supabase functions deploy --project-ref "$SUPABASE_PROJECT_REF"',
+    );
+    expect(yml).not.toMatch(/^\s+supabase link\b/m);
+    expect(yml).toContain("No supabase/functions sources, skipping deploy.");
+  });
+
+  it("fails a main-branch deploy loudly when credentials are missing", () => {
+    const yml = workflow();
+    expect(yml).toContain(
+      "Missing Supabase credentials on a main-branch deploy, failing.",
+    );
+  });
+
+  it("pins setup-node before setup-cli and serializes delivery", () => {
+    const yml = workflow();
+    expect(yml).toContain("actions/setup-node@v5");
+    expect(yml).toContain("supabase/setup-cli@v3");
+    expect(yml.indexOf("actions/setup-node@v5")).toBeLessThan(
+      yml.indexOf("supabase/setup-cli@v3"),
+    );
+    expect(yml).toContain("cancel-in-progress: false");
+    expect(yml).toContain("needs: [validate, migrate]");
+  });
+});
+
+describe("supabase delivery: CLI config", () => {
+  it("checks in supabase/config.toml so no manual init is needed", () => {
+    expect(existsSync(CONFIG_PATH)).toBe(true);
+    const toml = readFileSync(CONFIG_PATH, "utf-8");
+    expect(toml).toContain("project_id");
+    expect(toml).toContain("[functions]");
+  });
+});

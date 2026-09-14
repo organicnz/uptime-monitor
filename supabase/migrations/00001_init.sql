@@ -177,8 +177,7 @@ CREATE TABLE IF NOT EXISTS status_page_monitors (
 
 CREATE INDEX IF NOT EXISTS idx_monitors_user_id ON monitors(user_id);
 -- NOTE: idx_monitors_group_id is created by 20241210_add_monitor_groups.sql
--- once the group_id column exists (creating it here would fail on re-apply
--- because this revision of monitors has no group_id column yet).
+-- (kept in that migration to preserve the original migration ordering).
 CREATE INDEX IF NOT EXISTS idx_monitors_active ON monitors(active);
 CREATE INDEX IF NOT EXISTS idx_monitor_groups_user_id ON monitor_groups(user_id);
 CREATE INDEX IF NOT EXISTS idx_heartbeats_monitor_id ON heartbeats(monitor_id);

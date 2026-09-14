@@ -14,16 +14,8 @@ CREATE TABLE IF NOT EXISTS monitor_groups (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Add group_id to monitors (if not exists)
-DO $$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM information_schema.columns
-    WHERE table_name = 'monitors' AND column_name = 'group_id'
-  ) THEN
-    ALTER TABLE monitors ADD COLUMN group_id UUID REFERENCES monitor_groups(id) ON DELETE SET NULL;
-  END IF;
-END $$;
+-- Add group_id to monitors (idempotent)
+ALTER TABLE monitors ADD COLUMN IF NOT EXISTS group_id UUID REFERENCES monitor_groups(id) ON DELETE SET NULL;
 
 -- Create index for faster group queries
 CREATE INDEX IF NOT EXISTS idx_monitors_group_id ON monitors(group_id);

@@ -1,17 +1,112 @@
 name: Supabase Migrations
 
+# Fully automated delivery: no manual SQL Editor pastes, no manual
+# `supabase link` / `supabase db push` / dashboard deploys.
+#
+# - pull_request: validate only (lint + static checks). NEVER writes to prod.
+# - push to main / workflow_dispatch: apply migrations, verify live schema,
+#   then deploy edge functions.
+#
+# Required secrets: SUPABASE_ACCESS_TOKEN, SUPABASE_PROJECT_REF.
+
 on:
   push:
     branches: ["main"]
+    paths:
+      - "supabase/**"
+      - "scripts/supabase-*.py"
+      - ".github/workflows/supabase-migrations.yml"
   pull_request:
     branches: ["main"]
-  # Allow manual dispatch to run migrations on demand
+    paths:
+      - "supabase/**"
+      - "scripts/supabase-*.py"
+      - ".github/workflows/supabase-migrations.yml"
+  # Fallback for re-running delivery on demand (same path as push to main).
   workflow_dispatch:
 
+# A migration must never be cancelled or run twice concurrently.
+concurrency:
+  group: supabase-delivery-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
+  validate:
+    # Static checks only: no secrets, no prod writes. Safe on PRs and pushes.
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Compile delivery scripts
+        run: python3 -m py_compile scripts/supabase-migrate.py scripts/supabase-verify-schema.py
+
+      - name: Check Supabase CLI config is checked in
+        run: |
+          test -f supabase/config.toml || (echo "Missing supabase/config.toml - CLI needs manual init otherwise" && exit 1)
+          grep -q "project_id" supabase/config.toml
+
+      - name: Lint migrations for idempotency
+        # Every statement must be safe to re-apply (CI re-runs all files on
+        # every push to main). Bare CREATE TABLE / INDEX / POLICY and bare
+        # ADD COLUMN fail the run so they never reach the live database.
+        run: |
+          python3 - <<'EOF'
+          import glob
+          import re
+          import sys
+
+          bad: list[str] = []
+          files = sorted(glob.glob("supabase/migrations/*.sql"))
+          if not files:
+              print("No migration files found")
+              sys.exit(1)
+          for path in files:
+              sql = open(path, encoding="utf-8").read()
+              if not sql.strip():
+                  bad.append(f"{path}: empty file")
+                  continue
+              drops = len(re.findall(r"DROP\s+POLICY\s+IF\s+EXISTS", sql, re.I))
+              creates = len(
+                  re.findall(r"(?<!OR\sREPLACE\s)CREATE\s+POLICY\s+", sql, re.I)
+              )
+              if creates > drops:
+                  bad.append(
+                      f"{path}: {creates} CREATE POLICY but only "
+                      f"{drops} DROP POLICY IF EXISTS"
+                  )
+              for i, line in enumerate(sql.splitlines(), 1):
+                  s = line.strip().upper()
+                  if re.match(r"CREATE\s+TABLE\s+(?!IF\s+NOT\s+EXISTS)", s):
+                      bad.append(f"{path}:{i}: non-idempotent CREATE TABLE")
+                  if re.match(
+                      r"CREATE\s+(UNIQUE\s+)?INDEX\s+(?!IF\s+NOT\s+EXISTS)", s
+                  ):
+                      bad.append(f"{path}:{i}: non-idempotent CREATE INDEX")
+                  if re.match(r"ADD\s+COLUMN\s+(?!IF\s+NOT\s+EXISTS)", s):
+                      bad.append(f"{path}:{i}: non-idempotent ADD COLUMN")
+          if bad:
+              print("Migration idempotency lint FAILED:")
+              print("\n".join(bad))
+              sys.exit(1)
+          print(f"Migration idempotency lint passed ({len(files)} files)")
+          EOF
+
   migrate:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    needs: validate
+    # NEVER run on pull_request: PRs must not write to the production database.
+    if: github.event_name != 'pull_request'
     permissions:
       contents: read
 
@@ -39,16 +134,20 @@ jobs:
   edge-functions:
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    needs: migrate
-    # Always runs; the deploy step skips gracefully when no edge function
-    # sources exist, so introducing supabase/functions later needs no
-    # workflow change.
+    needs: [validate, migrate]
+    # Deploy only after migrations land on the main branch, never from a PR.
+    if: github.event_name != 'pull_request'
     permissions:
       contents: read
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: "22"
 
       - name: Setup Supabase CLI
         uses: supabase/setup-cli@v3
@@ -65,8 +164,9 @@ jobs:
             exit 0
           fi
           if [ -z "$SUPABASE_ACCESS_TOKEN" ] || [ -z "$SUPABASE_PROJECT_REF" ]; then
-            echo "Missing Supabase credentials, skipping deploy."
-            exit 0
+            echo "Missing Supabase credentials on a main-branch deploy, failing."
+            exit 1
           fi
-          supabase link --project-ref "$SUPABASE_PROJECT_REF"
-          supabase functions deploy
+          # --project-ref keeps this non-interactive: no `supabase link`
+          # (which would need a DB password / manual step) required.
+          supabase functions deploy --project-ref "$SUPABASE_PROJECT_REF"
