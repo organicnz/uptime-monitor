@@ -14,6 +14,15 @@ const supabase = createClient(supabaseUrl, serviceRoleKey, {
   auth: { autoRefreshToken: false, persistSession: false },
 });
 
+if (
+  !supabaseUrl.startsWith("http://127.0.0.1:") &&
+  !supabaseUrl.startsWith("http://localhost:")
+) {
+  throw new Error(
+    "E2E Supabase URL must be a local instance (127.0.0.1 or localhost)",
+  );
+}
+
 async function findOrCreateUser(): Promise<string> {
   const { data: created, error: createError } =
     await supabase.auth.admin.createUser({
