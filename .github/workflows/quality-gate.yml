@@ -23,6 +23,8 @@ jobs:
         with:
           node-version: "22"
       - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.2"
       - run: bun install --frozen-lockfile
       - run: bun run typecheck
 
@@ -35,6 +37,8 @@ jobs:
         with:
           node-version: "22"
       - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.2"
       - run: bun install --frozen-lockfile
       - run: bun run lint -- --max-warnings 0
       - run: bun run format:check
@@ -48,6 +52,8 @@ jobs:
         with:
           node-version: "22"
       - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.2"
       - run: bun install --frozen-lockfile
       - run: bun run coverage-check
 
@@ -60,6 +66,8 @@ jobs:
         with:
           node-version: "22"
       - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.2"
       - run: bun install --frozen-lockfile
       - run: bun run build
       - run: bun run bundle-size
@@ -73,6 +81,8 @@ jobs:
         with:
           node-version: "22"
       - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.2"
       - uses: supabase/setup-cli@v3
         with:
           version: v2.117.0

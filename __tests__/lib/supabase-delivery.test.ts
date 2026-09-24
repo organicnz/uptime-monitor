@@ -136,6 +136,25 @@ describe("delivery gate", () => {
     expect(workflow).toContain("bun run e2e:seed");
   });
 
+  it("pins the supported Bun version in every dependency-install workflow", () => {
+    const workflowDir = join(ROOT, ".github", "workflows");
+    const workflowFiles = readdirSync(workflowDir).filter((file) =>
+      file.endsWith(".yml"),
+    );
+    let checked = 0;
+
+    for (const file of workflowFiles) {
+      const workflow = readFileSync(join(workflowDir, file), "utf-8");
+      if (!workflow.includes("oven-sh/setup-bun@v2")) {
+        continue;
+      }
+      checked += 1;
+      expect(workflow).toContain('bun-version: "1.4.2"');
+    }
+
+    expect(checked).toBeGreaterThan(0);
+  });
+
   it("keeps the canonical delivery command in Lefthook", () => {
     const lefthook = readFileSync(join(ROOT, "lefthook.yml"), "utf-8");
     expect(lefthook).toContain("run: bun run verify:delivery");
