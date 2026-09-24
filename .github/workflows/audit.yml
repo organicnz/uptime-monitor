@@ -36,7 +36,8 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: Audit dependencies
-        run: bun run audit 2>&1 | tee audit.log
+        shell: bash
+        run: set -o pipefail; bun run audit 2>&1 | tee audit.log
 
       - name: Verify no vulnerabilities
         run: grep -q "No vulnerabilities found" audit.log

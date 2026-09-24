@@ -1,70 +1,30 @@
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { track } from "@vercel/analytics/server";
-import { resolveAndValidateUrl } from "@/lib/security";
+import { fetchWithSsrfProtection, resolveAndValidateUrl } from "@/lib/security";
 
-/**
- * Fire-and-forget analytics that can never fail a notification send.
- * track() may throw/reject when Web Analytics isn't provisioned for the
- * project, which would otherwise turn alert dispatch into failures.
- */
-function safeTrack(event: string, props?: Parameters<typeof track>[1]) {
-  try {
-    const result = track(event, props) as unknown as
-      Promise<unknown> | undefined;
-    if (result && typeof result.catch === "function") {
-      result.catch(() => {});
-    }
-  } catch {
-    // Analytics must never break notifications.
-  }
-}
+import {
+  type DiscordConfig,
+  type NotificationConfig,
+  type NotificationType,
+  type PushoverConfig,
+  type SlackConfig,
+  type TeamsConfig,
+  type TelegramConfig,
+  type WebhookConfig,
+} from "@/lib/notification-types";
 
-export interface TelegramConfig {
-  bot_token: string;
-  chat_id: string;
-}
-
-export interface DiscordConfig {
-  webhook_url: string;
-}
-
-export interface SlackConfig {
-  webhook_url: string;
-}
-
-export interface WebhookConfig {
-  url: string;
-  method?: "GET" | "POST";
-  headers?: Record<string, string>;
-}
-
-export interface EmailConfig {
-  email: string;
-}
-
-export interface PushoverConfig {
-  user_key: string;
-  token: string;
-  priority?: number;
-  sound?: string;
-}
-
-export interface TeamsConfig {
-  webhook_url: string;
-}
-
-export type NotificationConfig =
-  | TelegramConfig
-  | DiscordConfig
-  | SlackConfig
-  | WebhookConfig
-  | EmailConfig
-  | PushoverConfig
-  | TeamsConfig;
-
-export type NotificationType =
-  "email" | "discord" | "slack" | "webhook" | "telegram" | "pushover" | "teams";
+export type {
+  DiscordConfig,
+  EmailConfig,
+  NotificationConfig,
+  NotificationType,
+  PushoverConfig,
+  SlackConfig,
+  TeamsConfig,
+  TelegramConfig,
+  WebhookConfig,
+} from "@/lib/notification-types";
 
 export interface NotificationPayload {
   title: string;
@@ -75,79 +35,177 @@ export interface NotificationPayload {
   timestamp?: string;
 }
 
-// Send Telegram notification with retry logic
+type SendResult = { success: boolean; error?: string };
+
+type NotificationChannel = {
+  id: string;
+  user_id: string;
+  type: NotificationType;
+  name: string;
+  config: NotificationConfig;
+  active: boolean;
+};
+
+const MAX_ATTEMPTS = 3;
+const BASE_RETRY_DELAY_MS = 250;
+const MAX_RETRY_DELAY_MS = 2_000;
+const REQUEST_TIMEOUT_MS = 2_000;
+const RETRYABLE_STATUS_CODES = new Set([408, 425, 429, 500, 502, 503, 504]);
+
+function safeTrack(event: string, props?: Parameters<typeof track>[1]) {
+  try {
+    const result = track(event, props) as unknown as
+      Promise<unknown> | undefined;
+    if (result && typeof result.catch === "function") {
+      result.catch(() => {});
+    }
+  } catch {
+    return;
+  }
+}
+
+function escapeMarkdown(text: string): string {
+  return text.replace(/([_*[\]()~`>#+\-=|{}.!\\])/g, "\\$1");
+}
+
+function isRetryableStatus(status: number): boolean {
+  return RETRYABLE_STATUS_CODES.has(status);
+}
+
+function retryDelay(response: Response | undefined, attempt: number): number {
+  const retryAfter = response?.headers.get("retry-after");
+  if (retryAfter) {
+    const seconds = Number(retryAfter);
+    if (Number.isFinite(seconds)) {
+      return Math.min(MAX_RETRY_DELAY_MS, Math.max(0, seconds * 1_000));
+    }
+    const dateDelay = Date.parse(retryAfter) - Date.now();
+    if (Number.isFinite(dateDelay)) {
+      return Math.min(MAX_RETRY_DELAY_MS, Math.max(0, dateDelay));
+    }
+  }
+  return Math.min(MAX_RETRY_DELAY_MS, BASE_RETRY_DELAY_MS * 2 ** attempt);
+}
+
+function wait(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
+async function fetchWithRetry(
+  url: string,
+  init: RequestInit,
+  useSsrfProtection: boolean,
+): Promise<Response> {
+  let lastError: unknown = new Error("Notification request failed");
+
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+    try {
+      const requestInit = { ...init, signal: controller.signal };
+      const response = useSsrfProtection
+        ? await fetchWithSsrfProtection(url, requestInit)
+        : await fetch(url, requestInit);
+
+      if (
+        response.ok ||
+        !isRetryableStatus(response.status) ||
+        attempt === MAX_ATTEMPTS - 1
+      ) {
+        return response;
+      }
+
+      if (response.body) {
+        await response.body.cancel().catch(() => {});
+      }
+      await wait(retryDelay(response, attempt));
+    } catch (error) {
+      lastError = error;
+      if (attempt === MAX_ATTEMPTS - 1) {
+        throw error;
+      }
+      await wait(retryDelay(undefined, attempt));
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  }
+
+  throw lastError;
+}
+
+async function validateOutboundUrl(url: string): Promise<SendResult | null> {
+  try {
+    await resolveAndValidateUrl(url);
+    return null;
+  } catch (error) {
+    return {
+      success: false,
+      error: `URL blocked by SSRF filter: ${error instanceof Error ? error.message : "Invalid URL"}`,
+    };
+  }
+}
+
+async function readJson<T>(response: Response): Promise<T | null> {
+  try {
+    return (await response.json()) as T;
+  } catch {
+    return null;
+  }
+}
+
 export async function sendTelegramNotification(
   config: TelegramConfig,
   payload: NotificationPayload,
-): Promise<{ success: boolean; error?: string }> {
-  const { bot_token, chat_id } = config;
-
-  // Format message with emoji based on status
+): Promise<SendResult> {
   const statusEmoji =
     payload.status === "up" ? "✅" : payload.status === "down" ? "🔴" : "⚠️";
   const text = `${statusEmoji} *${escapeMarkdown(payload.title)}*
 
 ${escapeMarkdown(payload.message)}${payload.monitorName ? `\n\n📍 *Monitor:* ${escapeMarkdown(payload.monitorName)}` : ""}${payload.monitorUrl ? `\n🔗 *URL:* ${escapeMarkdown(payload.monitorUrl)}` : ""}${payload.timestamp ? `\n🕐 *Time:* ${escapeMarkdown(payload.timestamp)}` : ""}`;
 
-  const MAX_RETRIES = 3;
-  const RETRY_DELAY = 1000;
+  try {
+    const response = await fetchWithRetry(
+      `https://api.telegram.org/bot${config.bot_token}/sendMessage`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chat_id: config.chat_id,
+          text,
+          parse_mode: "MarkdownV2",
+          disable_web_page_preview: true,
+        }),
+      },
+      false,
+    );
+    const data = await readJson<{ ok?: boolean; description?: string }>(
+      response,
+    );
 
-  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-    try {
-      const response = await fetch(
-        `https://api.telegram.org/bot${bot_token}/sendMessage`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            chat_id,
-            text,
-            parse_mode: "MarkdownV2",
-            disable_web_page_preview: true,
-          }),
-          signal: AbortSignal.timeout(10000),
-        },
-      );
-
-      const data = await response.json();
-
-      if (!response.ok || !data.ok) {
-        if (attempt < MAX_RETRIES) {
-          await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY));
-          continue;
-        }
-        return {
-          success: false,
-          error: data.description || "Failed to send Telegram message",
-        };
-      }
-
-      return { success: true };
-    } catch (error) {
-      if (attempt < MAX_RETRIES) {
-        await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY));
-        continue;
-      }
+    if (!response.ok || !data?.ok) {
       return {
         success: false,
-        error: error instanceof Error ? error.message : "Unknown error",
+        error: data?.description || `Telegram API error: ${response.status}`,
       };
     }
+
+    return { success: true };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Unknown Telegram error",
+    };
   }
-
-  return { success: false, error: "Max retries exceeded" };
 }
 
-// Escape special characters for Telegram MarkdownV2
-function escapeMarkdown(text: string): string {
-  return text.replace(/([_*\[\]()~`>#+\-=|{}.!\\])/g, "\\$1");
-}
-
-// Send Discord notification with retry logic
 export async function sendDiscordNotification(
   config: DiscordConfig,
   payload: NotificationPayload,
-): Promise<{ success: boolean; error?: string }> {
+): Promise<SendResult> {
+  const validationError = await validateOutboundUrl(config.webhook_url);
+  if (validationError) return validationError;
+
   const color =
     payload.status === "up"
       ? 0x00ff00
@@ -155,12 +213,10 @@ export async function sendDiscordNotification(
         ? 0xff0000
         : 0xffff00;
 
-  const MAX_RETRIES = 3;
-  const RETRY_DELAY = 1000;
-
-  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-    try {
-      const response = await fetch(config.webhook_url, {
+  try {
+    const response = await fetchWithRetry(
+      config.webhook_url,
+      {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -185,41 +241,28 @@ export async function sendDiscordNotification(
             },
           ],
         }),
-        signal: AbortSignal.timeout(10000),
-      });
+      },
+      true,
+    );
 
-      if (!response.ok) {
-        if (attempt < MAX_RETRIES) {
-          await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY));
-          continue;
-        }
-        return {
-          success: false,
-          error: `Discord API error: ${response.status}`,
-        };
-      }
-
-      return { success: true };
-    } catch (error) {
-      if (attempt < MAX_RETRIES) {
-        await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY));
-        continue;
-      }
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : "Unknown error",
-      };
-    }
+    return response.ok
+      ? { success: true }
+      : { success: false, error: `Discord API error: ${response.status}` };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Unknown Discord error",
+    };
   }
-
-  return { success: false, error: "Max retries exceeded" };
 }
 
-// Send Slack notification
 export async function sendSlackNotification(
   config: SlackConfig,
   payload: NotificationPayload,
-): Promise<{ success: boolean; error?: string }> {
+): Promise<SendResult> {
+  const validationError = await validateOutboundUrl(config.webhook_url);
+  if (validationError) return validationError;
+
   const color =
     payload.status === "up"
       ? "good"
@@ -228,82 +271,88 @@ export async function sendSlackNotification(
         : "warning";
 
   try {
-    const response = await fetch(config.webhook_url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        attachments: [
-          {
-            color,
-            title: payload.title,
-            text: payload.message,
-            fields: [
-              payload.monitorName
-                ? { title: "Monitor", value: payload.monitorName, short: true }
-                : null,
-              payload.monitorUrl
-                ? { title: "URL", value: payload.monitorUrl, short: true }
-                : null,
-            ].filter(Boolean),
-            ts: payload.timestamp
-              ? new Date(payload.timestamp).getTime() / 1000
-              : Date.now() / 1000,
-          },
-        ],
-      }),
-      signal: AbortSignal.timeout(10000),
-    });
+    const response = await fetchWithRetry(
+      config.webhook_url,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          attachments: [
+            {
+              color,
+              title: payload.title,
+              text: payload.message,
+              fields: [
+                payload.monitorName
+                  ? {
+                      title: "Monitor",
+                      value: payload.monitorName,
+                      short: true,
+                    }
+                  : null,
+                payload.monitorUrl
+                  ? { title: "URL", value: payload.monitorUrl, short: true }
+                  : null,
+              ].filter(Boolean),
+              ts: payload.timestamp
+                ? new Date(payload.timestamp).getTime() / 1000
+                : Date.now() / 1000,
+            },
+          ],
+        }),
+      },
+      true,
+    );
 
-    if (!response.ok) {
-      return { success: false, error: `Slack API error: ${response.status}` };
-    }
-
-    return { success: true };
+    return response.ok
+      ? { success: true }
+      : { success: false, error: `Slack API error: ${response.status}` };
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Unknown error",
+      error: error instanceof Error ? error.message : "Unknown Slack error",
     };
   }
 }
 
-// Send Pushover notification
 export async function sendPushoverNotification(
   config: PushoverConfig,
   payload: NotificationPayload,
-): Promise<{ success: boolean; error?: string }> {
-  const { user_key, token, priority, sound } = config;
-
+): Promise<SendResult> {
   try {
     const formData = new FormData();
-    formData.append("user", user_key);
-    formData.append("token", token);
+    formData.append("user", config.user_key);
+    formData.append("token", config.token);
     formData.append("title", payload.title);
     formData.append("message", payload.message);
-    if (priority) formData.append("priority", priority.toString());
-    if (sound) formData.append("sound", sound);
+    if (config.priority !== undefined) {
+      formData.append("priority", config.priority.toString());
+    }
+    if (config.sound) formData.append("sound", config.sound);
     if (payload.monitorUrl) formData.append("url", payload.monitorUrl);
     if (payload.monitorName) formData.append("url_title", payload.monitorName);
-    if (payload.timestamp)
+    if (payload.timestamp) {
       formData.append(
         "timestamp",
         Math.floor(new Date(payload.timestamp).getTime() / 1000).toString(),
       );
+    }
 
-    const response = await fetch("https://api.pushover.net/1/messages.json", {
-      method: "POST",
-      body: formData,
-      signal: AbortSignal.timeout(10000),
-    });
+    const response = await fetchWithRetry(
+      "https://api.pushover.net/1/messages.json",
+      { method: "POST", body: formData },
+      false,
+    );
+    const data = await readJson<{
+      status?: number;
+      errors?: string[];
+    }>(response);
 
-    const data = await response.json();
-
-    if (!response.ok || data.status !== 1) {
+    if (!response.ok || data?.status !== 1) {
       return {
         success: false,
         error:
-          data.errors?.join(", ") ||
-          `Pushover API error: ${response.statusText}`,
+          data?.errors?.join(", ") || `Pushover API error: ${response.status}`,
       };
     }
 
@@ -311,133 +360,110 @@ export async function sendPushoverNotification(
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Unknown error",
+      error: error instanceof Error ? error.message : "Unknown Pushover error",
     };
   }
 }
 
-// Send Microsoft Teams notification
 export async function sendTeamsNotification(
   config: TeamsConfig,
   payload: NotificationPayload,
-): Promise<{ success: boolean; error?: string }> {
+): Promise<SendResult> {
+  const validationError = await validateOutboundUrl(config.webhook_url);
+  if (validationError) return validationError;
+
   const themeColor =
     payload.status === "up"
-      ? "00FF00" // Green
+      ? "00FF00"
       : payload.status === "down"
-        ? "FF0000" // Red
-        : "FFFF00"; // Yellow
+        ? "FF0000"
+        : "FFFF00";
 
   try {
-    const response = await fetch(config.webhook_url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        "@type": "MessageCard",
-        "@context": "http://schema.org/extensions",
-        themeColor: themeColor,
-        summary: payload.title,
-        sections: [
-          {
-            activityTitle: payload.title,
-            activitySubtitle: payload.message,
-            facts: [
-              payload.monitorName
-                ? { name: "Monitor", value: payload.monitorName }
-                : null,
-              payload.monitorUrl
-                ? { name: "URL", value: payload.monitorUrl }
-                : null,
-              payload.timestamp
-                ? { name: "Time", value: payload.timestamp }
-                : null,
-            ].filter(Boolean),
-            markdown: true,
-          },
-        ],
-      }),
-      signal: AbortSignal.timeout(10000),
-    });
+    const response = await fetchWithRetry(
+      config.webhook_url,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          "@type": "MessageCard",
+          "@context": "http://schema.org/extensions",
+          themeColor,
+          summary: payload.title,
+          sections: [
+            {
+              activityTitle: payload.title,
+              activitySubtitle: payload.message,
+              facts: [
+                payload.monitorName
+                  ? { name: "Monitor", value: payload.monitorName }
+                  : null,
+                payload.monitorUrl
+                  ? { name: "URL", value: payload.monitorUrl }
+                  : null,
+                payload.timestamp
+                  ? { name: "Time", value: payload.timestamp }
+                  : null,
+              ].filter(Boolean),
+              markdown: true,
+            },
+          ],
+        }),
+      },
+      true,
+    );
 
-    if (!response.ok) {
-      return { success: false, error: `Teams API error: ${response.status}` };
-    }
-
-    return { success: true };
+    return response.ok
+      ? { success: true }
+      : { success: false, error: `Teams API error: ${response.status}` };
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Unknown error",
+      error: error instanceof Error ? error.message : "Unknown Teams error",
     };
   }
 }
 
-// Send webhook notification with retry logic
 export async function sendWebhookNotification(
   config: WebhookConfig,
   payload: NotificationPayload,
-): Promise<{ success: boolean; error?: string }> {
-  if (!config.url) {
-    return { success: false, error: "Missing webhook URL" };
-  }
+): Promise<SendResult> {
+  const validationError = await validateOutboundUrl(config.url);
+  if (validationError) return validationError;
 
-  // Pre-flight SSRF protection on generic webhook endpoints
+  const method = config.method || "POST";
+  const headers = {
+    ...(method === "POST" ? { "Content-Type": "application/json" } : {}),
+    ...config.headers,
+  };
+
   try {
-    await resolveAndValidateUrl(config.url);
+    const response = await fetchWithRetry(
+      config.url,
+      {
+        method,
+        headers,
+        ...(method === "GET" ? {} : { body: JSON.stringify(payload) }),
+      },
+      true,
+    );
+
+    return response.ok
+      ? { success: true }
+      : { success: false, error: `Webhook error: ${response.status}` };
   } catch (error) {
     return {
       success: false,
-      error: `Webhook blocked by SSRF filter: ${(error as Error).message}`,
+      error: error instanceof Error ? error.message : "Unknown webhook error",
     };
   }
-
-  const MAX_RETRIES = 3;
-  const RETRY_DELAY = 1000; // 1 second
-
-  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-    try {
-      const response = await fetch(config.url, {
-        method: config.method || "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...config.headers,
-        },
-        body: JSON.stringify(payload),
-        signal: AbortSignal.timeout(10000),
-      });
-
-      if (!response.ok) {
-        // Retry on server errors (5xx)
-        if (attempt < MAX_RETRIES && response.status >= 500) {
-          await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY));
-          continue;
-        }
-        return { success: false, error: `Webhook error: ${response.status}` };
-      }
-
-      return { success: true };
-    } catch (error) {
-      // Retry on network errors
-      if (attempt < MAX_RETRIES) {
-        await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY));
-        continue;
-      }
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : "Unknown error",
-      };
-    }
-  }
-
-  return { success: false, error: "Max retries exceeded" };
 }
 
-// Main dispatcher function
 export async function sendNotification(
   type: NotificationType,
   config: NotificationConfig,
   payload: NotificationPayload,
-): Promise<{ success: boolean; error?: string }> {
+): Promise<SendResult> {
   switch (type) {
     case "telegram":
       return sendTelegramNotification(config as TelegramConfig, payload);
@@ -452,7 +478,6 @@ export async function sendNotification(
     case "teams":
       return sendTeamsNotification(config as TeamsConfig, payload);
     case "email":
-      // Email would require additional setup (SMTP, SendGrid, etc.)
       return {
         success: false,
         error: "Email notifications not yet implemented",
@@ -462,54 +487,56 @@ export async function sendNotification(
   }
 }
 
-// Send notification to channels linked to a specific monitor (uses service client for cron jobs)
 export async function notifyMonitor(
   monitorId: string,
   userId: string,
   payload: NotificationPayload,
+  deadlineAt?: number,
 ): Promise<{ sent: number; failed: number; errors: string[] }> {
-  // Use service client to bypass RLS (called from cron job without user session)
   const supabase = createServiceClient();
-  type NotificationChannel = {
-    id: string;
-    user_id: string;
-    type: NotificationType;
-    name: string;
-    config: NotificationConfig;
-    active: boolean;
-  };
+  const { data: monitor, error: monitorError } = await supabase
+    .from("monitors")
+    .select("user_id")
+    .eq("id", monitorId)
+    .maybeSingle();
 
-  // First, get channels linked to this specific monitor
+  if (monitorError || !monitor) {
+    const error = monitorError?.message || "Monitor not found";
+    return { sent: 0, failed: 1, errors: [error] };
+  }
+
+  if (monitor.user_id !== userId) {
+    return { sent: 0, failed: 1, errors: ["Monitor ownership mismatch"] };
+  }
+
   const { data: linkedChannels, error: linkError } = await supabase
     .from("monitor_notifications")
     .select("channel_id")
     .eq("monitor_id", monitorId);
 
   if (linkError) {
-    console.error(`[notifyMonitor] Error fetching linked channels:`, linkError);
+    return { sent: 0, failed: 1, errors: [linkError.message] };
   }
 
   const linkedIds = ((linkedChannels || []) as { channel_id: string }[]).map(
-    (l) => l.channel_id,
+    (link) => link.channel_id,
   );
 
   let channels: NotificationChannel[] = [];
-
   if (linkedIds.length > 0) {
-    // Use only the linked channels
-    const { data: channelsData, error: channelError } = await supabase
+    const { data: channelData, error: channelError } = await supabase
       .from("notification_channels")
       .select("*")
       .in("id", linkedIds)
+      .eq("user_id", userId)
       .eq("active", true);
 
     if (channelError) {
-      console.error(`[notifyMonitor] Error fetching channels:`, channelError);
+      return { sent: 0, failed: 1, errors: [channelError.message] };
     }
-    channels = (channelsData || []) as unknown as NotificationChannel[];
+    channels = (channelData || []) as unknown as NotificationChannel[];
   } else {
-    // Fallback: use default channels if no specific links exist
-    const { data: channelsData, error: defaultError } = await supabase
+    const { data: channelData, error: defaultError } = await supabase
       .from("notification_channels")
       .select("*")
       .eq("user_id", userId)
@@ -517,99 +544,84 @@ export async function notifyMonitor(
       .eq("is_default", true);
 
     if (defaultError) {
-      console.error(
-        `[notifyMonitor] Error fetching default channels:`,
-        defaultError,
-      );
+      return { sent: 0, failed: 1, errors: [defaultError.message] };
     }
-    channels = (channelsData || []) as unknown as NotificationChannel[];
+    channels = (channelData || []) as unknown as NotificationChannel[];
   }
 
-  if (channels.length === 0) {
-    return { sent: 0, failed: 0, errors: [] };
-  }
-
-  // Rate limiting: max 5 notifications per second per channel
-  const RATE_LIMIT_MS = 200;
-  const results = await Promise.all(
-    channels.map(async (channel) => {
-      // Rate limit within this call
-      await new Promise((resolve) => setTimeout(resolve, RATE_LIMIT_MS));
-
-      const result = await sendNotification(
-        channel.type,
-        channel.config,
-        payload,
-      );
-      if (!result.success) {
-        console.error(
-          `[notifyMonitor] Failed to send to ${channel.name}: ${result.error}`,
-        );
-      } else if (payload.status === "down") {
+  const results: Array<{ channel: string } & SendResult> = [];
+  let deadlineExceeded = false;
+  for (const channel of channels.slice(0, 20)) {
+    if (deadlineAt !== undefined && Date.now() >= deadlineAt) {
+      deadlineExceeded = true;
+      break;
+    }
+    const result = await sendNotification(
+      channel.type,
+      channel.config,
+      payload,
+    );
+    if (result.success) {
+      if (payload.status === "down") {
         safeTrack("Downtime Alert Triggered", { channel: channel.type });
       } else if (payload.status === "up") {
         safeTrack("Recovery Alert Triggered", { channel: channel.type });
       }
-      return { channel: channel.name, ...result };
-    }),
-  );
+    } else {
+      console.error(
+        `[notifyMonitor] Failed to send to ${channel.name}: ${result.error}`,
+      );
+    }
+    results.push({ channel: channel.name, ...result });
+  }
 
-  const sent = results.filter((r) => r.success).length;
-  const failed = results.filter((r) => !r.success).length;
   const errors = results
-    .filter((r) => !r.success)
-    .map((r) => `${r.channel}: ${r.error}`);
-
-  return { sent, failed, errors };
+    .filter((result) => !result.success)
+    .map((result) => `${result.channel}: ${result.error || "Unknown error"}`);
+  if (deadlineExceeded) {
+    errors.push("Notification deadline exceeded");
+  }
+  return {
+    sent: results.filter((result) => result.success).length,
+    failed:
+      results.filter((result) => !result.success).length +
+      (deadlineExceeded ? 1 : 0),
+    errors,
+  };
 }
 
-// Send notification to all active channels for a user (legacy, used for testing)
 export async function notifyUser(
   userId: string,
   payload: NotificationPayload,
 ): Promise<{ sent: number; failed: number; errors: string[] }> {
   const supabase = await createClient();
-  type NotificationChannel = {
-    id: string;
-    user_id: string;
-    type: NotificationType;
-    name: string;
-    config: NotificationConfig;
-    active: boolean;
-  };
   const { data: channelsData, error } = await supabase
     .from("notification_channels")
     .select("*")
     .eq("user_id", userId)
     .eq("active", true);
 
-  const channels = (channelsData || []) as unknown as NotificationChannel[];
-
-  if (error || channels.length === 0) {
-    return { sent: 0, failed: 0, errors: error ? [error.message] : [] };
+  if (error) {
+    return { sent: 0, failed: 1, errors: [error.message] };
   }
 
-  const results = await Promise.all(
-    channels.map(async (channel) => {
-      const result = await sendNotification(
-        channel.type,
-        channel.config,
-        payload,
-      );
-      if (result.success && payload.status === "down") {
-        safeTrack("Downtime Alert Triggered", { channel: channel.type });
-      } else if (result.success && payload.status === "up") {
-        safeTrack("Recovery Alert Triggered", { channel: channel.type });
-      }
-      return { channel: channel.name, ...result };
-    }),
-  );
+  const channels = (channelsData || []) as unknown as NotificationChannel[];
+  const results: Array<{ channel: string } & SendResult> = [];
 
-  const sent = results.filter((r) => r.success).length;
-  const failed = results.filter((r) => !r.success).length;
-  const errors = results
-    .filter((r) => !r.success)
-    .map((r) => `${r.channel}: ${r.error}`);
+  for (const channel of channels) {
+    const result = await sendNotification(
+      channel.type,
+      channel.config,
+      payload,
+    );
+    results.push({ channel: channel.name, ...result });
+  }
 
-  return { sent, failed, errors };
+  return {
+    sent: results.filter((result) => result.success).length,
+    failed: results.filter((result) => !result.success).length,
+    errors: results
+      .filter((result) => !result.success)
+      .map((result) => `${result.channel}: ${result.error || "Unknown error"}`),
+  };
 }

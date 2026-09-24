@@ -12,7 +12,7 @@ import {
   Shield,
 } from "lucide-react";
 
-import { Monitor, StatusPage, Heartbeat } from "@/types/application";
+import { Monitor, StatusPage } from "@/types/application";
 
 // Reusing types from dashboard
 const typeIcons: Record<string, typeof Globe> = {
@@ -33,38 +33,28 @@ export default async function PublicStatusPage({
   const { slug } = await params;
   const supabase = await createClient();
 
-  // 1. Fetch Status Page
-  const { data: statusPage, error } = await supabase
-    .from("status_pages")
-    .select("*")
-    .eq("slug", slug)
-    .single();
+  const { data: pageRows, error } = await supabase.rpc(
+    "get_public_status_page",
+    { p_slug: slug },
+  );
 
-  if (error || !statusPage) {
+  if (error || !pageRows || pageRows.length === 0) {
     notFound();
   }
 
-  const typedStatusPage = statusPage as unknown as StatusPage;
+  const firstRow = pageRows[0];
+  const typedStatusPage = firstRow as unknown as StatusPage;
+  type PublicMonitor = Pick<Monitor, "id" | "name" | "type">;
+  const publicRows = pageRows.filter(
+    (row) => row.monitor_id && row.monitor_name,
+  );
+  const monitors: PublicMonitor[] = publicRows.map((row) => ({
+    id: row.monitor_id!,
+    name: row.monitor_name!,
+    type: row.monitor_type as Monitor["type"],
+  }));
 
-  // 2. Fetch Monitors for this page
-  // join status_page_monitors -> monitors
-  const { data: pageMonitors } = await supabase
-    .from("status_page_monitors")
-    .select("monitor_id, display_order, monitors(*)")
-    .eq("status_page_id", typedStatusPage.id)
-    .order("display_order");
-
-  // Cast the joined data
-  type PageMonitorJoin = {
-    monitor_id: string;
-    display_order: number;
-    monitors: Monitor;
-  };
-  const monitors: Monitor[] =
-    pageMonitors?.map((pm: PageMonitorJoin) => pm.monitors as Monitor) || [];
-  const monitorIds: string[] = monitors.map((m) => m.id);
-
-  if (monitorIds.length === 0) {
+  if (monitors.length === 0) {
     return (
       <div className="min-h-screen bg-slate-50 dark:bg-neutral-950 flex items-center justify-center">
         <div className="text-center">
@@ -75,31 +65,14 @@ export default async function PublicStatusPage({
     );
   }
 
-  // 3. Fetch Latest Heartbeats
-  // We want the LATEST check for each monitor to determine current status
-  // Ideally we use a distinct on or just group in application
-  // For simplicity, let's fetch recent checks and filter
-  const { data: checks } = await supabase
-    .from("heartbeats")
-    .select("*")
-    .in("monitor_id", monitorIds)
-    .order("time", { ascending: false })
-    .limit(monitors.length * 5); // Fetch enough to cover all
-
-  // Map monitor -> latest status
   const monitorStatus = new Map<string, number>();
   const monitorLatency = new Map<string, number | null>();
-
-  monitors.forEach((m) => {
-    const typedChecks = (checks || []) as Heartbeat[];
-    const latest = typedChecks.find((c: Heartbeat) => c.monitor_id === m.id);
-    if (latest) {
-      monitorStatus.set(m.id, latest.status);
-      monitorLatency.set(m.id, latest.ping);
-    } else {
-      monitorStatus.set(m.id, 2); // Pending
+  for (const row of publicRows) {
+    if (row.monitor_id) {
+      monitorStatus.set(row.monitor_id, row.status);
+      monitorLatency.set(row.monitor_id, row.ping);
     }
-  });
+  }
 
   // Calculate Overall System Status
   const allUp = Array.from(monitorStatus.values()).every((s) => s === 1);

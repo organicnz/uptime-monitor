@@ -53,13 +53,14 @@ A self-hosted uptime monitoring application inspired by [Uptime Kuma](https://gi
 
 GitHub Actions workflows are configured for automated quality checks on every push to `main`:
 
-| Workflow      | Trigger                | Checks                                           |
-| ------------- | ---------------------- | ------------------------------------------------ |
-| **typecheck** | Push/PR to main        | TypeScript strict mode: 0 errors                 |
-| **build**     | Push/PR to main        | Production build + bundle-size guard (10% limit) |
-| **lint**      | Push/PR to main        | ESLint: 0 errors (1 pre-existing svgo warning)   |
-| **test**      | Push/PR to main        | Bun coverage gate: 70% funcs / 80% lines         |
-| **audit**     | Push/PR + weekly (Mon) | `bun audit`: 0 vulnerabilities                   |
+| Workflow         | Trigger                | Checks                                                    |
+| ---------------- | ---------------------- | --------------------------------------------------------- |
+| **typecheck**    | Push/PR to main        | TypeScript strict mode: 0 errors                          |
+| **build**        | Push/PR to main        | Production build + bundle-size guard (10% limit)          |
+| **lint**         | Push/PR to main        | ESLint: 0 errors and 0 warnings                           |
+| **test**         | Push/PR to main        | Bun coverage gate: 70% funcs / 80% lines                  |
+| **audit**        | Push/PR + weekly (Mon) | `bun audit`: 0 vulnerabilities                            |
+| **quality-gate** | Push/PR to main        | Typecheck, lint, unit coverage, build, and Playwright e2e |
 
 ### Workflow Files
 
@@ -68,6 +69,7 @@ GitHub Actions workflows are configured for automated quality checks on every pu
 - `.github/workflows/lint.yml` - `bun run lint` + `bun run format:check`
 - `.github/workflows/test.yml` - `bun run coverage-check`
 - `.github/workflows/audit.yml` - `bun run audit`
+- `.github/workflows/quality-gate.yml` - `bun run verify:delivery` equivalent checks
 
 All checks must pass before merge. See `.github/workflows/` for full workflow definitions.
 
@@ -77,6 +79,9 @@ Automated component tests run with Bun's test runner and happy-dom. `bunfig.toml
 
 ```bash
 bun run test
+bun run e2e:install
+bun run e2e
+bun run verify:delivery
 ```
 
 | Test File                                               | Component            | Coverage                                           |

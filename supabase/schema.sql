@@ -1,11 +1,21 @@
 -- Enable UUID extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- Canonical schema reference for fresh projects (mirrors types/database.ts).
+-- ============================================================
+-- SCHEMA DOCUMENTATION
+-- ============================================================
+-- This file is the canonical schema reference for the Uptime Monitor project.
+-- It mirrors types/database.ts which in turn mirrors the Supabase types.
 -- Incremental changes ship as idempotent files in supabase/migrations/ and
--- are applied to the live database by CI/CD
--- (.github/workflows/supabase-migrations.yml) - never by manual SQL pastes.
--- Keep this file in sync when migrations add tables or columns.
+-- are applied to the live database by CI/CD (.github/workflows/supabase-migrations.yml).
+-- Never apply manual SQL pastes to the live database.
+-- Keep this file in sync when adding tables, columns, or changing constraints.
+-- ============================================================
+
+-- ============================================================
+-- POSTGRES CONFIGURATION
+-- ============================================================
+-- Enable required extensions
 
 -- ============================================================
 -- PROFILES TABLE - User accounts with notification preferences
@@ -31,6 +41,9 @@ CREATE TABLE IF NOT EXISTS profiles (
 
 -- Index for profile lookups
 CREATE INDEX IF NOT EXISTS idx_profiles_email ON profiles(email);
+
+-- Comment: Stores user profile data including notification preferences.
+-- RLS: Owner-only access (auth.uid() = id)
 
 -- ============================================================
 -- MONITOR GROUPS TABLE - User-defined monitor groupings
@@ -147,6 +160,18 @@ CREATE INDEX IF NOT EXISTS idx_heartbeats_status ON heartbeats(status);
 CREATE INDEX IF NOT EXISTS idx_heartbeats_monitor_time ON heartbeats(monitor_id, time DESC);
 CREATE INDEX IF NOT EXISTS idx_heartbeats_error_type ON heartbeats(error_type);
 CREATE INDEX IF NOT EXISTS idx_heartbeats_ssl_valid ON heartbeats(ssl_valid);
+
+CREATE TABLE IF NOT EXISTS cron_failures (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  message_id TEXT NOT NULL UNIQUE,
+  failed_url TEXT NOT NULL,
+  failed_status TEXT,
+  failed_message TEXT,
+  retried INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_cron_failures_created_at ON cron_failures(created_at DESC);
 
 -- ============================================================
 -- INCIDENTS TABLE - For persistent outages with severity tracking
@@ -334,6 +359,43 @@ CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
+DELETE FROM monitor_notifications AS links
+USING monitors AS m, notification_channels AS c
+WHERE links.monitor_id = m.id
+  AND links.channel_id = c.id
+  AND m.user_id <> c.user_id;
+
+DELETE FROM maintenance_monitors AS links
+USING maintenance AS w, monitors AS m
+WHERE links.maintenance_id = w.id
+  AND links.monitor_id = m.id
+  AND w.user_id <> m.user_id;
+
+DELETE FROM status_page_monitors AS links
+USING status_pages AS p, monitors AS m
+WHERE links.status_page_id = p.id
+  AND links.monitor_id = m.id
+  AND p.user_id <> m.user_id;
+
+CREATE OR REPLACE FUNCTION public.mfa_mutation_allowed()
+RETURNS BOOLEAN
+LANGUAGE SQL
+SECURITY DEFINER
+SET search_path = public, auth
+AS $$
+  SELECT
+    NOT EXISTS (
+      SELECT 1
+      FROM auth.mfa_factors
+      WHERE user_id = (SELECT auth.uid())
+        AND status = 'verified'
+    )
+    OR COALESCE((SELECT auth.jwt()->>'aal'), 'aal1') = 'aal2';
+$$;
+
+REVOKE ALL ON FUNCTION public.mfa_mutation_allowed() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.mfa_mutation_allowed() TO authenticated;
+
 -- ============================================================
 -- ENABLE ROW LEVEL SECURITY (RLS) ON ALL TABLES
 -- ============================================================
@@ -341,6 +403,7 @@ ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE monitor_groups ENABLE ROW LEVEL SECURITY;
 ALTER TABLE monitors ENABLE ROW LEVEL SECURITY;
 ALTER TABLE heartbeats ENABLE ROW LEVEL SECURITY;
+ALTER TABLE cron_failures ENABLE ROW LEVEL SECURITY;
 ALTER TABLE incidents ENABLE ROW LEVEL SECURITY;
 ALTER TABLE notification_channels ENABLE ROW LEVEL SECURITY;
 ALTER TABLE monitor_notifications ENABLE ROW LEVEL SECURITY;
@@ -353,40 +416,136 @@ ALTER TABLE status_page_monitors ENABLE ROW LEVEL SECURITY;
 -- RLS POLICIES - Owner Access Only (simplified pattern)
 -- ============================================================
 
+DROP POLICY IF EXISTS "MFA required for profile writes" ON profiles;
+CREATE POLICY "MFA required for profile writes"
+ON profiles AS RESTRICTIVE FOR ALL TO authenticated
+USING (true) WITH CHECK (public.mfa_mutation_allowed());
+DROP POLICY IF EXISTS "MFA required for profile deletes" ON profiles;
+CREATE POLICY "MFA required for profile deletes"
+ON profiles AS RESTRICTIVE FOR DELETE TO authenticated
+USING (public.mfa_mutation_allowed());
+
+DROP POLICY IF EXISTS "MFA required for monitor writes" ON monitors;
+CREATE POLICY "MFA required for monitor writes"
+ON monitors AS RESTRICTIVE FOR ALL TO authenticated
+USING (true) WITH CHECK (public.mfa_mutation_allowed());
+DROP POLICY IF EXISTS "MFA required for monitor deletes" ON monitors;
+CREATE POLICY "MFA required for monitor deletes"
+ON monitors AS RESTRICTIVE FOR DELETE TO authenticated
+USING (public.mfa_mutation_allowed());
+
+DROP POLICY IF EXISTS "MFA required for group writes" ON monitor_groups;
+CREATE POLICY "MFA required for group writes"
+ON monitor_groups AS RESTRICTIVE FOR ALL TO authenticated
+USING (true) WITH CHECK (public.mfa_mutation_allowed());
+DROP POLICY IF EXISTS "MFA required for group deletes" ON monitor_groups;
+CREATE POLICY "MFA required for group deletes"
+ON monitor_groups AS RESTRICTIVE FOR DELETE TO authenticated
+USING (public.mfa_mutation_allowed());
+
+DROP POLICY IF EXISTS "MFA required for channel writes" ON notification_channels;
+CREATE POLICY "MFA required for channel writes"
+ON notification_channels AS RESTRICTIVE FOR ALL TO authenticated
+USING (true) WITH CHECK (public.mfa_mutation_allowed());
+DROP POLICY IF EXISTS "MFA required for channel deletes" ON notification_channels;
+CREATE POLICY "MFA required for channel deletes"
+ON notification_channels AS RESTRICTIVE FOR DELETE TO authenticated
+USING (public.mfa_mutation_allowed());
+
+DROP POLICY IF EXISTS "MFA required for monitor notification writes" ON monitor_notifications;
+CREATE POLICY "MFA required for monitor notification writes"
+ON monitor_notifications AS RESTRICTIVE FOR ALL TO authenticated
+USING (true) WITH CHECK (public.mfa_mutation_allowed());
+DROP POLICY IF EXISTS "MFA required for monitor notification deletes" ON monitor_notifications;
+CREATE POLICY "MFA required for monitor notification deletes"
+ON monitor_notifications AS RESTRICTIVE FOR DELETE TO authenticated
+USING (public.mfa_mutation_allowed());
+
+DROP POLICY IF EXISTS "MFA required for maintenance writes" ON maintenance;
+CREATE POLICY "MFA required for maintenance writes"
+ON maintenance AS RESTRICTIVE FOR ALL TO authenticated
+USING (true) WITH CHECK (public.mfa_mutation_allowed());
+DROP POLICY IF EXISTS "MFA required for maintenance deletes" ON maintenance;
+CREATE POLICY "MFA required for maintenance deletes"
+ON maintenance AS RESTRICTIVE FOR DELETE TO authenticated
+USING (public.mfa_mutation_allowed());
+
+DROP POLICY IF EXISTS "MFA required for maintenance monitor writes" ON maintenance_monitors;
+CREATE POLICY "MFA required for maintenance monitor writes"
+ON maintenance_monitors AS RESTRICTIVE FOR ALL TO authenticated
+USING (true) WITH CHECK (public.mfa_mutation_allowed());
+DROP POLICY IF EXISTS "MFA required for maintenance monitor deletes" ON maintenance_monitors;
+CREATE POLICY "MFA required for maintenance monitor deletes"
+ON maintenance_monitors AS RESTRICTIVE FOR DELETE TO authenticated
+USING (public.mfa_mutation_allowed());
+
+DROP POLICY IF EXISTS "MFA required for status page writes" ON status_pages;
+CREATE POLICY "MFA required for status page writes"
+ON status_pages AS RESTRICTIVE FOR ALL TO authenticated
+USING (true) WITH CHECK (public.mfa_mutation_allowed());
+DROP POLICY IF EXISTS "MFA required for status page deletes" ON status_pages;
+CREATE POLICY "MFA required for status page deletes"
+ON status_pages AS RESTRICTIVE FOR DELETE TO authenticated
+USING (public.mfa_mutation_allowed());
+
+DROP POLICY IF EXISTS "MFA required for status page monitor writes" ON status_page_monitors;
+CREATE POLICY "MFA required for status page monitor writes"
+ON status_page_monitors AS RESTRICTIVE FOR ALL TO authenticated
+USING (true) WITH CHECK (public.mfa_mutation_allowed());
+DROP POLICY IF EXISTS "MFA required for status page monitor deletes" ON status_page_monitors;
+CREATE POLICY "MFA required for status page monitor deletes"
+ON status_page_monitors AS RESTRICTIVE FOR DELETE TO authenticated
+USING (public.mfa_mutation_allowed());
+
+DROP POLICY IF EXISTS "MFA required for incident writes" ON incidents;
+CREATE POLICY "MFA required for incident writes"
+ON incidents AS RESTRICTIVE FOR ALL TO authenticated
+USING (true) WITH CHECK (public.mfa_mutation_allowed());
+DROP POLICY IF EXISTS "MFA required for incident deletes" ON incidents;
+CREATE POLICY "MFA required for incident deletes"
+ON incidents AS RESTRICTIVE FOR DELETE TO authenticated
+USING (public.mfa_mutation_allowed());
+
 -- Profiles
 CREATE POLICY "Users can view own profile" ON profiles FOR SELECT USING (auth.uid() = id);
-CREATE POLICY "Users can update own profile" ON profiles FOR UPDATE USING (auth.uid() = id);
+CREATE POLICY "Users can update own profile" ON profiles FOR UPDATE TO authenticated USING (id = (SELECT auth.uid())) WITH CHECK (id = (SELECT auth.uid()));
 
 -- Monitor Groups
 CREATE POLICY "Users can view own groups" ON monitor_groups FOR SELECT USING (auth.uid() = user_id);
 CREATE POLICY "Users can insert own groups" ON monitor_groups FOR INSERT WITH CHECK (auth.uid() = user_id);
-CREATE POLICY "Users can update own groups" ON monitor_groups FOR UPDATE USING (auth.uid() = user_id);
+CREATE POLICY "Users can update own groups" ON monitor_groups FOR UPDATE TO authenticated USING (user_id = (SELECT auth.uid())) WITH CHECK (user_id = (SELECT auth.uid()));
 CREATE POLICY "Users can delete own groups" ON monitor_groups FOR DELETE USING (auth.uid() = user_id);
 
 -- Monitors
 CREATE POLICY "Users can view own monitors" ON monitors FOR SELECT USING (auth.uid() = user_id);
 CREATE POLICY "Users can insert own monitors" ON monitors FOR INSERT WITH CHECK (auth.uid() = user_id);
-CREATE POLICY "Users can update own monitors" ON monitors FOR UPDATE USING (auth.uid() = user_id);
+CREATE POLICY "Users can update own monitors" ON monitors FOR UPDATE TO authenticated USING (user_id = (SELECT auth.uid())) WITH CHECK (user_id = (SELECT auth.uid()));
 CREATE POLICY "Users can delete own monitors" ON monitors FOR DELETE USING (auth.uid() = user_id);
 
 -- Heartbeats (View own, System inserts via service role)
 CREATE POLICY "Users view own monitor heartbeats" ON heartbeats FOR SELECT USING (
   EXISTS (SELECT 1 FROM monitors WHERE monitors.id = heartbeats.monitor_id AND monitors.user_id = auth.uid())
 );
-CREATE POLICY "System insert heartbeats" ON heartbeats FOR INSERT WITH CHECK (true); -- Requires Service Role
 
 -- Notification Channels
 CREATE POLICY "Users can view own channels" ON notification_channels FOR SELECT USING (auth.uid() = user_id);
 CREATE POLICY "Users can insert own channels" ON notification_channels FOR INSERT WITH CHECK (auth.uid() = user_id);
-CREATE POLICY "Users can update own channels" ON notification_channels FOR UPDATE USING (auth.uid() = user_id);
+CREATE POLICY "Users can update own channels" ON notification_channels FOR UPDATE TO authenticated USING (user_id = (SELECT auth.uid())) WITH CHECK (user_id = (SELECT auth.uid()));
 CREATE POLICY "Users can delete own channels" ON notification_channels FOR DELETE USING (auth.uid() = user_id);
 
 -- Monitor Notifications
-CREATE POLICY "Users can view own monitor notifs" ON monitor_notifications FOR SELECT USING (
-  EXISTS (SELECT 1 FROM monitors WHERE monitors.id = monitor_notifications.monitor_id AND monitors.user_id = auth.uid())
+CREATE POLICY "Users can view own monitor notifs" ON monitor_notifications FOR SELECT TO authenticated USING (
+  EXISTS (SELECT 1 FROM monitors WHERE monitors.id = monitor_notifications.monitor_id AND monitors.user_id = (SELECT auth.uid()))
+  AND EXISTS (SELECT 1 FROM notification_channels WHERE notification_channels.id = monitor_notifications.channel_id AND notification_channels.user_id = (SELECT auth.uid()))
 );
-CREATE POLICY "Users can manage own monitor notifs" ON monitor_notifications FOR ALL USING (
-  EXISTS (SELECT 1 FROM monitors WHERE monitors.id = monitor_notifications.monitor_id AND monitors.user_id = auth.uid())
+CREATE POLICY "Users can manage own monitor notifs" ON monitor_notifications FOR ALL TO authenticated
+USING (
+  EXISTS (SELECT 1 FROM monitors WHERE monitors.id = monitor_notifications.monitor_id AND monitors.user_id = (SELECT auth.uid()))
+  AND EXISTS (SELECT 1 FROM notification_channels WHERE notification_channels.id = monitor_notifications.channel_id AND notification_channels.user_id = (SELECT auth.uid()))
+)
+WITH CHECK (
+  EXISTS (SELECT 1 FROM monitors WHERE monitors.id = monitor_notifications.monitor_id AND monitors.user_id = (SELECT auth.uid()))
+  AND EXISTS (SELECT 1 FROM notification_channels WHERE notification_channels.id = monitor_notifications.channel_id AND notification_channels.user_id = (SELECT auth.uid()))
 );
 
 -- Incidents
@@ -396,34 +555,222 @@ CREATE POLICY "Users can view own incidents" ON incidents FOR SELECT USING (
 CREATE POLICY "Users can insert own incidents" ON incidents FOR INSERT WITH CHECK (
   EXISTS (SELECT 1 FROM monitors WHERE monitors.id = incidents.monitor_id AND monitors.user_id = auth.uid())
 );
-CREATE POLICY "Users can update own incidents" ON incidents FOR UPDATE USING (
-  EXISTS (SELECT 1 FROM monitors WHERE monitors.id = incidents.monitor_id AND monitors.user_id = auth.uid())
+CREATE POLICY "Users can update own incidents" ON incidents FOR UPDATE TO authenticated
+USING (
+  EXISTS (SELECT 1 FROM monitors WHERE monitors.id = incidents.monitor_id AND monitors.user_id = (SELECT auth.uid()))
+)
+WITH CHECK (
+  EXISTS (SELECT 1 FROM monitors WHERE monitors.id = incidents.monitor_id AND monitors.user_id = (SELECT auth.uid()))
 );
 CREATE POLICY "Users can delete own incidents" ON incidents FOR DELETE USING (
   EXISTS (SELECT 1 FROM monitors WHERE monitors.id = incidents.monitor_id AND monitors.user_id = auth.uid())
 );
 
+CREATE POLICY "Public can view public status page incidents"
+ON incidents FOR SELECT TO anon
+USING (
+  EXISTS (
+    SELECT 1
+    FROM status_page_monitors
+    JOIN status_pages ON status_pages.id = status_page_monitors.status_page_id
+    JOIN monitors ON monitors.id = status_page_monitors.monitor_id
+    WHERE status_page_monitors.monitor_id = incidents.monitor_id
+      AND status_pages.is_public = true
+      AND monitors.user_id = status_pages.user_id
+  )
+);
+
 -- Maintenance
 CREATE POLICY "Users can view own maintenance" ON maintenance FOR SELECT USING (auth.uid() = user_id);
 CREATE POLICY "Users can insert own maintenance" ON maintenance FOR INSERT WITH CHECK (auth.uid() = user_id);
-CREATE POLICY "Users can update own maintenance" ON maintenance FOR UPDATE USING (auth.uid() = user_id);
+CREATE POLICY "Users can update own maintenance" ON maintenance FOR UPDATE TO authenticated USING (user_id = (SELECT auth.uid())) WITH CHECK (user_id = (SELECT auth.uid()));
 CREATE POLICY "Users can delete own maintenance" ON maintenance FOR DELETE USING (auth.uid() = user_id);
 
 -- Maintenance Monitors
-CREATE POLICY "Users can view own maintenance monitors" ON maintenance_monitors FOR SELECT USING (
-  EXISTS (SELECT 1 FROM monitors WHERE monitors.id = maintenance_monitors.monitor_id AND monitors.user_id = auth.uid())
+CREATE POLICY "Users can view own maintenance monitors" ON maintenance_monitors FOR SELECT TO authenticated USING (
+  EXISTS (SELECT 1 FROM maintenance WHERE maintenance.id = maintenance_monitors.maintenance_id AND maintenance.user_id = (SELECT auth.uid()))
+  AND EXISTS (SELECT 1 FROM monitors WHERE monitors.id = maintenance_monitors.monitor_id AND monitors.user_id = (SELECT auth.uid()))
+);
+CREATE POLICY "Users can manage own maintenance monitors" ON maintenance_monitors FOR ALL TO authenticated
+USING (
+  EXISTS (SELECT 1 FROM maintenance WHERE maintenance.id = maintenance_monitors.maintenance_id AND maintenance.user_id = (SELECT auth.uid()))
+  AND EXISTS (SELECT 1 FROM monitors WHERE monitors.id = maintenance_monitors.monitor_id AND monitors.user_id = (SELECT auth.uid()))
+)
+WITH CHECK (
+  EXISTS (SELECT 1 FROM maintenance WHERE maintenance.id = maintenance_monitors.maintenance_id AND maintenance.user_id = (SELECT auth.uid()))
+  AND EXISTS (SELECT 1 FROM monitors WHERE monitors.id = maintenance_monitors.monitor_id AND monitors.user_id = (SELECT auth.uid()))
 );
 
 -- Status Pages
 CREATE POLICY "Users can view own status pages" ON status_pages FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Public can view public status pages" ON status_pages FOR SELECT TO anon USING (is_public = true);
 CREATE POLICY "Users can insert own status pages" ON status_pages FOR INSERT WITH CHECK (auth.uid() = user_id);
-CREATE POLICY "Users can update own status pages" ON status_pages FOR UPDATE USING (auth.uid() = user_id);
+CREATE POLICY "Users can update own status pages" ON status_pages FOR UPDATE TO authenticated USING (user_id = (SELECT auth.uid())) WITH CHECK (user_id = (SELECT auth.uid()));
 CREATE POLICY "Users can delete own status pages" ON status_pages FOR DELETE USING (auth.uid() = user_id);
 
 -- Status Page Monitors
-CREATE POLICY "Users can view own status page monitors" ON status_page_monitors FOR SELECT USING (
-  EXISTS (SELECT 1 FROM monitors WHERE monitors.id = status_page_monitors.monitor_id AND monitors.user_id = auth.uid())
+CREATE POLICY "Users can view own status page monitors" ON status_page_monitors FOR SELECT TO authenticated USING (
+  EXISTS (SELECT 1 FROM status_pages WHERE status_pages.id = status_page_monitors.status_page_id AND status_pages.user_id = (SELECT auth.uid()))
+  AND EXISTS (SELECT 1 FROM monitors WHERE monitors.id = status_page_monitors.monitor_id AND monitors.user_id = (SELECT auth.uid()))
 );
-CREATE POLICY "Users can manage own status page monitors" ON status_page_monitors FOR ALL USING (
-  EXISTS (SELECT 1 FROM monitors WHERE monitors.id = status_page_monitors.monitor_id AND monitors.user_id = auth.uid())
+CREATE POLICY "Public can view public status page monitors" ON status_page_monitors FOR SELECT TO anon USING (
+  EXISTS (SELECT 1 FROM status_pages WHERE status_pages.id = status_page_monitors.status_page_id AND status_pages.is_public = true)
 );
+CREATE POLICY "Users can manage own status page monitors" ON status_page_monitors FOR ALL TO authenticated
+USING (
+  EXISTS (SELECT 1 FROM status_pages WHERE status_pages.id = status_page_monitors.status_page_id AND status_pages.user_id = (SELECT auth.uid()))
+  AND EXISTS (SELECT 1 FROM monitors WHERE monitors.id = status_page_monitors.monitor_id AND monitors.user_id = (SELECT auth.uid()))
+)
+WITH CHECK (
+  EXISTS (SELECT 1 FROM status_pages WHERE status_pages.id = status_page_monitors.status_page_id AND status_pages.user_id = (SELECT auth.uid()))
+  AND EXISTS (SELECT 1 FROM monitors WHERE monitors.id = status_page_monitors.monitor_id AND monitors.user_id = (SELECT auth.uid()))
+);
+
+CREATE OR REPLACE FUNCTION public.get_public_status_page(p_slug TEXT)
+RETURNS TABLE (
+  id UUID,
+  slug TEXT,
+  title TEXT,
+  description TEXT,
+  custom_domain TEXT,
+  monitor_id UUID,
+  monitor_name TEXT,
+  monitor_type TEXT,
+  display_order INTEGER,
+  status SMALLINT,
+  ping INTEGER
+)
+LANGUAGE SQL
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT
+    status_pages.id,
+    status_pages.slug,
+    status_pages.title,
+    status_pages.description,
+    status_pages.custom_domain,
+    monitors.id,
+    monitors.name,
+    monitors.type,
+    status_page_monitors.display_order,
+    COALESCE(latest_heartbeat.status, 2::SMALLINT),
+    latest_heartbeat.ping
+  FROM status_pages
+  LEFT JOIN status_page_monitors ON status_page_monitors.status_page_id = status_pages.id
+  LEFT JOIN monitors
+    ON monitors.id = status_page_monitors.monitor_id
+    AND monitors.user_id = status_pages.user_id
+  LEFT JOIN LATERAL (
+    SELECT heartbeats.status, heartbeats.ping
+    FROM heartbeats
+    WHERE heartbeats.monitor_id = monitors.id
+    ORDER BY heartbeats.time DESC
+    LIMIT 1
+  ) AS latest_heartbeat ON true
+  WHERE status_pages.slug = p_slug AND status_pages.is_public = true
+  ORDER BY status_page_monitors.display_order NULLS LAST, monitors.name;
+$$;
+
+REVOKE ALL ON FUNCTION public.get_public_status_page(TEXT) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.get_public_status_page(TEXT) TO anon, authenticated;
+
+CREATE OR REPLACE FUNCTION public.create_status_page_with_monitors(
+  p_title TEXT,
+  p_slug TEXT,
+  p_description TEXT,
+  p_is_public BOOLEAN,
+  p_monitor_ids UUID[]
+)
+RETURNS UUID
+LANGUAGE plpgsql
+SECURITY INVOKER
+SET search_path = public
+AS $$
+DECLARE
+  page_id UUID;
+BEGIN
+  IF NOT public.mfa_mutation_allowed() THEN
+    RAISE EXCEPTION 'MFA verification required';
+  END IF;
+
+  IF p_monitor_ids IS NOT NULL AND EXISTS (
+    SELECT 1 FROM unnest(p_monitor_ids) AS requested_monitor(id)
+    WHERE NOT EXISTS (
+      SELECT 1 FROM monitors
+      WHERE monitors.id = requested_monitor.id
+        AND monitors.user_id = (SELECT auth.uid())
+    )
+  ) THEN
+    RAISE EXCEPTION 'One or more monitors are not owned by the current user';
+  END IF;
+
+  INSERT INTO status_pages (user_id, title, slug, description, is_public)
+  VALUES ((SELECT auth.uid()), p_title, p_slug, p_description, p_is_public)
+  RETURNING id INTO page_id;
+
+  INSERT INTO status_page_monitors (status_page_id, monitor_id, display_order)
+  SELECT page_id, requested_monitor.id, requested_monitor.ordinality - 1
+  FROM unnest(COALESCE(p_monitor_ids, ARRAY[]::UUID[]))
+    WITH ORDINALITY AS requested_monitor(id, ordinality);
+
+  RETURN page_id;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.update_status_page_with_monitors(
+  p_status_page_id UUID,
+  p_title TEXT,
+  p_slug TEXT,
+  p_description TEXT,
+  p_is_public BOOLEAN,
+  p_monitor_ids UUID[]
+)
+RETURNS UUID
+LANGUAGE plpgsql
+SECURITY INVOKER
+SET search_path = public
+AS $$
+BEGIN
+  IF NOT public.mfa_mutation_allowed() THEN
+    RAISE EXCEPTION 'MFA verification required';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM status_pages
+    WHERE status_pages.id = p_status_page_id
+      AND status_pages.user_id = (SELECT auth.uid())
+  ) THEN
+    RAISE EXCEPTION 'Status page not found';
+  END IF;
+
+  IF p_monitor_ids IS NOT NULL AND EXISTS (
+    SELECT 1 FROM unnest(p_monitor_ids) AS requested_monitor(id)
+    WHERE NOT EXISTS (
+      SELECT 1 FROM monitors
+      WHERE monitors.id = requested_monitor.id
+        AND monitors.user_id = (SELECT auth.uid())
+    )
+  ) THEN
+    RAISE EXCEPTION 'One or more monitors are not owned by the current user';
+  END IF;
+
+  UPDATE status_pages
+  SET title = p_title, slug = p_slug, description = p_description, is_public = p_is_public
+  WHERE id = p_status_page_id AND user_id = (SELECT auth.uid());
+
+  DELETE FROM status_page_monitors WHERE status_page_id = p_status_page_id;
+
+  INSERT INTO status_page_monitors (status_page_id, monitor_id, display_order)
+  SELECT p_status_page_id, requested_monitor.id, requested_monitor.ordinality - 1
+  FROM unnest(COALESCE(p_monitor_ids, ARRAY[]::UUID[]))
+    WITH ORDINALITY AS requested_monitor(id, ordinality);
+
+  RETURN p_status_page_id;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.create_status_page_with_monitors(TEXT, TEXT, TEXT, BOOLEAN, UUID[]) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.create_status_page_with_monitors(TEXT, TEXT, TEXT, BOOLEAN, UUID[]) TO authenticated;
+REVOKE ALL ON FUNCTION public.update_status_page_with_monitors(UUID, TEXT, TEXT, TEXT, BOOLEAN, UUID[]) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.update_status_page_with_monitors(UUID, TEXT, TEXT, TEXT, BOOLEAN, UUID[]) TO authenticated;

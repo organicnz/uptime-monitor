@@ -10,24 +10,21 @@ name: Supabase Migrations
 # Required secrets: SUPABASE_ACCESS_TOKEN, SUPABASE_PROJECT_REF.
 
 on:
-  push:
-    branches: ["main"]
-    paths:
-      - "supabase/**"
-      - "scripts/supabase-*.py"
-      - ".github/workflows/supabase-migrations.yml"
   pull_request:
     branches: ["main"]
     paths:
       - "supabase/**"
       - "scripts/supabase-*.py"
       - ".github/workflows/supabase-migrations.yml"
-  # Fallback for re-running delivery on demand (same path as push to main).
+  workflow_run:
+    workflows: ["Quality Gate"]
+    types: [completed]
+    branches: ["main"]
   workflow_dispatch:
 
 # A migration must never be cancelled or run twice concurrently.
 concurrency:
-  group: supabase-delivery-${{ github.ref }}
+  group: supabase-delivery
   cancel-in-progress: false
 
 jobs:
@@ -41,6 +38,9 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          persist-credentials: false
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -106,13 +106,23 @@ jobs:
     timeout-minutes: 15
     needs: validate
     # NEVER run on pull_request: PRs must not write to the production database.
-    if: github.event_name != 'pull_request'
+    if: >-
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
+      (github.event_name == 'workflow_run' &&
+        github.event.workflow_run.event == 'push' &&
+        github.event.workflow_run.head_branch == 'main' &&
+        github.event.workflow_run.head_repository.full_name == github.repository &&
+        github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.head_sha == github.sha)
     permissions:
       contents: read
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          persist-credentials: false
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -136,13 +146,23 @@ jobs:
     timeout-minutes: 10
     needs: [validate, migrate]
     # Deploy only after migrations land on the main branch, never from a PR.
-    if: github.event_name != 'pull_request'
+    if: >-
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
+      (github.event_name == 'workflow_run' &&
+        github.event.workflow_run.event == 'push' &&
+        github.event.workflow_run.head_branch == 'main' &&
+        github.event.workflow_run.head_repository.full_name == github.repository &&
+        github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.head_sha == github.sha)
     permissions:
       contents: read
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          persist-credentials: false
 
       - name: Setup Node.js
         uses: actions/setup-node@v5
@@ -152,7 +172,7 @@ jobs:
       - name: Setup Supabase CLI
         uses: supabase/setup-cli@v3
         with:
-          version: latest
+          version: v2.117.0
 
       - name: Deploy edge functions (if any)
         env:

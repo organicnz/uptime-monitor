@@ -242,6 +242,36 @@ export interface Database {
         };
         Relationships: any[];
       };
+      cron_failures: {
+        Row: {
+          id: string;
+          message_id: string;
+          failed_url: string;
+          failed_status: string | null;
+          failed_message: string | null;
+          retried: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          message_id: string;
+          failed_url: string;
+          failed_status?: string | null;
+          failed_message?: string | null;
+          retried?: number;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          message_id?: string;
+          failed_url?: string;
+          failed_status?: string | null;
+          failed_message?: string | null;
+          retried?: number;
+          created_at?: string;
+        };
+        Relationships: any[];
+      };
       incidents: {
         Row: {
           id: string;
@@ -539,7 +569,47 @@ export interface Database {
       [_ in never]: never;
     };
     Functions: {
-      [_ in never]: never;
+      mfa_mutation_allowed: {
+        Args: Record<string, never>;
+        Returns: boolean;
+      };
+      create_status_page_with_monitors: {
+        Args: {
+          p_title: string;
+          p_slug: string;
+          p_description: string | null;
+          p_is_public: boolean;
+          p_monitor_ids: string[];
+        };
+        Returns: string;
+      };
+      update_status_page_with_monitors: {
+        Args: {
+          p_status_page_id: string;
+          p_title: string;
+          p_slug: string;
+          p_description: string | null;
+          p_is_public: boolean;
+          p_monitor_ids: string[];
+        };
+        Returns: string;
+      };
+      get_public_status_page: {
+        Args: { p_slug: string };
+        Returns: Array<{
+          id: string;
+          slug: string;
+          title: string;
+          description: string | null;
+          custom_domain: string | null;
+          monitor_id: string | null;
+          monitor_name: string | null;
+          monitor_type: string | null;
+          display_order: number | null;
+          status: number;
+          ping: number | null;
+        }>;
+      };
     };
     Enums: {
       [_ in never]: never;

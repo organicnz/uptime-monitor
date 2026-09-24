@@ -1,7 +1,8 @@
+import { connect } from "node:net";
 import { createServiceClient } from "@/lib/supabase/service";
 import { notifyMonitor } from "@/lib/notifications";
 import {
-  resolveAndValidateUrl,
+  fetchWithSsrfProtection,
   resolveAndValidateHost,
   formatHostForUrl,
 } from "@/lib/security";
@@ -11,14 +12,13 @@ import {
   SSL_DAYS_REMAINING_UNKNOWN,
 } from "@/lib/ssl-utils";
 
-// Status constants (matching Uptime Kuma)
-export const HEARTBEAT_STATUS = {
-  DOWN: 0,
-  UP: 1,
-  PENDING: 2,
-  MAINTENANCE: 3,
-  DEGRADED: 4,
-} as const;
+import type { Heartbeat, Monitor } from "@/types/application";
+import {
+  determineEffectiveStatus,
+  HEARTBEAT_STATUS,
+} from "@/lib/monitor-status";
+
+export { determineEffectiveStatus, HEARTBEAT_STATUS };
 
 export const INCIDENT_STATUS = {
   OPEN: 0,
@@ -33,25 +33,8 @@ export const MONITOR_STATUS = {
   DEGRADED: "degraded",
 } as const;
 
-// Config
 const DEFAULT_TIMEOUT_SECONDS = 48;
 const USER_AGENT = "Uptime-Monitor/1.0";
-
-// Types - canonical domain types live in types/application.ts (which mirrors
-// types/database.ts <- supabase/schema.sql). Import them here so schema
-// changes propagate and local drift cannot reoccur.
-import type { Monitor } from "@/types/application";
-
-type Heartbeat = {
-  id: string;
-  monitor_id: string;
-  status: number;
-  msg: string | null;
-  ping: number | null;
-  duration: number | null;
-  down_count: number;
-  time: string;
-};
 
 type CheckResult = {
   status: number;
@@ -69,66 +52,79 @@ type HeartbeatInsert = {
   time: string;
 };
 
-// Timeout helper
-function createTimeoutController(timeoutSeconds: number) {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeoutSeconds * 1000);
-  return { controller, clear: () => clearTimeout(timeoutId) };
+type PreviousHeartbeat = Pick<Heartbeat, "status" | "down_count">;
+
+const MAX_RESPONSE_BYTES = 1_048_576;
+
+async function readResponseText(response: Response): Promise<string> {
+  const contentLength = Number(response.headers.get("content-length"));
+  if (Number.isFinite(contentLength) && contentLength > MAX_RESPONSE_BYTES) {
+    throw new Error("Response body exceeds the 1 MiB limit");
+  }
+
+  if (!response.body) {
+    const text = await response.text();
+    if (new TextEncoder().encode(text).byteLength > MAX_RESPONSE_BYTES) {
+      throw new Error("Response body exceeds the 1 MiB limit");
+    }
+    return text;
+  }
+
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > MAX_RESPONSE_BYTES) {
+        await reader.cancel();
+        throw new Error("Response body exceeds the 1 MiB limit");
+      }
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+
+  const body = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    body.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return new TextDecoder().decode(body);
+}
+
+function assertBeforeDeadline(deadlineAt?: number): void {
+  if (deadlineAt !== undefined && Date.now() >= deadlineAt) {
+    throw new Error("Execution deadline exceeded");
+  }
+}
+
+function getRemainingSeconds(
+  timeoutSeconds: number,
+  deadlineAt?: number,
+): number {
+  if (deadlineAt === undefined) return timeoutSeconds;
+  return Math.min(
+    timeoutSeconds,
+    Math.max(0, (deadlineAt - Date.now()) / 1000),
+  );
 }
 
 /**
- * Custom fetch with manual redirect handling to protect against SSRF via redirects.
- * Validates each hop's destination against SSRF filters.
+ * Perform an HTTP/HTTPS monitor check
  */
-async function fetchWithSsrfProtection(
-  initialUrl: string,
-  options: RequestInit & { maxRedirects?: number } = {},
-): Promise<Response> {
-  const maxRedirects = options.maxRedirects ?? 5;
-  let currentUrl = initialUrl;
-  let redirectCount = 0;
-
-  while (redirectCount <= maxRedirects) {
-    // Validate current URL before making the request
-    await resolveAndValidateUrl(currentUrl);
-
-    const response = await fetch(currentUrl, {
-      ...options,
-      redirect: "manual",
-    });
-
-    // Check if response is a redirect (301, 302, 303, 307, 308)
-    if ([301, 302, 303, 307, 308].includes(response.status)) {
-      const location = response.headers.get("location");
-      if (!location) {
-        return response; // No location header, return as is
-      }
-
-      // Resolve relative redirect URLs against current URL
-      const targetUrl = new URL(location, currentUrl).toString();
-      currentUrl = targetUrl;
-      redirectCount++;
-
-      if (redirectCount > maxRedirects) {
-        throw new Error(
-          `Too many redirects (exceeded limit of ${maxRedirects})`,
-        );
-      }
-      continue;
-    }
-
-    return response;
-  }
-
-  throw new Error(`Too many redirects (exceeded limit of ${maxRedirects})`);
-}
-
-// HTTP/HTTPS check
-async function checkHttp(monitor: Monitor): Promise<CheckResult> {
+async function checkHttp(
+  monitor: Monitor,
+  deadlineAt?: number,
+): Promise<CheckResult> {
   const startTime = Date.now();
   const timeout = monitor.timeout || DEFAULT_TIMEOUT_SECONDS;
+  assertBeforeDeadline(deadlineAt);
 
-  // SSRF protection - validate URL before making request
   if (!monitor.url) {
     return {
       status: HEARTBEAT_STATUS.DOWN,
@@ -137,66 +133,73 @@ async function checkHttp(monitor: Monitor): Promise<CheckResult> {
     };
   }
 
-  const { controller, clear } = createTimeoutController(timeout);
+  let ping: number | null = null;
+  let msg = "";
 
   try {
     const headers: Record<string, string> = {
       "User-Agent": USER_AGENT,
-      ...((monitor.headers as Record<string, string> | null) || {}),
+      ...(monitor.headers as Record<string, string> | null),
     };
 
-    const response = await fetchWithSsrfProtection(monitor.url, {
-      method: monitor.method || "GET",
-      headers,
-      body: monitor.body || undefined,
-      signal: controller.signal,
-    });
+    const { controller, clear } = createTimeoutController(timeout, deadlineAt);
 
-    clear();
-    const ping = Date.now() - startTime;
+    try {
+      const response = await fetchWithSsrfProtection(monitor.url, {
+        method: monitor.method || "GET",
+        headers,
+        body: monitor.body || undefined,
+        signal: controller.signal,
+      });
 
-    // Keyword check
-    if (monitor.type === "keyword" && monitor.keyword) {
-      const text = await response.text();
-      const keywordFound = text.includes(monitor.keyword);
-      const success = monitor.upside_down ? !keywordFound : keywordFound;
-
-      if (!success) {
-        return {
-          status: HEARTBEAT_STATUS.DOWN,
-          ping,
-          msg: monitor.upside_down
-            ? `Keyword "${monitor.keyword}" found (upside down mode)`
-            : `Keyword "${monitor.keyword}" not found`,
-        };
+      let responseText: string | undefined;
+      if (monitor.type === "keyword" && monitor.keyword) {
+        responseText = await readResponseText(response);
       }
-    }
 
-    // HTTP status check
-    const isSuccess = monitor.upside_down ? !response.ok : response.ok;
+      ping = Date.now() - startTime;
 
-    let msg = `${response.status} - ${response.statusText}`;
+      if (monitor.type === "keyword" && monitor.keyword) {
+        const keywordFound = responseText!.includes(monitor.keyword);
+        const success = monitor.upside_down ? !keywordFound : keywordFound;
 
-    // Enrich message for common blocking scenarios
-    if (response.status === 429 || response.status === 403) {
-      const server = response.headers.get("server")?.toLowerCase() || "";
-      const mitigated = response.headers.get("x-vercel-mitigated");
-
-      if (server.includes("vercel") || mitigated) {
-        msg +=
-          " (Vercel Protection detected - try adding x-vercel-protection-bypass header)";
-      } else if (server.includes("cloudflare")) {
-        msg += " (Cloudflare detected - try whitelisting monitor IP)";
+        if (!success) {
+          return {
+            status: HEARTBEAT_STATUS.DOWN,
+            ping,
+            msg: monitor.upside_down
+              ? `Keyword "${monitor.keyword}" found (upside down mode)`
+              : `Keyword "${monitor.keyword}" not found`,
+          };
+        }
       }
-    }
 
-    return {
-      status: isSuccess ? HEARTBEAT_STATUS.UP : HEARTBEAT_STATUS.DOWN,
-      ping,
-      msg,
-    };
+      const isSuccess = monitor.upside_down ? !response.ok : response.ok;
+
+      msg = `${response.status} - ${response.statusText}`;
+
+      // Enrich message for common blocking scenarios
+      if (response.status === 429 || response.status === 403) {
+        const server = response.headers.get("server")?.toLowerCase() || "";
+        const mitigated = response.headers.get("x-vercel-mitigated");
+
+        if (server.includes("vercel") || mitigated) {
+          msg +=
+            " (Vercel Protection detected - try adding x-vercel-protection-bypass header)";
+        } else if (server.includes("cloudflare")) {
+          msg += " (Cloudflare detected - try whitelisting monitor IP)";
+        }
+      }
+
+      return {
+        status: isSuccess ? HEARTBEAT_STATUS.UP : HEARTBEAT_STATUS.DOWN,
+        ping,
+        msg,
+      };
+    } finally {
+      clear();
+    }
   } catch (error) {
-    clear();
     const ping = Date.now() - startTime;
 
     if (error instanceof Error && error.name === "AbortError") {
@@ -210,18 +213,53 @@ async function checkHttp(monitor: Monitor): Promise<CheckResult> {
     return {
       status: HEARTBEAT_STATUS.DOWN,
       ping,
-      msg:
-        error instanceof Error ? (error as Error).message : "Connection failed",
+      msg: error instanceof Error ? error.message : "Connection failed",
     };
   }
 }
 
-// TCP check (simplified - uses HTTP HEAD as proxy in serverless)
-async function checkTcp(monitor: Monitor): Promise<CheckResult> {
+function openTcpConnection(
+  hostname: string,
+  port: number,
+  timeoutSeconds: number,
+  deadlineAt?: number,
+): Promise<void> {
+  const effectiveTimeout = getRemainingSeconds(timeoutSeconds, deadlineAt);
+  if (effectiveTimeout <= 0) {
+    return Promise.reject(new Error("Execution deadline exceeded"));
+  }
+
+  return new Promise((resolve, reject) => {
+    const socket = connect({ host: hostname, port });
+    const timeoutId = setTimeout(() => {
+      socket.destroy();
+      reject(new Error(`Timeout after ${timeoutSeconds}s`));
+    }, effectiveTimeout * 1_000);
+
+    socket.once("connect", () => {
+      clearTimeout(timeoutId);
+      socket.destroy();
+      resolve();
+    });
+    socket.once("error", (error) => {
+      clearTimeout(timeoutId);
+      socket.destroy();
+      reject(error);
+    });
+  });
+}
+
+/**
+ * Perform a TCP monitor check using actual TCP connection
+ */
+async function checkTcp(
+  monitor: Monitor,
+  deadlineAt?: number,
+): Promise<CheckResult> {
   const startTime = Date.now();
   const timeout = monitor.timeout || DEFAULT_TIMEOUT_SECONDS;
+  assertBeforeDeadline(deadlineAt);
 
-  // SSRF protection - validate hostname
   if (!monitor.hostname) {
     return {
       status: HEARTBEAT_STATUS.DOWN,
@@ -233,7 +271,7 @@ async function checkTcp(monitor: Monitor): Promise<CheckResult> {
   let safeHostname = monitor.hostname;
   try {
     safeHostname = await resolveAndValidateHost(monitor.hostname);
-  } catch (error: unknown) {
+  } catch (error) {
     return {
       status: HEARTBEAT_STATUS.DOWN,
       ping: null,
@@ -241,28 +279,27 @@ async function checkTcp(monitor: Monitor): Promise<CheckResult> {
     };
   }
 
-  const { controller, clear } = createTimeoutController(timeout);
+  let ping: number | null = null;
+  let success = false;
+  let msg = "";
 
   try {
-    const formattedHost = formatHostForUrl(safeHostname);
-    const url = `http://${formattedHost}:${monitor.port}`;
-    await fetch(url, { method: "HEAD", signal: controller.signal });
-    clear();
+    await openTcpConnection(
+      safeHostname,
+      monitor.port || 80,
+      timeout,
+      deadlineAt,
+    );
 
-    const ping = Date.now() - startTime;
-    const success = !monitor.upside_down;
+    ping = Date.now() - startTime;
+    success = !monitor.upside_down;
 
-    return {
-      status: success ? HEARTBEAT_STATUS.UP : HEARTBEAT_STATUS.DOWN,
-      ping,
-      msg: success
-        ? "Connection successful"
-        : "Connection successful (upside down)",
-    };
+    msg = success
+      ? "Connection successful"
+      : "Connection successful (upside down)";
   } catch (error) {
-    clear();
-    const ping = Date.now() - startTime;
-    const success = monitor.upside_down;
+    ping = Date.now() - startTime;
+    success = monitor.upside_down;
 
     if (error instanceof Error && error.name === "AbortError") {
       return {
@@ -275,18 +312,28 @@ async function checkTcp(monitor: Monitor): Promise<CheckResult> {
     return {
       status: success ? HEARTBEAT_STATUS.UP : HEARTBEAT_STATUS.DOWN,
       ping,
-      msg:
-        error instanceof Error ? (error as Error).message : "Connection failed",
+      msg: error instanceof Error ? error.message : "Connection failed",
     };
   }
+
+  return {
+    status: success ? HEARTBEAT_STATUS.UP : HEARTBEAT_STATUS.DOWN,
+    ping,
+    msg,
+  };
 }
 
-// Ping check (uses HTTP HEAD as substitute in serverless)
-async function checkPing(monitor: Monitor): Promise<CheckResult> {
+/**
+ * Perform a Ping monitor check using HTTP HEAD
+ */
+async function checkPing(
+  monitor: Monitor,
+  deadlineAt?: number,
+): Promise<CheckResult> {
   const startTime = Date.now();
   const timeout = monitor.timeout || DEFAULT_TIMEOUT_SECONDS;
+  assertBeforeDeadline(deadlineAt);
 
-  // SSRF protection - validate hostname
   if (!monitor.hostname) {
     return {
       status: HEARTBEAT_STATUS.DOWN,
@@ -303,7 +350,7 @@ async function checkPing(monitor: Monitor): Promise<CheckResult> {
       : monitor.hostname;
 
     safeHostname = await resolveAndValidateHost(hostToResolve);
-  } catch (error: unknown) {
+  } catch (error) {
     return {
       status: HEARTBEAT_STATUS.DOWN,
       ping: null,
@@ -311,63 +358,98 @@ async function checkPing(monitor: Monitor): Promise<CheckResult> {
     };
   }
 
-  const { controller, clear } = createTimeoutController(timeout);
+  let ping: number | null = null;
+  let isReachable = false;
+  let success = false;
+  let msg = "";
 
   try {
-    const formattedHost = formatHostForUrl(safeHostname);
     const url = monitor.hostname?.startsWith("http")
-      ? monitor.hostname
-      : `https://${formattedHost}`;
+      ? new URL(monitor.hostname)
+      : new URL(`https://${formatHostForUrl(safeHostname)}`);
+    if (monitor.hostname?.startsWith("http")) {
+      url.hostname = safeHostname;
+    }
 
-    const response = await fetch(url, {
-      method: "HEAD",
-      signal: controller.signal,
-    });
-    clear();
+    const { controller, clear } = createTimeoutController(timeout, deadlineAt);
 
-    const ping = Date.now() - startTime;
-    const isReachable = response.ok || response.status < 500;
-    const success = monitor.upside_down ? !isReachable : isReachable;
+    try {
+      const response = await fetchWithSsrfProtection(url.toString(), {
+        method: "HEAD",
+        signal: controller.signal,
+      });
+      clear();
 
-    return {
-      status: success ? HEARTBEAT_STATUS.UP : HEARTBEAT_STATUS.DOWN,
-      ping,
-      msg: `${ping}ms`,
-    };
+      ping = Date.now() - startTime;
+      isReachable = response.ok || response.status < 500;
+      success = monitor.upside_down ? !isReachable : isReachable;
+
+      msg = `${ping}ms`;
+    } finally {
+      clear();
+    }
   } catch (error) {
-    clear();
-    const ping = Date.now() - startTime;
-    const success = monitor.upside_down;
+    ping = Date.now() - startTime;
+    success = monitor.upside_down;
+
+    if (error instanceof Error && error.name === "AbortError") {
+      return {
+        status: success ? HEARTBEAT_STATUS.UP : HEARTBEAT_STATUS.DOWN,
+        ping,
+        msg: `Timeout after ${timeout}s`,
+      };
+    }
 
     return {
       status: success ? HEARTBEAT_STATUS.UP : HEARTBEAT_STATUS.DOWN,
       ping,
-      msg:
-        error instanceof Error ? (error as Error).message : "Host unreachable",
+      msg: error instanceof Error ? error.message : "Host unreachable",
     };
   }
+
+  return {
+    status: success ? HEARTBEAT_STATUS.UP : HEARTBEAT_STATUS.DOWN,
+    ping,
+    msg,
+  };
 }
 
-// DNS check
-type DnsResponse = {
-  Status: number;
-  Answer?: Array<{ data: string }>;
-};
+/**
+ * Perform a DNS monitor check using public DNS resolver
+ */
+async function checkDns(
+  monitor: Monitor,
+  deadlineAt?: number,
+): Promise<CheckResult> {
+  if (!monitor.hostname) {
+    return {
+      status: HEARTBEAT_STATUS.DOWN,
+      ping: null,
+      msg: "Missing hostname",
+    };
+  }
 
-async function checkDns(monitor: Monitor): Promise<CheckResult> {
   const startTime = Date.now();
   const timeout = monitor.timeout || DEFAULT_TIMEOUT_SECONDS;
-  const { controller, clear } = createTimeoutController(timeout);
+  assertBeforeDeadline(deadlineAt);
+  const { controller, clear } = createTimeoutController(timeout, deadlineAt);
 
   try {
     const encodedHostname = encodeURIComponent(monitor.hostname || "");
+
     const response = await fetch(
       `https://dns.google/resolve?name=${encodedHostname}&type=A`,
       { signal: controller.signal },
     );
+    const data: {
+      Status: number;
+      Answer?: Array<{ data: string }>;
+    } = await response.json();
     clear();
 
-    const data: DnsResponse = await response.json();
+    if (!response.ok) {
+      throw new Error(`DNS resolver error: ${response.status}`);
+    }
     const ping = Date.now() - startTime;
     const resolved =
       data.Status === 0 && Array.isArray(data.Answer) && data.Answer.length > 0;
@@ -389,221 +471,57 @@ async function checkDns(monitor: Monitor): Promise<CheckResult> {
   } catch (error) {
     clear();
     const ping = Date.now() - startTime;
+    const success = monitor.upside_down
+      ? HEARTBEAT_STATUS.UP
+      : HEARTBEAT_STATUS.DOWN;
 
     return {
-      status: monitor.upside_down ? HEARTBEAT_STATUS.UP : HEARTBEAT_STATUS.DOWN,
+      status: success,
       ping,
-      msg:
-        error instanceof Error ? (error as Error).message : "DNS query failed",
+      msg: error instanceof Error ? error.message : "DNS query failed",
     };
   }
 }
 
-// Main check dispatcher
-export async function checkMonitor(monitor: Monitor): Promise<CheckResult> {
+/**
+ * Create an AbortController with timeout
+ */
+function createTimeoutController(timeoutSeconds: number, deadlineAt?: number) {
+  const controller = new AbortController();
+  const effectiveTimeout = getRemainingSeconds(timeoutSeconds, deadlineAt);
+  if (effectiveTimeout <= 0) {
+    controller.abort();
+  }
+  const timeoutId = setTimeout(
+    () => controller.abort(),
+    Math.max(1, effectiveTimeout * 1000),
+  );
+  return { controller, clear: () => clearTimeout(timeoutId) };
+}
+
+/**
+ * Main check dispatcher
+ */
+export async function checkMonitor(
+  monitor: Monitor,
+  deadlineAt?: number,
+): Promise<CheckResult> {
   switch (monitor.type) {
     case "http":
     case "keyword":
-      return checkHttp(monitor);
+      return checkHttp(monitor, deadlineAt);
     case "tcp":
-      return checkTcp(monitor);
+      return checkTcp(monitor, deadlineAt);
     case "ping":
-      return checkPing(monitor);
+      return checkPing(monitor, deadlineAt);
     case "dns":
-      return checkDns(monitor);
+      return checkDns(monitor, deadlineAt);
     default:
       return {
         status: HEARTBEAT_STATUS.PENDING,
         ping: null,
         msg: `Unsupported monitor type: ${monitor.type}`,
       };
-  }
-}
-
-/**
- * Determine the effective heartbeat status from a raw check result.
- *
- * Uptime Kuma logic:
- * - A DOWN result only becomes effective after `maxRetries` consecutive
- *   failures; until then the previous status is kept (PENDING if first check).
- * - Any non-DOWN result resets the consecutive failure counter.
- */
-export function determineEffectiveStatus(
-  resultStatus: number,
-  previousStatus: number | null,
-  previousDownCount: number,
-  maxRetries: number,
-): { status: number; downCount: number } {
-  if (resultStatus === HEARTBEAT_STATUS.DOWN) {
-    const downCount = previousDownCount + 1;
-
-    if (downCount <= maxRetries) {
-      return { status: previousStatus ?? HEARTBEAT_STATUS.PENDING, downCount };
-    }
-    return { status: HEARTBEAT_STATUS.DOWN, downCount };
-  }
-
-  return { status: resultStatus, downCount: 0 };
-}
-
-// Get previous heartbeat for a monitor
-async function getPreviousHeartbeat(
-  supabase: ReturnType<typeof createServiceClient>,
-  monitorId: string,
-): Promise<Heartbeat | null> {
-  const { data } = await supabase
-    .from("heartbeats")
-    .select("*")
-    .eq("monitor_id", monitorId)
-    .order("time", { ascending: false })
-    .limit(1)
-    .single();
-
-  return data as Heartbeat | null;
-}
-
-// Check if monitor is under maintenance
-async function isUnderMaintenance(
-  supabase: ReturnType<typeof createServiceClient>,
-  monitorId: string,
-): Promise<boolean> {
-  const now = new Date().toISOString();
-
-  const { data } = await supabase
-    .from("maintenance_monitors")
-    .select(
-      `
-      maintenance:maintenance_id (
-        active,
-        start_date,
-        end_date
-      )
-    `,
-    )
-    .eq("monitor_id", monitorId);
-
-  if (!data || data.length === 0) return false;
-
-  return (
-    data as unknown as Array<{
-      maintenance: { active: boolean; start_date: string; end_date: string };
-    }>
-  ).some((item) => {
-    const m = item.maintenance;
-    return m?.active && m.start_date <= now && m.end_date >= now;
-  });
-}
-
-// Record heartbeat (Uptime Kuma style)
-async function recordHeartbeat(
-  supabase: ReturnType<typeof createServiceClient>,
-  heartbeat: HeartbeatInsert,
-): Promise<void> {
-  await supabase.from("heartbeats").insert(heartbeat);
-}
-
-// Handle status change notifications and incidents
-async function handleStatusChange(
-  supabase: ReturnType<typeof createServiceClient>,
-  monitor: Monitor,
-  previousStatus: number | null,
-  currentStatus: number,
-  msg: string,
-): Promise<void> {
-  // No change or first heartbeat with UP status - no notification needed
-  if (previousStatus === currentStatus) return;
-  if (previousStatus === null && currentStatus === HEARTBEAT_STATUS.UP) return;
-
-  const isDown = currentStatus === HEARTBEAT_STATUS.DOWN;
-  const isRecovery =
-    previousStatus === HEARTBEAT_STATUS.DOWN &&
-    currentStatus === HEARTBEAT_STATUS.UP;
-  const isDegraded =
-    currentStatus === HEARTBEAT_STATUS.DEGRADED &&
-    previousStatus !== HEARTBEAT_STATUS.DOWN;
-
-  if (isDown) {
-    // Create incident if none exists
-    const { data: existingIncident } = await supabase
-      .from("incidents")
-      .select("id")
-      .eq("monitor_id", monitor.id)
-      .eq("status", INCIDENT_STATUS.OPEN)
-      .limit(1)
-      .single();
-
-    if (!existingIncident) {
-      await supabase.from("incidents").insert({
-        monitor_id: monitor.id,
-        title: `${monitor.name} is down`,
-        content: msg,
-        status: INCIDENT_STATUS.OPEN,
-        started_at: new Date().toISOString(),
-      });
-    }
-
-    // Send DOWN notification
-    try {
-      await notifyMonitor(monitor.id, monitor.user_id, {
-        title: `🔴 ${monitor.name} is DOWN`,
-        message: msg,
-        monitorName: monitor.name,
-        monitorUrl: monitor.url || monitor.hostname || undefined,
-        status: "down",
-        timestamp: new Date().toISOString(),
-      });
-    } catch (error) {
-      console.error(
-        `[${monitor.name}] Failed to send DOWN notification:`,
-        error,
-      );
-    }
-  }
-
-  if (isRecovery) {
-    // Resolve open incidents
-    await supabase
-      .from("incidents")
-      .update({
-        status: INCIDENT_STATUS.RESOLVED,
-        resolved_at: new Date().toISOString(),
-      })
-      .eq("monitor_id", monitor.id)
-      .eq("status", INCIDENT_STATUS.OPEN);
-
-    // Send UP notification
-    try {
-      await notifyMonitor(monitor.id, monitor.user_id, {
-        title: `✅ ${monitor.name} is UP`,
-        message: "Service has recovered",
-        monitorName: monitor.name,
-        monitorUrl: monitor.url || monitor.hostname || undefined,
-        status: "up",
-        timestamp: new Date().toISOString(),
-      });
-    } catch (error) {
-      console.error(`[${monitor.name}] Failed to send UP notification:`, error);
-    }
-  }
-
-  // Handle DEGRADED status notifications
-  if (isDegraded) {
-    // Send DEGRADED notification (e.g., SSL expiry warning, slow response)
-    try {
-      await notifyMonitor(monitor.id, monitor.user_id, {
-        title: `⚠️ ${monitor.name} is DEGRADED`,
-        message: msg || "Service is experiencing issues",
-        monitorName: monitor.name,
-        monitorUrl: monitor.url || monitor.hostname || undefined,
-        status: "degraded",
-        timestamp: new Date().toISOString(),
-      });
-    } catch (error) {
-      console.error(
-        `[${monitor.name}] Failed to send DEGRADED notification:`,
-        error,
-      );
-    }
   }
 }
 
@@ -618,13 +536,19 @@ async function handleStatusChange(
  * 5. Supports upside_down mode (inverts success/failure)
  * 6. Supports DEGRADED status for warning thresholds
  */
-export async function processMonitorCheck(monitor: Monitor): Promise<void> {
+export async function processMonitorCheck(
+  monitor: Monitor,
+  deadlineAt?: number,
+): Promise<void> {
   const supabase = createServiceClient();
+  assertBeforeDeadline(deadlineAt);
   const checkStartTime = Date.now();
 
   // Check maintenance status first
   const inMaintenance = await isUnderMaintenance(supabase, monitor.id);
   if (inMaintenance) {
+    assertBeforeDeadline(deadlineAt);
+    const checkedAt = new Date().toISOString();
     await recordHeartbeat(supabase, {
       monitor_id: monitor.id,
       status: HEARTBEAT_STATUS.MAINTENANCE,
@@ -632,8 +556,24 @@ export async function processMonitorCheck(monitor: Monitor): Promise<void> {
       ping: null,
       duration: 0,
       down_count: 0,
-      time: new Date().toISOString(),
+      time: checkedAt,
     });
+    const { error: maintenanceUpdateError } = await supabase
+      .from("monitors")
+      .update({
+        status: HEARTBEAT_STATUS.MAINTENANCE,
+        down_count: 0,
+        last_check_at: checkedAt,
+        ...(monitor.status !== HEARTBEAT_STATUS.MAINTENANCE && {
+          last_status_change_at: checkedAt,
+        }),
+      })
+      .eq("id", monitor.id);
+    if (maintenanceUpdateError) {
+      throw new Error(
+        `Failed to update maintenance state: ${maintenanceUpdateError.message}`,
+      );
+    }
     return;
   }
 
@@ -643,7 +583,7 @@ export async function processMonitorCheck(monitor: Monitor): Promise<void> {
   const previousStatus = previousHeartbeat?.status ?? null;
 
   // Perform the actual check
-  const result = await checkMonitor(monitor);
+  const result = await checkMonitor(monitor, deadlineAt);
   const duration = Date.now() - checkStartTime;
 
   // Calculate new down_count and effective status (Uptime Kuma logic)
@@ -654,7 +594,9 @@ export async function processMonitorCheck(monitor: Monitor): Promise<void> {
     monitor.max_retries,
   );
 
-  // Record the heartbeat
+  assertBeforeDeadline(deadlineAt);
+  const checkedAt = new Date().toISOString();
+
   await recordHeartbeat(supabase, {
     monitor_id: monitor.id,
     status: effectiveStatus,
@@ -662,15 +604,34 @@ export async function processMonitorCheck(monitor: Monitor): Promise<void> {
     ping: result.ping,
     duration,
     down_count: downCount,
-    time: new Date().toISOString(),
+    time: checkedAt,
   });
+
+  const { error: monitorUpdateError } = await supabase
+    .from("monitors")
+    .update({
+      status: effectiveStatus,
+      down_count: downCount,
+      last_check_at: checkedAt,
+      ...(effectiveStatus !== previousStatus && {
+        last_status_change_at: checkedAt,
+      }),
+    })
+    .eq("id", monitor.id);
+
+  if (monitorUpdateError) {
+    throw new Error(
+      `Failed to update monitor state: ${monitorUpdateError.message}`,
+    );
+  }
 
   // SSL Certificate check for HTTPS monitors (runs periodically, not every check)
   if (
     (monitor.type === "http" || monitor.type === "keyword") &&
-    monitor.url?.startsWith("https://")
+    monitor.url?.startsWith("https://") &&
+    (deadlineAt === undefined || deadlineAt - Date.now() > 10_000)
   ) {
-    await checkAndUpdateSsl(supabase, monitor);
+    await checkAndUpdateSsl(supabase, monitor, deadlineAt);
   }
 
   // Handle notifications only on actual status changes
@@ -682,7 +643,260 @@ export async function processMonitorCheck(monitor: Monitor): Promise<void> {
       previousStatus,
       effectiveStatus,
       result.msg,
+      deadlineAt,
     );
+  }
+}
+
+async function getPreviousHeartbeat(
+  supabase: ReturnType<typeof createServiceClient>,
+  monitorId: string,
+): Promise<PreviousHeartbeat | null> {
+  const { data, error } = await supabase
+    .from("heartbeats")
+    .select("status, down_count")
+    .eq("monitor_id", monitorId)
+    .order("time", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`Failed to read previous heartbeat: ${error.message}`);
+  }
+
+  return data as PreviousHeartbeat | null;
+}
+
+/**
+ * Check if monitor is under maintenance
+ */
+async function isUnderMaintenance(
+  supabase: ReturnType<typeof createServiceClient>,
+  monitorId: string,
+): Promise<boolean> {
+  const now = new Date().toISOString();
+
+  const { data, error } = await supabase
+    .from("maintenance_monitors")
+    .select(
+      `
+      maintenance:maintenance_id (
+        active,
+        start_date,
+        end_date
+      )
+    `,
+    )
+    .eq("monitor_id", monitorId);
+
+  if (error) {
+    throw new Error(`Failed to read maintenance state: ${error.message}`);
+  }
+
+  if (!data || data.length === 0) return false;
+
+  return (
+    data as unknown as Array<{
+      maintenance: { active: boolean; start_date: string; end_date: string };
+    }>
+  ).some((item) => {
+    const m = item.maintenance;
+    return m?.active && m.start_date <= now && m.end_date >= now;
+  });
+}
+
+/**
+ * Record heartbeat (Uptime Kuma style)
+ */
+async function recordHeartbeat(
+  supabase: ReturnType<typeof createServiceClient>,
+  heartbeat: HeartbeatInsert,
+): Promise<void> {
+  const { error } = await supabase.from("heartbeats").insert(heartbeat);
+  if (error) {
+    throw new Error(`Failed to record heartbeat: ${error.message}`);
+  }
+}
+
+async function withTimeout<T>(
+  operation: Promise<T>,
+  timeoutMs: number,
+): Promise<T> {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(
+      () => reject(new Error("Notification delivery timed out")),
+      timeoutMs,
+    );
+  });
+
+  try {
+    return await Promise.race([operation, timeout]);
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+  }
+}
+
+async function sendStatusNotification(
+  monitor: Monitor,
+  payload: Parameters<typeof notifyMonitor>[2],
+  deadlineAt?: number,
+): Promise<void> {
+  const remaining =
+    deadlineAt === undefined
+      ? 5_000
+      : Math.min(5_000, Math.max(1, deadlineAt - Date.now()));
+  const result = await withTimeout(
+    notifyMonitor(monitor.id, monitor.user_id, payload, deadlineAt),
+    remaining,
+  );
+  if (result.failed > 0) {
+    console.error(
+      `[${monitor.name}] Notification delivery failed:`,
+      result.errors,
+    );
+  }
+}
+
+/**
+ * Handle status change notifications and incidents
+ */
+async function handleStatusChange(
+  supabase: ReturnType<typeof createServiceClient>,
+  monitor: Monitor,
+  previousStatus: number | null,
+  currentStatus: number,
+  msg: string,
+  deadlineAt?: number,
+): Promise<void> {
+  assertBeforeDeadline(deadlineAt);
+  // No change or first heartbeat with UP status - no notification needed
+  if (previousStatus === currentStatus) return;
+  if (previousStatus === null && currentStatus === HEARTBEAT_STATUS.UP) return;
+
+  const isDown = currentStatus === HEARTBEAT_STATUS.DOWN;
+  const isRecovery =
+    (previousStatus === HEARTBEAT_STATUS.DOWN ||
+      previousStatus === HEARTBEAT_STATUS.MAINTENANCE) &&
+    currentStatus === HEARTBEAT_STATUS.UP;
+  const isDegraded =
+    currentStatus === HEARTBEAT_STATUS.DEGRADED &&
+    previousStatus !== HEARTBEAT_STATUS.DOWN;
+
+  if (isDown) {
+    // Create incident if none exists
+    const { data: existingIncident, error: incidentLookupError } =
+      await supabase
+        .from("incidents")
+        .select("id")
+        .eq("monitor_id", monitor.id)
+        .eq("status", INCIDENT_STATUS.OPEN)
+        .limit(1)
+        .maybeSingle();
+
+    if (incidentLookupError) {
+      throw new Error(
+        `Failed to check existing incidents: ${incidentLookupError.message}`,
+      );
+    }
+
+    if (!existingIncident) {
+      const { error: incidentInsertError } = await supabase
+        .from("incidents")
+        .insert({
+          monitor_id: monitor.id,
+          title: `${monitor.name} is down`,
+          content: msg,
+          status: INCIDENT_STATUS.OPEN,
+          started_at: new Date().toISOString(),
+        });
+
+      if (incidentInsertError) {
+        throw new Error(
+          `Failed to create incident: ${incidentInsertError.message}`,
+        );
+      }
+    }
+
+    // Send DOWN notification
+    try {
+      await sendStatusNotification(
+        monitor,
+        {
+          title: `🔴 ${monitor.name} is DOWN`,
+          message: msg,
+          monitorName: monitor.name,
+          monitorUrl: monitor.url || monitor.hostname || undefined,
+          status: "down",
+          timestamp: new Date().toISOString(),
+        },
+        deadlineAt,
+      );
+    } catch (error) {
+      console.error(
+        `[${monitor.name}] Failed to send DOWN notification:`,
+        error,
+      );
+    }
+  }
+
+  if (isRecovery) {
+    // Resolve open incidents
+    const { error: resolveIncidentError } = await supabase
+      .from("incidents")
+      .update({
+        status: INCIDENT_STATUS.RESOLVED,
+        resolved_at: new Date().toISOString(),
+      })
+      .eq("monitor_id", monitor.id)
+      .eq("status", INCIDENT_STATUS.OPEN);
+
+    if (resolveIncidentError) {
+      throw new Error(
+        `Failed to resolve incidents: ${resolveIncidentError.message}`,
+      );
+    }
+
+    // Send UP notification
+    try {
+      await sendStatusNotification(
+        monitor,
+        {
+          title: `✅ ${monitor.name} is UP`,
+          message: "Service has recovered",
+          monitorName: monitor.name,
+          monitorUrl: monitor.url || monitor.hostname || undefined,
+          status: "up",
+          timestamp: new Date().toISOString(),
+        },
+        deadlineAt,
+      );
+    } catch (error) {
+      console.error(`[${monitor.name}] Failed to send UP notification:`, error);
+    }
+  }
+
+  // Handle DEGRADED status notifications
+  if (isDegraded) {
+    try {
+      await sendStatusNotification(
+        monitor,
+        {
+          title: `⚠️ ${monitor.name} is DEGRADED`,
+          message: msg || "Service is experiencing issues",
+          monitorName: monitor.name,
+          monitorUrl: monitor.url || monitor.hostname || undefined,
+          status: "degraded",
+          timestamp: new Date().toISOString(),
+        },
+        deadlineAt,
+      );
+    } catch (error) {
+      console.error(
+        `[${monitor.name}] Failed to send DEGRADED notification:`,
+        error,
+      );
+    }
   }
 }
 
@@ -693,21 +907,30 @@ export async function processMonitorCheck(monitor: Monitor): Promise<void> {
 async function checkAndUpdateSsl(
   supabase: ReturnType<typeof createServiceClient>,
   monitor: Monitor,
+  deadlineAt?: number,
 ): Promise<void> {
   if (!monitor.url) return;
 
   try {
+    assertBeforeDeadline(deadlineAt);
     const sslResult = await checkSslCertificate(monitor.url);
 
     if (sslResult.success && sslResult.info) {
       const { info } = sslResult;
 
       // Get current SSL info from monitor to check if we need to send warning
-      const { data: currentMonitor } = await supabase
-        .from("monitors")
-        .select("ssl_expiry")
-        .eq("id", monitor.id)
-        .single();
+      const { data: currentMonitor, error: currentMonitorError } =
+        await supabase
+          .from("monitors")
+          .select("ssl_expiry")
+          .eq("id", monitor.id)
+          .maybeSingle();
+
+      if (currentMonitorError) {
+        throw new Error(
+          `Failed to read SSL state: ${currentMonitorError.message}`,
+        );
+      }
 
       const monitorData = currentMonitor as {
         ssl_expiry: string | null;
@@ -722,14 +945,17 @@ async function checkAndUpdateSsl(
         : undefined;
 
       // Update monitor with SSL info
-      if (info.validTo && info.daysRemaining !== -1) {
-        await supabase
+      if (info.validTo && info.daysRemaining !== SSL_DAYS_REMAINING_UNKNOWN) {
+        const { error: updateError } = await supabase
           .from("monitors")
           .update({
             ssl_expiry: new Date(info.validTo).toISOString(),
             ssl_issuer: info.issuer,
           })
           .eq("id", monitor.id);
+        if (updateError) {
+          throw new Error(`Failed to update SSL state: ${updateError.message}`);
+        }
       }
 
       // Check if we should send SSL expiry warning (now only for actual expiration)
@@ -740,14 +966,18 @@ async function checkAndUpdateSsl(
       ) {
         // Send SSL expiry warning notification
         try {
-          await notifyMonitor(monitor.id, monitor.user_id, {
-            title: `🔴 SSL Certificate Expired: ${monitor.name}`,
-            message: `Certificate has expired! (${info.daysRemaining} days ago, on ${info.validTo})`,
-            monitorName: monitor.name,
-            monitorUrl: monitor.url,
-            status: info.daysRemaining <= 7 ? "down" : "degraded",
-            timestamp: new Date().toISOString(),
-          });
+          await sendStatusNotification(
+            monitor,
+            {
+              title: `🔴 SSL Certificate Expired: ${monitor.name}`,
+              message: `Certificate has expired! (${info.daysRemaining} days ago, on ${info.validTo})`,
+              monitorName: monitor.name,
+              monitorUrl: monitor.url,
+              status: info.daysRemaining <= 7 ? "down" : "degraded",
+              timestamp: new Date().toISOString(),
+            },
+            deadlineAt,
+          );
         } catch (error) {
           console.error(`[${monitor.name}] Failed to send SSL warning:`, error);
         }

@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
 import { z } from "zod";
+import { withAuth } from "@/lib/api-utils/with-auth";
 
-// Input validation schema
+// Input validation schema for creating a status page
 const createStatusPageSchema = z.object({
   title: z
     .string()
@@ -27,94 +27,119 @@ const createStatusPageSchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
-  try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    // Parse and validate input
-    let body;
-    try {
-      body = await request.json();
-    } catch {
-      return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
-    }
-
-    const validationResult = createStatusPageSchema.safeParse(body);
-    if (!validationResult.success) {
-      return NextResponse.json(
-        { error: validationResult.error.issues[0].message },
-        { status: 400 },
-      );
-    }
-
-    const { title, slug, description, is_public, monitor_ids } =
-      validationResult.data;
-
-    // Sanitize slug
-    const cleanSlug = slug.toLowerCase().replace(/[^a-z0-9-]/g, "-");
-
-    // Define type locally
-    interface StatusPage {
-      id: string;
-    }
-
-    // 1. Create status page
-    const { data: statusPage, error: pageError } = await supabase
-      .from("status_pages")
-      .insert({
-        user_id: user.id,
-        title,
-        slug: cleanSlug,
-        description,
-        is_public: is_public ?? true,
-      } as never)
-      .select("id")
-      .single();
-
-    if (pageError) {
-      if (pageError.code === "23505") {
+  return withAuth(
+    async (supabase) => {
+      // Parse and validate input
+      let body;
+      try {
+        body = await request.json();
+      } catch {
         return NextResponse.json(
-          { error: "Slug already exists" },
-          { status: 409 },
+          { error: "Invalid JSON body" },
+          { status: 400 },
         );
       }
-      throw pageError;
-    }
 
-    const typedStatusPage = statusPage as unknown as StatusPage;
+      const validationResult = createStatusPageSchema.safeParse(body);
+      if (!validationResult.success) {
+        return NextResponse.json(
+          { error: validationResult.error.issues[0].message },
+          { status: 400 },
+        );
+      }
 
-    // 2. Link monitors if provided
-    if (monitor_ids && Array.isArray(monitor_ids) && monitor_ids.length > 0) {
-      const monitorInserts = monitor_ids.map(
-        (monitorId: string, index: number) => ({
-          status_page_id: typedStatusPage.id,
-          monitor_id: monitorId,
-          display_order: index,
-        }),
+      const { title, slug, description, is_public, monitor_ids } =
+        validationResult.data;
+      const cleanSlug = slug.toLowerCase().replace(/[^a-z0-9-]/g, "-");
+
+      const { data: statusPageId, error: pageError } = await supabase.rpc(
+        "create_status_page_with_monitors",
+        {
+          p_title: title,
+          p_slug: cleanSlug,
+          p_description: description ?? null,
+          p_is_public: is_public,
+          p_monitor_ids: monitor_ids,
+        },
       );
 
-      const { error: monitorsError } = await supabase
-        .from("status_page_monitors")
-        .insert(monitorInserts as never);
-
-      if (monitorsError) {
-        // Log error but don't fail the whole request since page is created
-        console.error("Error linking monitors:", monitorsError);
+      if (pageError) {
+        if (pageError.code === "23505") {
+          return NextResponse.json(
+            { error: "Slug already exists" },
+            { status: 409 },
+          );
+        }
+        if (pageError.code === "P0001") {
+          return NextResponse.json(
+            { error: pageError.message },
+            { status: 400 },
+          );
+        }
+        throw pageError;
       }
+
+      return NextResponse.json({
+        success: true,
+        statusPage: { id: statusPageId },
+      });
+    },
+    { requireMfa: true },
+  );
+}
+
+export async function GET() {
+  return withAuth(async (supabase, user) => {
+    const { data: channels, error } = await supabase
+      .from("status_pages")
+      .select("id, title, slug, is_public, created_at, updated_at")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.error("Fetch status pages error:", error);
+      return NextResponse.json(
+        { error: "Failed to fetch status pages" },
+        { status: 500 },
+      );
     }
 
-    return NextResponse.json({ success: true, statusPage });
-  } catch (error) {
-    console.error("Create status page error:", error);
-    return NextResponse.json(
-      { error: "Failed to create status page" },
-      { status: 500 },
-    );
-  }
+    return NextResponse.json({ statusPages: channels || [] });
+  });
+}
+
+export async function DELETE(request: NextRequest) {
+  return withAuth(
+    async (supabase, user) => {
+      const { searchParams } = new URL(request.url);
+      const id = searchParams.get("id");
+
+      // Validate UUID format
+      const uuidRegex =
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (!id || !uuidRegex.test(id)) {
+        return NextResponse.json(
+          { error: "Valid status page ID required" },
+          { status: 400 },
+        );
+      }
+
+      const { error } = await supabase
+        .from("status_pages")
+        .delete()
+        .eq("id", id)
+        .eq("user_id", user.id);
+
+      if (error) {
+        console.error("Delete status page error:", error);
+        return NextResponse.json(
+          { error: "Failed to delete status page" },
+          { status: 500 },
+        );
+      }
+
+      return NextResponse.json({ success: true });
+    },
+    { requireMfa: true },
+  );
 }

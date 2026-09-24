@@ -107,12 +107,9 @@ describe("MonitorCard", () => {
     await user.click(screen.getByRole("button"));
     // Text query: the item embeds a lucide svg, which skews role-name matching.
     await user.click(await screen.findByText("Duplicate"));
-    // NOTE: currently two toasts appear because the menu trigger itself also
-    // fires handleDuplicate on open (suspected product bug, flagged separately).
-    // Keep >= 1 so this stays green once the trigger handler is removed.
     const titles = await screen.findAllByText("Failed to duplicate");
-    expect(titles.length).toBeGreaterThanOrEqual(1);
+    expect(titles).toHaveLength(1);
     const descriptions = await screen.findAllByText("mocked");
-    expect(descriptions.length).toBeGreaterThanOrEqual(1);
+    expect(descriptions).toHaveLength(1);
   });
 });

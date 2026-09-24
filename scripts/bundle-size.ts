@@ -21,7 +21,7 @@ type FileEntry = { raw: number; gzip: number };
 
 async function walk(dir: string, out: Map<string, FileEntry>): Promise<void> {
   for (const name of await readdir(dir)) {
-    if (name === "cache") continue; // build cache is non-deterministic
+    if (name === "cache" || name === "dev") continue;
     const full = join(dir, name);
     const st = await stat(full);
     if (st.isDirectory()) {

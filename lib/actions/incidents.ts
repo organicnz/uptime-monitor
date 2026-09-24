@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { getMfaVerificationError } from "@/lib/mfa";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { INCIDENT_STATUS } from "@/lib/constants";
@@ -28,6 +29,11 @@ export async function createIncident(
 
   if (!user) {
     return { success: false, error: "Unauthorized" };
+  }
+
+  const mfaError = await getMfaVerificationError(supabase);
+  if (mfaError) {
+    return { success: false, error: mfaError };
   }
 
   const rawData = {
@@ -93,6 +99,11 @@ export async function updateIncidentStatus(
     return { success: false, error: "Unauthorized" };
   }
 
+  const mfaError = await getMfaVerificationError(supabase);
+  if (mfaError) {
+    return { success: false, error: mfaError };
+  }
+
   // Verify incident belongs to user's monitor
   const { data: incident } = await supabase
     .from("incidents")
@@ -150,6 +161,11 @@ export async function updateIncident(
 
   if (!user) {
     return { success: false, error: "Unauthorized" };
+  }
+
+  const mfaError = await getMfaVerificationError(supabase);
+  if (mfaError) {
+    return { success: false, error: mfaError };
   }
 
   const title = formData.get("title") as string;
@@ -218,6 +234,11 @@ export async function deleteIncident(id: string): Promise<IncidentFormState> {
 
   if (!user) {
     return { success: false, error: "Unauthorized" };
+  }
+
+  const mfaError = await getMfaVerificationError(supabase);
+  if (mfaError) {
+    return { success: false, error: mfaError };
   }
 
   // Verify incident belongs to user's monitor

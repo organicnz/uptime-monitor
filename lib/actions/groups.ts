@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { getMfaVerificationError } from "@/lib/mfa";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
@@ -27,6 +28,11 @@ export async function createGroup(formData: FormData): Promise<GroupFormState> {
 
   if (!user) {
     return { success: false, error: "Unauthorized" };
+  }
+
+  const mfaError = await getMfaVerificationError(supabase);
+  if (mfaError) {
+    return { success: false, error: mfaError };
   }
 
   const rawData = {
@@ -92,6 +98,11 @@ export async function updateGroup(
     return { success: false, error: "Unauthorized" };
   }
 
+  const mfaError = await getMfaVerificationError(supabase);
+  if (mfaError) {
+    return { success: false, error: mfaError };
+  }
+
   const rawData = {
     name: formData.get("name") as string,
     description: formData.get("description") as string,
@@ -138,6 +149,11 @@ export async function deleteGroup(id: string): Promise<GroupFormState> {
     return { success: false, error: "Unauthorized" };
   }
 
+  const mfaError = await getMfaVerificationError(supabase);
+  if (mfaError) {
+    return { success: false, error: mfaError };
+  }
+
   const { error } = await supabase
     .from("monitor_groups")
     .delete()
@@ -167,6 +183,11 @@ export async function assignMonitorToGroup(
 
   if (!user) {
     return { success: false, error: "Unauthorized" };
+  }
+
+  const mfaError = await getMfaVerificationError(supabase);
+  if (mfaError) {
+    return { success: false, error: mfaError };
   }
 
   // Verify monitor ownership
@@ -223,6 +244,11 @@ export async function toggleGroupCollapsed(
 
   if (!user) {
     return { success: false, error: "Unauthorized" };
+  }
+
+  const mfaError = await getMfaVerificationError(supabase);
+  if (mfaError) {
+    return { success: false, error: mfaError };
   }
 
   // Get current state

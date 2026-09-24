@@ -86,6 +86,7 @@ export async function getSchedule(
 export async function createSchedule(params: {
   destination: string;
   cron: string;
+  failureCallback?: string;
 }): Promise<{ scheduleId: string }> {
   const client = getQStashClient();
 
@@ -99,6 +100,7 @@ export async function createSchedule(params: {
   const result = await client.schedules.create({
     destination: params.destination,
     cron: params.cron,
+    failureCallback: params.failureCallback,
     headers: Object.keys(headers).length > 0 ? headers : undefined,
   });
   return { scheduleId: result.scheduleId };
@@ -114,9 +116,6 @@ export async function updateSchedule(
   // Get existing schedule
   const existing = await client.schedules.get(scheduleId);
   const existingSched = existing as Record<string, unknown>;
-
-  // Delete old schedule
-  await client.schedules.delete(scheduleId);
 
   // Build headers for authentication bypass if Vercel Authentication is enabled
   const headers: Record<string, string> = {};
@@ -145,6 +144,13 @@ export async function updateSchedule(
   const result = await client.schedules.create(
     createOptions as Parameters<typeof client.schedules.create>[0],
   );
+
+  try {
+    await client.schedules.delete(scheduleId);
+  } catch (error) {
+    await client.schedules.delete(result.scheduleId).catch(() => {});
+    throw error;
+  }
 
   return { scheduleId: result.scheduleId };
 }

@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { getMfaVerificationError } from "@/lib/mfa";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
@@ -142,6 +143,16 @@ export async function resetPassword(formData: FormData) {
 
 export async function updatePassword(formData: FormData) {
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return { error: "Not authenticated" };
+  }
+  const mfaError = await getMfaVerificationError(supabase);
+  if (mfaError) {
+    return { error: mfaError };
+  }
 
   const rawPassword = formData.get("password");
   const rawConfirmPassword = formData.get("confirmPassword");
@@ -170,6 +181,16 @@ export async function updatePassword(formData: FormData) {
 
 export async function updateProfile(formData: FormData) {
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return { error: "Not authenticated" };
+  }
+  const mfaError = await getMfaVerificationError(supabase);
+  if (mfaError) {
+    return { error: mfaError };
+  }
 
   const fullName = formData.get("fullName") as string;
 
@@ -181,19 +202,13 @@ export async function updateProfile(formData: FormData) {
     return { error: "Authentication failed. Please try again." };
   }
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { error: profileError } = await supabase
+    .from("profiles")
+    .update({ full_name: fullName } as never)
+    .eq("id", user.id);
 
-  if (user) {
-    const { error: profileError } = await supabase
-      .from("profiles")
-      .update({ full_name: fullName } as never)
-      .eq("id", user.id);
-
-    if (profileError) {
-      return { error: "Profile update failed. Please try again." };
-    }
+  if (profileError) {
+    return { error: "Profile update failed. Please try again." };
   }
 
   revalidatePath("/dashboard/settings", "page");
@@ -202,6 +217,16 @@ export async function updateProfile(formData: FormData) {
 
 export async function updateEmail(formData: FormData) {
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return { error: "Not authenticated" };
+  }
+  const mfaError = await getMfaVerificationError(supabase);
+  if (mfaError) {
+    return { error: mfaError };
+  }
 
   const email = formData.get("email") as string;
 
@@ -231,6 +256,10 @@ export async function deleteAccount() {
 
   if (!user) {
     return { error: "Not authenticated" };
+  }
+  const mfaError = await getMfaVerificationError(supabase);
+  if (mfaError) {
+    return { error: mfaError };
   }
 
   // Delete user data (cascades will handle related records)

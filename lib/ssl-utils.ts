@@ -5,6 +5,8 @@
  * Uses an external approach since serverless environments can't access raw TLS certs.
  */
 
+import { fetchWithSsrfProtection } from "@/lib/security";
+
 export type SslInfo = {
   issuer: string;
   validFrom: string;
@@ -97,20 +99,23 @@ async function fetchCertificateInfo(hostname: string): Promise<SslInfo | null> {
       return null;
     }
 
-    // Get the most recent valid certificate
     const now = new Date();
-    const validCerts = certs
-      .filter((cert) => new Date(cert.not_after) > now)
+    const datedCerts = certs
+      .filter(
+        (cert) =>
+          !Number.isNaN(new Date(cert.not_before).getTime()) &&
+          !Number.isNaN(new Date(cert.not_after).getTime()),
+      )
       .sort(
         (a, b) =>
           new Date(b.not_before).getTime() - new Date(a.not_before).getTime(),
       );
 
-    if (validCerts.length === 0) {
+    if (datedCerts.length === 0) {
       return null;
     }
 
-    const cert = validCerts[0];
+    const cert = datedCerts[0];
     const validTo = new Date(cert.not_after);
     const daysRemaining = Math.floor(
       (validTo.getTime() - now.getTime()) / (1000 * 60 * 60 * 24),
@@ -135,7 +140,7 @@ async function fetchCertificateInfo(hostname: string): Promise<SslInfo | null> {
  */
 async function fallbackSslCheck(url: string): Promise<SslCheckResult> {
   try {
-    const response = await fetch(url, {
+    const response = await fetchWithSsrfProtection(url, {
       method: "HEAD",
       signal: AbortSignal.timeout(10000),
     });

@@ -219,7 +219,6 @@ export function MonitorCard({ monitor }: MonitorCardProps) {
             variant="ghost"
             size="icon"
             className="absolute top-2 right-2 h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity bg-neutral-900/80 hover:bg-neutral-800"
-            onClick={handleDuplicate}
           >
             <MoreVertical className="h-4 w-4" />
           </Button>

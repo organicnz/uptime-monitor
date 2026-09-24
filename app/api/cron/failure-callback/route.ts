@@ -38,36 +38,40 @@ export async function POST(request: NextRequest) {
       request.headers.get("upstash-failed-status") || "unknown";
     const failedMessage = request.headers.get("upstash-failed-message") || "";
     const messageId = request.headers.get("upstash-message-id") || "";
-    const retried = request.headers.get("upstash-retried") || "0";
+    const retried = Number.parseInt(
+      request.headers.get("upstash-retried") || "0",
+      10,
+    );
+    const retryCount = Number.isFinite(retried) ? Math.max(0, retried) : 0;
+    const failureKey =
+      messageId || `${failedUrl}:${failedStatus}:${retryCount}`;
 
     console.error(`[${requestId}] QStash failure callback received:`, {
       failedUrl,
       failedStatus,
       failedMessage,
       messageId,
-      retried,
+      retried: retryCount,
     });
 
-    // Log to database for tracking
     const supabase = createServiceClient();
-
-    // You could create an incidents table entry or a dedicated cron_failures table
-    // For now, we'll just log it. You can extend this to:
-    // 1. Create an incident
-    // 2. Send a notification
-    // 3. Store in a failures log table
-
-    // Example: Create an incident for the failure
-    // This assumes you want to track cron failures as incidents
-    const { error: insertError } = await supabase.from("incidents").insert({
-      title: `Cron Job Failure`,
-      content: `Monitor check cron job failed after ${retried} retries.\n\nURL: ${failedUrl}\nStatus: ${failedStatus}\nMessage: ${failedMessage}\nMessage ID: ${messageId}`,
-      status: 0, // OPEN
-      started_at: new Date().toISOString(),
-    } as never);
+    const { error: insertError } = await supabase.from("cron_failures").upsert(
+      {
+        message_id: failureKey,
+        failed_url: failedUrl,
+        failed_status: failedStatus,
+        failed_message: failedMessage.slice(0, 4000),
+        retried: retryCount,
+      },
+      { onConflict: "message_id" },
+    );
 
     if (insertError) {
-      console.error(`[${requestId}] Failed to log incident:`, insertError);
+      console.error(`[${requestId}] Failed to log cron failure:`, insertError);
+      return NextResponse.json(
+        { error: "Failed to log cron failure", requestId },
+        { status: 500 },
+      );
     }
 
     return NextResponse.json({

@@ -1,4 +1,6 @@
 import { timingSafeEqual } from "crypto";
+import { Agent } from "undici";
+import type { LookupFunction } from "node:net";
 
 /**
  * Constant-time string comparison to prevent timing attacks
@@ -133,16 +135,20 @@ export async function resolveAndValidateHost(
   // If it's a domain name, resolve it first to prevent DNS rebinding.
   // We prefer IPv4 but will accept IPv6.
   try {
-    const lookupResult = await dns.lookup(hostname, { all: false });
-    const resolvedIp = lookupResult.address;
-
-    if (!isSafeIp(resolvedIp)) {
-      throw new Error(
-        `Resolved IP (${resolvedIp}) is blocked (private/loopback range)`,
-      );
+    const lookupResults = await dns.lookup(hostname, { all: true });
+    if (lookupResults.length === 0) {
+      throw new Error("DNS Resolution returned no addresses");
     }
 
-    return resolvedIp;
+    for (const result of lookupResults) {
+      if (!isSafeIp(result.address)) {
+        throw new Error(
+          `Resolved IP (${result.address}) is blocked (private/loopback range)`,
+        );
+      }
+    }
+
+    return lookupResults[0].address;
   } catch (error: unknown) {
     throw new Error(`DNS Resolution failed: ${(error as Error).message}`);
   }
@@ -158,9 +164,11 @@ export async function resolveAndValidateUrl(
   try {
     const parsed = new URL(url);
 
-    // Only allow http and https protocols
     if (!["http:", "https:"].includes(parsed.protocol)) {
       throw new Error("Invalid protocol. Only HTTP and HTTPS are allowed.");
+    }
+    if (parsed.username || parsed.password) {
+      throw new Error("URLs with embedded credentials are not allowed");
     }
 
     const resolvedIp = await resolveAndValidateHost(parsed.hostname);
@@ -169,6 +177,111 @@ export async function resolveAndValidateUrl(
   } catch (error: unknown) {
     throw new Error(`URL Validation failed: ${(error as Error).message}`);
   }
+}
+
+const pinnedAgents = new Map<string, Agent>();
+
+function getPinnedAgent(
+  hostname: string,
+  resolvedIp: string,
+): Agent | undefined {
+  if (typeof process === "undefined") {
+    throw new Error("DNS pinning is unavailable in this runtime");
+  }
+  if ("bun" in process.versions) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("DNS pinning requires the Node.js runtime");
+    }
+    return undefined;
+  }
+  if (ipaddr.isValid(hostname)) {
+    return undefined;
+  }
+
+  const key = `${hostname}:${resolvedIp}`;
+  const existing = pinnedAgents.get(key);
+  if (existing) return existing;
+
+  const family = resolvedIp.includes(":") ? 6 : 4;
+  const lookup: LookupFunction = (_host, options, callback) => {
+    if (options.all) {
+      callback(null, [{ address: resolvedIp, family }]);
+      return;
+    }
+    callback(null, resolvedIp, family);
+  };
+  const agent = new Agent({
+    connect: {
+      lookup,
+      servername: hostname,
+    },
+  });
+  if (pinnedAgents.size >= 100) {
+    const oldestKey = pinnedAgents.keys().next().value;
+    if (oldestKey) {
+      const oldestAgent = pinnedAgents.get(oldestKey);
+      pinnedAgents.delete(oldestKey);
+      void oldestAgent?.close();
+    }
+  }
+  pinnedAgents.set(key, agent);
+  return agent;
+}
+
+export async function fetchWithSsrfProtection(
+  initialUrl: string,
+  init: RequestInit = {},
+  maxRedirects = 5,
+): Promise<Response> {
+  const initialOrigin = new URL(initialUrl).origin;
+  let currentUrl = initialUrl;
+  let method = init.method || "GET";
+  let body = init.body;
+  let headers = new Headers(init.headers);
+
+  for (let redirectCount = 0; redirectCount <= maxRedirects; redirectCount++) {
+    const { resolvedIp } = await resolveAndValidateUrl(currentUrl);
+    const dispatcher = getPinnedAgent(new URL(currentUrl).hostname, resolvedIp);
+
+    const response = await fetch(currentUrl, {
+      ...init,
+      headers,
+      method,
+      body,
+      redirect: "manual",
+      ...(dispatcher ? { dispatcher } : {}),
+    } as RequestInit);
+
+    if (![301, 302, 303, 307, 308].includes(response.status)) {
+      return response;
+    }
+
+    const location = response.headers.get("location");
+    if (!location) {
+      return response;
+    }
+
+    if (redirectCount === maxRedirects) {
+      throw new Error("Too many redirects");
+    }
+
+    const nextUrl = new URL(location, currentUrl).toString();
+    const nextOrigin = new URL(nextUrl).origin;
+    if (nextOrigin !== initialOrigin) {
+      headers = new Headers();
+      method = "GET";
+      body = undefined;
+    } else if (
+      response.status === 303 ||
+      ([301, 302].includes(response.status) && method === "POST")
+    ) {
+      method = "GET";
+      body = undefined;
+    }
+    currentUrl = nextUrl;
+  }
+
+  throw new Error("Too many redirects");
 }
 
 /**

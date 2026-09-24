@@ -3,6 +3,7 @@ import {
   generateSecureToken,
   resolveAndValidateHost,
   resolveAndValidateUrl,
+  fetchWithSsrfProtection,
   sanitizeHtml,
   secureCompare,
 } from "@/lib/security";
@@ -115,6 +116,53 @@ describe("resolveAndValidateHost", () => {
     await expect(resolveAndValidateHost("")).rejects.toThrow(
       "Invalid hostname",
     );
+  });
+});
+
+describe("fetchWithSsrfProtection", () => {
+  it("rejects a redirect to a blocked address", async () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = (async () =>
+      new Response(null, {
+        status: 302,
+        headers: { location: "http://127.0.0.1/private" },
+      })) as unknown as typeof fetch;
+
+    try {
+      await expect(
+        fetchWithSsrfProtection("http://8.8.8.8/start"),
+      ).rejects.toThrow("URL Validation failed");
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  it("drops custom headers on a cross-origin redirect", async () => {
+    const originalFetch = globalThis.fetch;
+    const requests: RequestInit[] = [];
+    globalThis.fetch = (async (
+      _input: RequestInfo | URL,
+      init?: RequestInit,
+    ) => {
+      requests.push(init ?? {});
+      if (requests.length === 1) {
+        return new Response(null, {
+          status: 302,
+          headers: { location: "http://1.1.1.1/next" },
+        });
+      }
+      return new Response("ok");
+    }) as unknown as typeof fetch;
+
+    try {
+      await fetchWithSsrfProtection("http://8.8.8.8/start", {
+        headers: { "X-Secret": "do-not-forward" },
+      });
+      expect(requests).toHaveLength(2);
+      expect(new Headers(requests[1].headers).has("x-secret")).toBe(false);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
   });
 });
 

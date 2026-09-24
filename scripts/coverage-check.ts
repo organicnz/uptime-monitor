@@ -9,7 +9,7 @@ import { join } from "node:path";
 const MIN_FUNCS = Number(process.env.MIN_COVERAGE_FUNCS ?? 70);
 const MIN_LINES = Number(process.env.MIN_COVERAGE_LINES ?? 80);
 
-const proc = Bun.spawn(["bun", "test", "--coverage"], {
+const proc = Bun.spawn(["bun", "test", "__tests__", "--coverage"], {
   stdout: "pipe",
   stderr: "pipe",
 });

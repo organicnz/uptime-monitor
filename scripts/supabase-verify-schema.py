@@ -39,6 +39,14 @@ EXPECTED: dict[str, list[str]] = {
         "checked_by",
     ],
     "incidents": ["severity", "source", "resolved_by", "acknowledgment_at"],
+    "cron_failures": [
+        "message_id",
+        "failed_url",
+        "failed_status",
+        "failed_message",
+        "retried",
+        "created_at",
+    ],
     "profiles": [
         "last_check_at",
         "email_notifications",
@@ -49,6 +57,21 @@ EXPECTED: dict[str, list[str]] = {
         "pushover_notifications",
         "teams_notifications",
     ],
+}
+
+EXPECTED_FUNCTIONS = {
+    "mfa_mutation_allowed",
+    "get_public_status_page",
+    "create_status_page_with_monitors",
+    "update_status_page_with_monitors",
+}
+
+EXPECTED_POLICIES = {
+    "MFA required for monitor writes",
+    "MFA required for status page writes",
+    "Users can manage own monitor notifs",
+    "Users can manage own maintenance monitors",
+    "Users can manage own status page monitors",
 }
 
 
@@ -80,7 +103,7 @@ def main() -> int:
             token,
             ref,
             f"SELECT column_name FROM information_schema.columns "
-            f"WHERE table_name='{table}'",
+            f"WHERE table_schema='public' AND table_name='{table}'",
         )
         present = {r["column_name"] for r in rows}
         missing = [c for c in cols if c not in present]
@@ -89,6 +112,37 @@ def main() -> int:
             print(f"FAIL {table}: missing {missing}")
         else:
             print(f"OK {table}: all {len(cols)} expected columns present")
+    function_rows = mgmt_query(
+        token,
+        ref,
+        "SELECT routine_name FROM information_schema.routines "
+        "WHERE routine_schema='public'",
+    )
+    present_functions = {row["routine_name"] for row in function_rows}
+    missing_functions = EXPECTED_FUNCTIONS - present_functions
+    if missing_functions:
+        ok = False
+        print(f"FAIL functions: missing {sorted(missing_functions)}")
+    else:
+        print(f"OK functions: all {len(EXPECTED_FUNCTIONS)} expected functions present")
+
+    policy_rows = mgmt_query(
+        token,
+        ref,
+        "SELECT policyname FROM pg_policies WHERE schemaname='public'",
+    )
+    present_policies = {row["policyname"] for row in policy_rows}
+    missing_policies = EXPECTED_POLICIES - present_policies
+    forbidden_policies = {"System insert heartbeats"} & present_policies
+    if missing_policies or forbidden_policies:
+        ok = False
+        if missing_policies:
+            print(f"FAIL policies: missing {sorted(missing_policies)}")
+        if forbidden_policies:
+            print(f"FAIL policies: forbidden {sorted(forbidden_policies)}")
+    else:
+        print(f"OK policies: all {len(EXPECTED_POLICIES)} expected policies present")
+
     print("Schema verification passed" if ok else "Schema verification FAILED")
     return 0 if ok else 2
 

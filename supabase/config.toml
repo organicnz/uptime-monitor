@@ -7,7 +7,3 @@
 # See .github/workflows/supabase-migrations.yml.
 
 project_id = "uptime-monitor"
-
-[functions]
-# Deploys under supabase/functions/* verify JWTs by default.
-verify_jwt = true

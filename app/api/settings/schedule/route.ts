@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { getMfaVerificationError } from "@/lib/mfa";
+import type { User } from "@supabase/supabase-js";
 import {
   listSchedules,
   updateSchedule,
@@ -10,6 +12,40 @@ import {
   cronToTimezone,
   createSchedule,
 } from "@/lib/qstash";
+
+const MONITOR_SCHEDULE_SUFFIX = "/api/cron/check-monitors";
+
+function getSiteUrl(): string | null {
+  const configured =
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : undefined);
+  return configured?.replace(/\/+$/, "") || null;
+}
+
+function isScheduleAdmin(user: User): boolean {
+  const configuredIds = (process.env.ADMIN_USER_IDS || "")
+    .split(",")
+    .map((id) => id.trim())
+    .filter(Boolean);
+  return user.app_metadata?.role === "admin" || configuredIds.includes(user.id);
+}
+
+function findMonitorSchedule(
+  schedules: Awaited<ReturnType<typeof listSchedules>>,
+) {
+  return schedules.find((schedule) =>
+    schedule.destination.includes(MONITOR_SCHEDULE_SUFFIX),
+  );
+}
+
+function isValidTimezone(timezone: string): boolean {
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: timezone }).format();
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 // GET - List schedules and find the monitor check schedule
 export async function GET() {
@@ -22,13 +58,14 @@ export async function GET() {
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+    if (!isScheduleAdmin(user)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
 
     const schedules = await listSchedules();
 
     // Find the monitor check schedule
-    const monitorSchedule = schedules.find((s) =>
-      s.destination.includes("/api/cron/check-monitors"),
-    );
+    const monitorSchedule = findMonitorSchedule(schedules);
 
     if (!monitorSchedule) {
       return NextResponse.json({
@@ -73,19 +110,45 @@ export async function POST(request: NextRequest) {
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+    if (!isScheduleAdmin(user)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+    const mfaError = await getMfaVerificationError(supabase);
+    if (mfaError) {
+      return NextResponse.json({ error: mfaError }, { status: 403 });
+    }
 
-    const body = await request.json();
-    const { intervalMinutes } = body;
-
-    if (!intervalMinutes || intervalMinutes < 1) {
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+    }
+    const intervalMinutes = Number(
+      body && typeof body === "object" && "intervalMinutes" in body
+        ? body.intervalMinutes
+        : NaN,
+    );
+    if (
+      !Number.isInteger(intervalMinutes) ||
+      intervalMinutes < 1 ||
+      intervalMinutes > 1440
+    ) {
       return NextResponse.json(
-        { error: "Invalid interval. Minimum is 1 minute." },
+        { error: "Interval must be a whole number between 1 and 1440 minutes" },
         { status: 400 },
       );
     }
 
-    // Get the site URL for the destination
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.VERCEL_URL;
+    const schedules = await listSchedules();
+    if (findMonitorSchedule(schedules)) {
+      return NextResponse.json(
+        { error: "Monitor check schedule already exists" },
+        { status: 409 },
+      );
+    }
+
+    const siteUrl = getSiteUrl();
     if (!siteUrl) {
       return NextResponse.json(
         { error: "Site URL not configured" },
@@ -93,12 +156,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const destination = siteUrl.startsWith("http")
-      ? `${siteUrl}/api/cron/check-monitors`
-      : `https://${siteUrl}/api/cron/check-monitors`;
+    const destination = `${siteUrl}${MONITOR_SCHEDULE_SUFFIX}`;
 
     const cron = intervalToCron(intervalMinutes);
-    const result = await createSchedule({ destination, cron });
+    const result = await createSchedule({
+      destination,
+      cron,
+      failureCallback: `${siteUrl}/api/cron/failure-callback`,
+    });
 
     return NextResponse.json({
       success: true,
@@ -129,8 +194,26 @@ export async function PATCH(request: NextRequest) {
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+    if (!isScheduleAdmin(user)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+    const mfaError = await getMfaVerificationError(supabase);
+    if (mfaError) {
+      return NextResponse.json({ error: mfaError }, { status: 403 });
+    }
 
-    const body = await request.json();
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+    }
+    if (!body || typeof body !== "object") {
+      return NextResponse.json(
+        { error: "Invalid request body" },
+        { status: 400 },
+      );
+    }
     const {
       scheduleId,
       intervalMinutes,
@@ -138,7 +221,14 @@ export async function PATCH(request: NextRequest) {
       retries,
       failureCallback,
       timezone,
-    } = body;
+    } = body as {
+      scheduleId?: string;
+      intervalMinutes?: unknown;
+      action?: string;
+      retries?: unknown;
+      failureCallback?: string;
+      timezone?: string;
+    };
 
     if (!scheduleId) {
       return NextResponse.json(
@@ -147,60 +237,93 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
-    // Handle pause/resume
+    const schedules = await listSchedules();
+    const currentSchedule = findMonitorSchedule(schedules);
+    if (!currentSchedule || currentSchedule.scheduleId !== scheduleId) {
+      return NextResponse.json(
+        { error: "Monitor check schedule not found" },
+        { status: 404 },
+      );
+    }
+
     if (action === "pause") {
-      await pauseSchedule(scheduleId);
+      await pauseSchedule(currentSchedule.scheduleId);
       return NextResponse.json({ success: true, action: "paused" });
     }
 
     if (action === "resume") {
-      await resumeSchedule(scheduleId);
+      await resumeSchedule(currentSchedule.scheduleId);
       return NextResponse.json({ success: true, action: "resumed" });
     }
 
-    // Build update config
     const updateConfig: {
       cron?: string;
       retries?: number;
       failureCallback?: string;
     } = {};
 
-    // Get current schedule to preserve existing values
-    const schedules = await listSchedules();
-    const currentSchedule = schedules.find((s) => s.scheduleId === scheduleId);
+    if (action !== undefined && action !== "update") {
+      return NextResponse.json(
+        { error: "Invalid schedule action" },
+        { status: 400 },
+      );
+    }
 
-    // Handle interval and/or timezone changes - both affect the cron string
-    if (intervalMinutes !== undefined || timezone !== undefined) {
-      if (intervalMinutes !== undefined && intervalMinutes < 1) {
-        return NextResponse.json(
-          { error: "Invalid interval. Minimum is 1 minute." },
-          { status: 400 },
-        );
-      }
+    const parsedInterval =
+      intervalMinutes === undefined ? undefined : Number(intervalMinutes);
+    if (
+      parsedInterval !== undefined &&
+      (!Number.isInteger(parsedInterval) ||
+        parsedInterval < 1 ||
+        parsedInterval > 1440)
+    ) {
+      return NextResponse.json(
+        { error: "Interval must be a whole number between 1 and 1440 minutes" },
+        { status: 400 },
+      );
+    }
+    if (timezone !== undefined && !isValidTimezone(timezone)) {
+      return NextResponse.json({ error: "Invalid timezone" }, { status: 400 });
+    }
 
-      // Use new values or fall back to current
+    if (parsedInterval !== undefined || timezone !== undefined) {
       const newInterval =
-        intervalMinutes ??
-        (currentSchedule ? cronToInterval(currentSchedule.cron) : 1);
-      const newTimezone =
-        timezone ??
-        (currentSchedule ? cronToTimezone(currentSchedule.cron) : "UTC");
-
+        parsedInterval ?? cronToInterval(currentSchedule.cron);
+      const newTimezone = timezone ?? cronToTimezone(currentSchedule.cron);
       updateConfig.cron = intervalToCron(newInterval, newTimezone);
     }
 
-    if (retries !== undefined) {
-      if (retries < 0 || retries > 5) {
+    const parsedRetries = retries === undefined ? undefined : Number(retries);
+    if (parsedRetries !== undefined) {
+      if (
+        !Number.isInteger(parsedRetries) ||
+        parsedRetries < 0 ||
+        parsedRetries > 5
+      ) {
         return NextResponse.json(
           { error: "Retries must be between 0 and 5." },
           { status: 400 },
         );
       }
-      updateConfig.retries = retries;
+      updateConfig.retries = parsedRetries;
     }
 
     if (failureCallback !== undefined) {
-      updateConfig.failureCallback = failureCallback || undefined;
+      const siteUrl = getSiteUrl();
+      if (!siteUrl) {
+        return NextResponse.json(
+          { error: "Site URL not configured" },
+          { status: 500 },
+        );
+      }
+      const expectedFailureCallback = `${siteUrl}/api/cron/failure-callback`;
+      if (failureCallback && failureCallback !== expectedFailureCallback) {
+        return NextResponse.json(
+          { error: "Invalid failure callback" },
+          { status: 400 },
+        );
+      }
+      updateConfig.failureCallback = expectedFailureCallback;
     }
 
     // Check if we have anything to update
@@ -217,7 +340,7 @@ export async function PATCH(request: NextRequest) {
       success: true,
       newScheduleId: result.scheduleId,
       ...updateConfig,
-      intervalMinutes: updateConfig.cron ? intervalMinutes : undefined,
+      intervalMinutes: updateConfig.cron ? parsedInterval : undefined,
     });
   } catch (error) {
     console.error("Error updating schedule:", error);

@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { getMfaVerificationError } from "@/lib/mfa";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
@@ -31,6 +32,11 @@ export async function createMaintenance(
 
   if (!user) {
     return { success: false, error: "Unauthorized" };
+  }
+
+  const mfaError = await getMfaVerificationError(supabase);
+  if (mfaError) {
+    return { success: false, error: mfaError };
   }
 
   const rawData = {
@@ -118,6 +124,11 @@ export async function updateMaintenance(
     return { success: false, error: "Unauthorized" };
   }
 
+  const mfaError = await getMfaVerificationError(supabase);
+  if (mfaError) {
+    return { success: false, error: mfaError };
+  }
+
   const rawData = {
     title: formData.get("title") as string,
     description: formData.get("description") as string,
@@ -194,6 +205,11 @@ export async function deleteMaintenance(
 
   if (!user) {
     return { success: false, error: "Unauthorized" };
+  }
+
+  const mfaError = await getMfaVerificationError(supabase);
+  if (mfaError) {
+    return { success: false, error: mfaError };
   }
 
   // Delete maintenance (cascade will delete monitor assignments)

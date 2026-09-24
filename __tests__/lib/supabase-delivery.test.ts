@@ -11,6 +11,12 @@ const WORKFLOW_PATH = join(
 );
 const CONFIG_PATH = join(ROOT, "supabase", "config.toml");
 const SCHEMA_PATH = join(ROOT, "supabase", "schema.sql");
+const QUALITY_WORKFLOW_PATH = join(
+  ROOT,
+  ".github",
+  "workflows",
+  "quality-gate.yml",
+);
 const VERIFY_SCRIPT_PATH = join(ROOT, "scripts", "supabase-verify-schema.py");
 
 function migrationFiles(): string[] {
@@ -98,6 +104,43 @@ describe("supabase delivery: migrations", () => {
     expect(schema).toContain("group_id UUID REFERENCES monitor_groups(id)");
     expect(schema).toContain("idx_monitors_group_id");
   });
+
+  it("keeps the durable cron failure and status-page functions in schema and migrations", () => {
+    const schema = readFileSync(SCHEMA_PATH, "utf-8");
+    const migration = readFileSync(
+      join(
+        MIGRATIONS_DIR,
+        "20260924161747_add_cron_failures_and_integrity_policies.sql",
+      ),
+      "utf-8",
+    );
+    for (const sql of [schema, migration]) {
+      expect(sql).toContain("cron_failures");
+      expect(sql).toContain("get_public_status_page");
+      expect(sql).toContain("create_status_page_with_monitors");
+      expect(sql).toContain("update_status_page_with_monitors");
+      expect(sql).toContain("notification_channels.user_id");
+      expect(sql).toContain("mfa_mutation_allowed");
+      expect(sql).toContain("monitors.user_id = status_pages.user_id");
+    }
+  });
+});
+
+describe("delivery gate", () => {
+  it("runs the browser suite in the quality workflow", () => {
+    const workflow = readFileSync(QUALITY_WORKFLOW_PATH, "utf-8");
+    expect(workflow).toContain("name: Quality Gate");
+    expect(workflow).toContain("bun run e2e:ci");
+    expect(workflow).toContain("bun run e2e:install:ci");
+    expect(workflow).toContain("supabase db reset --local --no-seed");
+    expect(workflow).toContain("bun run e2e:seed");
+  });
+
+  it("keeps the canonical delivery command in Lefthook", () => {
+    const lefthook = readFileSync(join(ROOT, "lefthook.yml"), "utf-8");
+    expect(lefthook).toContain("run: bun run verify:delivery");
+    expect(lefthook).not.toContain("skip_output:");
+  });
 });
 
 describe("supabase delivery: CI/CD workflow", () => {
@@ -107,15 +150,19 @@ describe("supabase delivery: CI/CD workflow", () => {
     const yml = workflow();
     expect(yml).toContain("validate:");
     expect(yml).toContain("pull_request");
-    expect(yml).toContain("github.event_name != 'pull_request'");
+    expect(yml).toContain("workflow_run:");
+    expect(yml).toContain("github.event.workflow_run.conclusion == 'success'");
   });
 
-  it("gates migrations and edge deploys to non-PR runs", () => {
+  it("gates privileged jobs to a trusted successful main push", () => {
     const yml = workflow();
     expect(yml).toContain("migrate:");
     expect(yml).toContain("edge-functions:");
-    const gated = yml.match(/if:\s*github\.event_name\s*!=\s*'pull_request'/g);
-    expect((gated ?? []).length).toBeGreaterThanOrEqual(2);
+    expect(yml).toContain(
+      "github.event.workflow_run.head_repository.full_name == github.repository",
+    );
+    expect(yml).toContain("github.event.workflow_run.head_sha == github.sha");
+    expect(yml).toContain("github.ref == 'refs/heads/main'");
   });
 
   it("deploys edge functions non-interactively with --project-ref", () => {
@@ -138,6 +185,7 @@ describe("supabase delivery: CI/CD workflow", () => {
     const yml = workflow();
     expect(yml).toContain("actions/setup-node@v5");
     expect(yml).toContain("supabase/setup-cli@v3");
+    expect(yml).toContain("version: v2.117.0");
     expect(yml.indexOf("actions/setup-node@v5")).toBeLessThan(
       yml.indexOf("supabase/setup-cli@v3"),
     );
@@ -151,6 +199,7 @@ describe("supabase delivery: CLI config", () => {
     expect(existsSync(CONFIG_PATH)).toBe(true);
     const toml = readFileSync(CONFIG_PATH, "utf-8");
     expect(toml).toContain("project_id");
-    expect(toml).toContain("[functions]");
+    expect(toml).not.toContain("[functions.build]");
+    expect(toml).not.toContain("[functions.deploy]");
   });
 });

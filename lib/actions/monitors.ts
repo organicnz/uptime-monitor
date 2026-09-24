@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { getMfaVerificationError } from "@/lib/mfa";
 import { revalidatePath } from "next/cache";
 import { track } from "@vercel/analytics/server";
 import type { Monitor } from "@/types/application";
@@ -159,6 +160,11 @@ export async function createMonitor(payload: unknown) {
       return { error: "Unauthorized" };
     }
 
+    const mfaError = await getMfaVerificationError(supabase);
+    if (mfaError) {
+      return { error: mfaError };
+    }
+
     const parsed = MonitorSchema.safeParse(payload);
 
     if (!parsed.success) {
@@ -215,6 +221,11 @@ export async function updateMonitor(id: string, payload: unknown) {
       return { error: "Unauthorized" };
     }
 
+    const mfaError = await getMfaVerificationError(supabase);
+    if (mfaError) {
+      return { error: mfaError };
+    }
+
     const parsed = MonitorSchema.safeParse(payload);
 
     if (!parsed.success) {
@@ -265,6 +276,11 @@ export async function deleteMonitor(id: string) {
 
     if (!user) {
       return { error: "Unauthorized" };
+    }
+
+    const mfaError = await getMfaVerificationError(supabase);
+    if (mfaError) {
+      return { error: mfaError };
     }
 
     const { error } = await supabase

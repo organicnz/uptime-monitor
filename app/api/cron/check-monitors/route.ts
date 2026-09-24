@@ -2,10 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { Receiver } from "@upstash/qstash";
 import { createServiceClient } from "@/lib/supabase/service";
 import { processMonitorCheck } from "@/lib/monitor-checker";
+import { getCheckInterval } from "@/lib/monitor-status";
 import { secureCompare } from "@/lib/security";
 import type { Monitor } from "@/types/application";
 
-// Config
+export const runtime = "nodejs";
+
 const CONCURRENCY_LIMIT = 10;
 const MAX_EXECUTION_TIME_MS = 55_000; // Leave buffer before Vercel's 60s timeout
 
@@ -34,7 +36,26 @@ function generateRequestId(): string {
   return `cron_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
-// Canonical Monitor row type (types/application.ts <- types/database.ts).
+async function withDeadline<T>(
+  operation: Promise<T>,
+  timeoutMs: number,
+): Promise<T> {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(
+      () => reject(new Error("Execution deadline exceeded")),
+      Math.max(1, timeoutMs),
+    );
+  });
+
+  try {
+    return await Promise.race([operation, timeout]);
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+  }
+}
+
+// Canonical Monitor row type is imported from types/application.
 // Do not redefine locally so schema changes propagate.
 
 // QStash receiver for signature verification
@@ -81,14 +102,18 @@ async function authenticateRequest(request: NextRequest): Promise<AuthSource> {
 function buildResponse(
   result: CheckResult,
   meta: { requestId: string; startTime: number; source: AuthSource },
+  status = 200,
 ) {
-  return NextResponse.json({
-    ...result,
-    requestId: meta.requestId,
-    duration: `${Date.now() - meta.startTime}ms`,
-    source: meta.source,
-    timestamp: new Date().toISOString(),
-  });
+  return NextResponse.json(
+    {
+      ...result,
+      requestId: meta.requestId,
+      duration: `${Date.now() - meta.startTime}ms`,
+      source: meta.source,
+      timestamp: new Date().toISOString(),
+    },
+    { status },
+  );
 }
 
 // POST handler - called by QStash
@@ -106,10 +131,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log(`[${requestId}] Starting monitor checks via ${source}`);
+    console.info(`[${requestId}] Starting monitor checks via ${source}`);
     const result = await runMonitorChecks(startTime, requestId);
 
-    return buildResponse(result, { requestId, startTime, source });
+    const status = result.timedOut || result.failed > 0 ? 503 : 200;
+    return buildResponse(result, { requestId, startTime, source }, status);
   } catch (error) {
     console.error(`[${requestId}] Cron job error:`, error);
     return NextResponse.json(
@@ -146,10 +172,15 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    console.log(`[${requestId}] Starting monitor checks via bearer`);
+    console.info(`[${requestId}] Starting monitor checks via bearer`);
     const result = await runMonitorChecks(startTime, requestId);
 
-    return buildResponse(result, { requestId, startTime, source: "bearer" });
+    const status = result.timedOut || result.failed > 0 ? 503 : 200;
+    return buildResponse(
+      result,
+      { requestId, startTime, source: "bearer" },
+      status,
+    );
   } catch (error) {
     console.error(`[${requestId}] Cron job error:`, error);
     return NextResponse.json(
@@ -193,34 +224,52 @@ async function runMonitorChecks(
 
   // Get last heartbeat times in a single query
   const monitorIds = (monitors as Monitor[]).map((m) => m.id);
-  const { data: lastHeartbeats } = await supabase
+  const { data: lastHeartbeats, error: heartbeatError } = await supabase
     .from("heartbeats")
-    .select("monitor_id, time")
+    .select("monitor_id, time, status, down_count")
     .in("monitor_id", monitorIds)
     .order("time", { ascending: false });
 
-  // Build lookup map for last check times
-  const lastCheckMap = new Map<string, Date>();
+  if (heartbeatError) {
+    throw new Error("Failed to fetch last heartbeat times");
+  }
+
+  const lastHeartbeatMap = new Map<
+    string,
+    { time: Date; status: number; downCount: number }
+  >();
   for (const hb of (lastHeartbeats || []) as {
     monitor_id: string;
     time: string;
+    status: number;
+    down_count: number | null;
   }[]) {
-    if (!lastCheckMap.has(hb.monitor_id)) {
-      lastCheckMap.set(hb.monitor_id, new Date(hb.time));
+    if (!lastHeartbeatMap.has(hb.monitor_id)) {
+      lastHeartbeatMap.set(hb.monitor_id, {
+        time: new Date(hb.time),
+        status: hb.status,
+        downCount: hb.down_count ?? 0,
+      });
     }
   }
 
   // Filter monitors that are due for a check, prioritize by longest wait
   const monitorsToCheck = (monitors as Monitor[])
     .map((monitor) => {
-      const lastCheckTime = lastCheckMap.get(monitor.id);
-      const secondsSinceLastCheck = lastCheckTime
-        ? (now.getTime() - lastCheckTime.getTime()) / 1000
+      const lastHeartbeat = lastHeartbeatMap.get(monitor.id);
+      const secondsSinceLastCheck = lastHeartbeat
+        ? (now.getTime() - lastHeartbeat.time.getTime()) / 1000
         : Infinity;
+      const checkInterval = getCheckInterval(
+        monitor.interval,
+        monitor.retry_interval,
+        lastHeartbeat?.status ?? null,
+        lastHeartbeat?.downCount ?? 0,
+      );
       return {
         monitor,
         secondsSinceLastCheck,
-        isDue: !lastCheckTime || secondsSinceLastCheck >= monitor.interval,
+        isDue: !lastHeartbeat || secondsSinceLastCheck >= checkInterval,
       };
     })
     .filter((m) => m.isDue)
@@ -237,7 +286,7 @@ async function runMonitorChecks(
     };
   }
 
-  console.log(
+  console.info(
     `[${requestId}] Checking ${monitorsToCheck.length}/${monitors.length} monitors`,
   );
 
@@ -259,8 +308,12 @@ async function runMonitorChecks(
     }
 
     const batch = monitorsToCheck.slice(i, i + CONCURRENCY_LIMIT);
+    const remainingTime = MAX_EXECUTION_TIME_MS - (Date.now() - startTime);
+    const deadlineAt = startTime + MAX_EXECUTION_TIME_MS;
     const batchResults = await Promise.allSettled(
-      batch.map((monitor) => processMonitorCheck(monitor)),
+      batch.map((monitor) =>
+        withDeadline(processMonitorCheck(monitor, deadlineAt), remainingTime),
+      ),
     );
 
     // Collect failure details
@@ -286,7 +339,7 @@ async function runMonitorChecks(
   const successful = results.filter((r) => r.status === "fulfilled").length;
   const failed = failures.length;
 
-  console.log(
+  console.info(
     `[${requestId}] Completed: ${successful} success, ${failed} failed, ${skipped} skipped`,
   );
 
