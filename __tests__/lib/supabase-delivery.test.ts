@@ -134,6 +134,14 @@ describe("delivery gate", () => {
     expect(workflow).toContain("bun run e2e:install:ci");
     expect(workflow).toContain("supabase db reset --local --no-seed");
     expect(workflow).toContain("bun run e2e:seed");
+    expect(workflow).toContain(
+      `      - uses: supabase/setup-cli@v3
+        with:
+          version: v2.117.0
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.2"`,
+    );
   });
 
   it("pins the supported Bun version in every dependency-install workflow", () => {

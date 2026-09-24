@@ -80,12 +80,12 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: "22"
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: "1.4.2"
       - uses: supabase/setup-cli@v3
         with:
           version: v2.117.0
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.2"
       - run: bun install --frozen-lockfile
       - run: bun run e2e:install:ci
       - name: Start local Supabase
