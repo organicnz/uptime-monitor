@@ -1,6 +1,27 @@
 import type { NextConfig } from "next";
 import { withSentryConfig } from "@sentry/nextjs";
 
+const configuredSupabaseOrigin = (() => {
+  try {
+    const origin = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").origin;
+    return origin.startsWith("http://127.0.0.1:") ||
+      origin.startsWith("http://localhost:")
+      ? origin
+      : "";
+  } catch {
+    return "";
+  }
+})();
+
+const connectSources = [
+  "'self'",
+  "https://*.supabase.co",
+  "wss://*.supabase.co",
+  "https://va.vercel-scripts.com",
+  "https://*.sentry.io",
+  ...(configuredSupabaseOrigin ? [configuredSupabaseOrigin] : []),
+].join(" ");
+
 const securityHeaders = [
   {
     key: "X-DNS-Prefetch-Control",
@@ -38,7 +59,7 @@ const securityHeaders = [
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: https: blob:",
       "font-src 'self' data:",
-      "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://va.vercel-scripts.com https://*.sentry.io",
+      `connect-src ${connectSources}`,
       "frame-ancestors 'none'",
       "base-uri 'self'",
       "form-action 'self'",

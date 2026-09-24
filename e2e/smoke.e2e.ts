@@ -79,5 +79,7 @@ test("renders a configured public status page", async ({ page }) => {
   const response = await page.goto(`/status/${slug}`);
 
   expect(response?.status()).toBe(200);
-  await expect(page.getByRole("heading", { name: /status/i })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { level: 1, name: /status/i }),
+  ).toBeVisible();
 });
