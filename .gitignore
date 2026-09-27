@@ -64,3 +64,8 @@ scripts/generate-favicons.js
 tools/audit/target/
 supabase-mcp.json
 supabase/.temp/
+
+# editor/hand-rolled copies - never commit superseded source snapshots
+*.backup
+*.bak
+*.orig

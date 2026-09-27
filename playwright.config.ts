@@ -30,9 +30,18 @@ export default defineConfig({
   },
   webServer: {
     command: serverCommand,
-    url: `${baseURL}/api/cron/check-monitors?health=true`,
-    reuseExistingServer: !isCI,
+    // Poll the landing page rather than the cron health endpoint: the health
+    // route is auth/CAS-guarded, so probing it can report "not ready" even when
+    // the server is serving traffic fine.
+    url: baseURL,
+    // Always boot a dedicated server unless one is explicitly pinned via
+    // E2E_BASE_URL (e.g. against a deployed preview). Relying on an ambient
+    // dev server made local runs non-deterministic and silently reuse stale
+    // builds.
+    reuseExistingServer: Boolean(process.env.E2E_BASE_URL),
     timeout: 120_000,
+    stdout: "pipe",
+    stderr: "pipe",
     env: {
       NEXT_PUBLIC_SUPABASE_URL:
         process.env.NEXT_PUBLIC_SUPABASE_URL ?? "http://127.0.0.1:54321",

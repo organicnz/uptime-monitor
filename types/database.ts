@@ -192,7 +192,7 @@ export interface Database {
         Row: {
           id: string;
           monitor_id: string;
-          status: number; // 0=DOWN, 1=UP, 2=PENDING, 3=MAINTENANCE
+          status: number; // 0=DOWN, 1=UP, 2=PENDING, 3=MAINTENANCE, 4=DEGRADED
           msg: string | null;
           ping: number | null;
           duration: number | null;

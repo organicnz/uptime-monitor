@@ -534,7 +534,8 @@ export async function checkMonitor(
  * 3. Respects maintenance windows
  * 4. Only notifies on actual status changes
  * 5. Supports upside_down mode (inverts success/failure)
- * 6. Supports DEGRADED status for warning thresholds
+ * 6. Only DOWN/UP/PENDING are produced here; DEGRADED (4) is reserved and
+ *    never emitted, so it must not be treated as a reachable state
  */
 export async function processMonitorCheck(
   monitor: Monitor,
@@ -779,9 +780,6 @@ async function handleStatusChange(
     (previousStatus === HEARTBEAT_STATUS.DOWN ||
       previousStatus === HEARTBEAT_STATUS.MAINTENANCE) &&
     currentStatus === HEARTBEAT_STATUS.UP;
-  const isDegraded =
-    currentStatus === HEARTBEAT_STATUS.DEGRADED &&
-    previousStatus !== HEARTBEAT_STATUS.DOWN;
 
   if (isDown) {
     // Create incident if none exists
@@ -873,29 +871,6 @@ async function handleStatusChange(
       );
     } catch (error) {
       console.error(`[${monitor.name}] Failed to send UP notification:`, error);
-    }
-  }
-
-  // Handle DEGRADED status notifications
-  if (isDegraded) {
-    try {
-      await sendStatusNotification(
-        monitor,
-        {
-          title: `⚠️ ${monitor.name} is DEGRADED`,
-          message: msg || "Service is experiencing issues",
-          monitorName: monitor.name,
-          monitorUrl: monitor.url || monitor.hostname || undefined,
-          status: "degraded",
-          timestamp: new Date().toISOString(),
-        },
-        deadlineAt,
-      );
-    } catch (error) {
-      console.error(
-        `[${monitor.name}] Failed to send DEGRADED notification:`,
-        error,
-      );
     }
   }
 }

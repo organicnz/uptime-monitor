@@ -188,10 +188,48 @@ See `.env.local.example` for all required variables:
 | `NEXT_PUBLIC_SITE_URL`            | Public URL of deployment           | Yes      |
 | `CRON_SECRET`                     | Secret for cron job authentication | Yes      |
 | `QSTASH_TOKEN`                    | QStash API token                   | Yes      |
-| `QSTASH_CURRENT_SIGNing_KEY`      | QStash signing key                 | Yes      |
-| `QSTASH_NEXT_SIGNing_KEY`         | QStash next signing key            | Yes      |
+| `QSTASH_CURRENT_SIGNING_KEY`      | QStash signing key                 | Yes      |
+| `QSTASH_NEXT_SIGNING_KEY`         | QStash next signing key            | Yes      |
 | `VERCEL_AUTOMATION_BYPASS_SECRET` | Bypass secret for Vercel Auth      | No       |
 | `NEXT_PUBLIC_SENTRY_DSN`          | Sentry DSN for error tracking      | Yes      |
+
+### Secret Management
+
+Secrets are **never** committed. `.env.local` is gitignored; only
+`.env.local.example` (placeholders + generation guidance) is tracked, and a
+`secrets-check` pre-commit hook blocks credential-shaped strings from landing.
+
+**Where secrets live**
+
+| Scope          | Mechanism                                        | Used for                                                                                 |
+| -------------- | ------------------------------------------------ | ---------------------------------------------------------------------------------------- |
+| CI/CD          | GitHub Actions repository/org **Secrets**        | `SUPABASE_ACCESS_TOKEN`, `SUPABASE_SERVICE_ROLE_KEY`, `CRON_SECRET`, `SENTRY_AUTH_TOKEN` |
+| Local dev      | `.env.local` (gitignored)                        | Same variables for `next dev`, tests, and `audit local-cron`                             |
+| Migrations     | `SUPABASE_ACCESS_TOKEN` secret + `--project-ref` | `supabase db push` in `supabase-migrations.yml`; never hardcoded in `config.toml`        |
+| Runtime (prod) | Vercel project environment variables             | Same set, injected at build/runtime                                                      |
+
+**Why there is no Supabase Vault or Edge Functions secret store**
+
+This app has no `supabase/functions/` directory, so there is no Edge Function
+whose secrets need co-locating. Access control is enforced in the **database**
+via RLS on all tables, which is strictly stronger than relying on a
+function-held secret: a leaked service key still cannot read another tenant's
+rows through the anon/authenticated roles. Vault would only add value if we
+needed secret _rotation without a redeploy_, which this workload does not.
+
+Adopt Vault/Edge Functions when — and only when — one of these becomes true:
+
+- secrets must rotate without a deploy or app restart, or
+- privileged logic must run close to the database (e.g. outbound webhooks that
+  must not traverse the Next.js runtime), or
+- a non-Human actor (Edge Function) needs its own scoped credential.
+
+**Required GitHub repository secrets**
+
+`SUPABASE_ACCESS_TOKEN`, `SUPABASE_SERVICE_ROLE_KEY`, `CRON_SECRET`, and
+`SENTRY_AUTH_TOKEN` (the last only for source-map upload; builds succeed
+without it). Non-secret configuration (project ref, site URL) belongs in
+GitHub **Variables**, not Secrets.
 
 ## Project Structure
 

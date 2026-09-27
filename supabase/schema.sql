@@ -95,7 +95,7 @@ CREATE TABLE IF NOT EXISTS monitors (
   packet_size INTEGER DEFAULT 56, -- For Ping
   
   -- Status Tracking
-  status INTEGER DEFAULT 1, -- 0=DOWN, 1=UP, 2=PENDING, 3=MAINTENANCE
+  status INTEGER DEFAULT 1, -- 0=DOWN, 1=UP, 2=PENDING, 3=MAINTENANCE, 4=DEGRADED (keep in sync with lib/monitor-status.ts HEARTBEAT_STATUS)
   down_count INTEGER DEFAULT 0, -- Consecutive downs
   last_check_at TIMESTAMPTZ, -- Time of last check
   last_status_change_at TIMESTAMPTZ, -- Time of last status change
@@ -134,7 +134,7 @@ CREATE INDEX IF NOT EXISTS idx_monitors_type_active ON monitors(type, active);
 CREATE TABLE IF NOT EXISTS heartbeats (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   monitor_id UUID NOT NULL REFERENCES monitors(id) ON DELETE CASCADE,
-  status SMALLINT NOT NULL, -- 0=DOWN, 1=UP, 2=PENDING, 3=MAINTENANCE
+  status SMALLINT NOT NULL, -- 0=DOWN, 1=UP, 2=PENDING, 3=MAINTENANCE, 4=DEGRADED (keep in sync with lib/monitor-status.ts HEARTBEAT_STATUS)
   msg TEXT, -- Error message or simple "OK"
   ping INTEGER, -- Response time in ms
   duration INTEGER, -- Total duration in ms
