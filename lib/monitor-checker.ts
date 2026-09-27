@@ -15,6 +15,8 @@ import {
 import type { Heartbeat, Monitor } from "@/types/application";
 import {
   determineEffectiveStatus,
+  classifyErrorType,
+  nextConsecutiveUptime,
   HEARTBEAT_STATUS,
 } from "@/lib/monitor-status";
 
@@ -50,6 +52,7 @@ type HeartbeatInsert = {
   duration: number;
   down_count: number;
   time: string;
+  error_type: string | null;
 };
 
 type PreviousHeartbeat = Pick<Heartbeat, "status" | "down_count">;
@@ -558,6 +561,8 @@ export async function processMonitorCheck(
       duration: 0,
       down_count: 0,
       time: checkedAt,
+      // No failure to describe: the monitor is intentionally suspended.
+      error_type: classifyErrorType(null, HEARTBEAT_STATUS.MAINTENANCE),
     });
     const { error: maintenanceUpdateError } = await supabase
       .from("monitors")
@@ -565,6 +570,8 @@ export async function processMonitorCheck(
         status: HEARTBEAT_STATUS.MAINTENANCE,
         down_count: 0,
         last_check_at: checkedAt,
+        // consecutive_uptime is deliberately left untouched: a maintenance
+        // window suspends the streak, it does not end it.
         ...(monitor.status !== HEARTBEAT_STATUS.MAINTENANCE && {
           last_status_change_at: checkedAt,
         }),
@@ -606,6 +613,7 @@ export async function processMonitorCheck(
     duration,
     down_count: downCount,
     time: checkedAt,
+    error_type: classifyErrorType(result.msg, effectiveStatus),
   });
 
   const { error: monitorUpdateError } = await supabase
@@ -613,6 +621,10 @@ export async function processMonitorCheck(
     .update({
       status: effectiveStatus,
       down_count: downCount,
+      consecutive_uptime: nextConsecutiveUptime(
+        monitor.consecutive_uptime,
+        effectiveStatus,
+      ),
       last_check_at: checkedAt,
       ...(effectiveStatus !== previousStatus && {
         last_status_change_at: checkedAt,

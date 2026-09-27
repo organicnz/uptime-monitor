@@ -92,7 +92,7 @@ CREATE TABLE IF NOT EXISTS monitors (
   max_retries INTEGER DEFAULT 1, -- Retries before down
   ignore_tls BOOLEAN DEFAULT false,
   upside_down BOOLEAN DEFAULT false, -- Invert status logic (e.g. 404 is UP)
-  packet_size INTEGER DEFAULT 56, -- For Ping
+  packet_size INTEGER DEFAULT 56, -- RESERVED: Ping checks use HTTP HEAD, not ICMP
   
   -- Status Tracking
   status INTEGER DEFAULT 1, -- 0=DOWN, 1=UP, 2=PENDING, 3=MAINTENANCE, 4=DEGRADED (keep in sync with lib/monitor-status.ts HEARTBEAT_STATUS)
@@ -101,13 +101,17 @@ CREATE TABLE IF NOT EXISTS monitors (
   last_status_change_at TIMESTAMPTZ, -- Time of last status change
   
   -- Advanced: AI/Analytics fields
-  avg_response_time_ms INTEGER DEFAULT 0,
-  success_rate_percent INTEGER DEFAULT 100,
-  consecutive_uptime INTEGER DEFAULT 0,
+  -- NOTE: only consecutive_uptime is currently written (see
+  -- nextConsecutiveUptime in lib/monitor-status.ts). avg_response_time_ms and
+  -- success_rate_percent are reserved for a rolling-stats pass and are NOT
+  -- populated yet - do not read them as live data.
+  avg_response_time_ms INTEGER DEFAULT 0, -- RESERVED: not yet populated
+  success_rate_percent INTEGER DEFAULT 100, -- RESERVED: not yet populated
+  consecutive_uptime INTEGER DEFAULT 0, -- Consecutive UP checks; suspended during maintenance
   
   -- Meta
   description TEXT,
-  parent_id UUID REFERENCES monitors(id), -- For grouped monitors
+  parent_id UUID REFERENCES monitors(id), -- RESERVED: grouped monitors not implemented
   
   -- SSL Info
   ssl_expiry TIMESTAMPTZ,
@@ -143,14 +147,16 @@ CREATE TABLE IF NOT EXISTS heartbeats (
   created_at TIMESTAMPTZ DEFAULT NOW(),
   
   -- Enhanced analytics fields
-  rtt_ms INTEGER, -- Round trip time for this check
-  ssl_valid BOOLEAN DEFAULT false, -- SSL certificate validity
-  error_type TEXT, -- Type of error (timeout, dns_failure, etc.)
-  ip_resolved INET, -- IP address that was checked
-  status_reason TEXT, -- Human-readable reason for status
+  -- NOTE: only error_type is currently written (see classifyErrorType in
+  -- lib/monitor-status.ts). The rest are reserved - do not read as live data.
+  rtt_ms INTEGER, -- RESERVED: duplicates ping, not populated
+  ssl_valid BOOLEAN DEFAULT false, -- RESERVED: not populated (SSL results land on monitors.ssl_expiry)
+  error_type TEXT, -- Machine-readable failure category; NULL when the check passed
+  ip_resolved INET, -- RESERVED: not populated
+  status_reason TEXT, -- RESERVED: duplicates msg, not populated
   
   -- Audit fields
-  checked_by UUID REFERENCES auth.users(id) -- Who triggered this check (for manual checks)
+  checked_by UUID REFERENCES auth.users(id) -- RESERVED: manual checks not implemented
 );
 
 -- Indexes for heartbeat performance and querying

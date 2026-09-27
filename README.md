@@ -84,6 +84,17 @@ bun run e2e
 bun run verify:delivery
 ```
 
+`bun run e2e:ci` runs a **preflight check first** (`scripts/e2e-preflight.ts`)
+that launches a browser once up front. If the binary is missing it fails
+immediately with the exact install command, instead of surfacing as a
+mid-suite Playwright error that looks like a product failure. `bun run e2e`
+starts its own dedicated server, so it does not depend on a dev server already
+running on the port.
+
+Tests that need a seeded account (`E2E_EMAIL` / `E2E_PASSWORD`) or a published
+status page (`E2E_PUBLIC_STATUS_SLUG`) skip when those are unset; CI sets them
+and fails loudly if they are missing.
+
 | Test File                                               | Component            | Coverage                                           |
 | ------------------------------------------------------- | -------------------- | -------------------------------------------------- |
 | `__tests__/components/ui/monitor-card.test.tsx`         | `MonitorCard`        | Name, URL, labels, icon, menu, states, error toast |

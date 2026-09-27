@@ -58,3 +58,80 @@ export function determineEffectiveStatus(
 
   return { status: resultStatus, downCount: 0 };
 }
+
+/** Upper bound for the uptime streak so a bad interval cannot overflow INTEGER. */
+export const MAX_CONSECUTIVE_UPTIME = 2_000_000_000;
+
+function normalizeUptime(value: number): number {
+  if (!Number.isFinite(value)) return 0;
+  return Math.min(MAX_CONSECUTIVE_UPTIME, Math.max(0, Math.floor(value)));
+}
+
+/**
+ * Advance the "currently up for N checks" streak.
+ *
+ * Only conclusive verdicts move the counter:
+ * - UP increments it,
+ * - DOWN resets it to zero,
+ * - PENDING (no verdict yet) and MAINTENANCE (window suspended) leave it
+ *   untouched, because neither is evidence that the service is unhealthy.
+ *   Resetting on maintenance would erase a long healthy streak every time
+ *   planned work was scheduled.
+ */
+export function nextConsecutiveUptime(
+  currentUptime: number,
+  status: number,
+): number {
+  const current = normalizeUptime(currentUptime);
+
+  if (status === HEARTBEAT_STATUS.UP) {
+    return Math.min(current + 1, MAX_CONSECUTIVE_UPTIME);
+  }
+  if (status === HEARTBEAT_STATUS.DOWN) {
+    return 0;
+  }
+  return current;
+}
+
+/**
+ * Machine-readable failure reason derived from a check's message.
+ *
+ * `msg` is free text aimed at humans; this gives dashboards and alerting a
+ * stable category to group and filter on without string-matching the message.
+ *
+ * Returns null when there is no failure to describe: a healthy check, or a
+ * maintenance window (the monitor is intentionally suspended, so recording a
+ * failure category would pollute the column). PENDING is still classified
+ * because it means "failed, but inside the retry window".
+ */
+const NON_FAILURE_STATES: readonly number[] = [
+  HEARTBEAT_STATUS.UP,
+  HEARTBEAT_STATUS.MAINTENANCE,
+];
+
+const ERROR_TYPE_PATTERNS: ReadonlyArray<readonly [string, RegExp]> = [
+  ["ssrf_blocked", /SSRF Blocked/i],
+  ["timeout", /timed? ?out|Timeout after|execution deadline/i],
+  ["too_many_redirects", /too many redirects/i],
+  ["response_too_large", /response body exceeds/i],
+  ["tls_error", /certificate|self[- ]signed|SSL|TLS|EPROTO/i],
+  ["dns_failure", /ENOTFOUND|EAI_AGAIN|getaddrinfo|DNS resol/i],
+  ["connection_refused", /ECONNREFUSED/i],
+  ["connection_reset", /ECONNRESET|EPIPE|socket hang up/i],
+  ["host_unreachable", /EHOSTUNREACH|ENETUNREACH|Host unreachable/i],
+  ["misconfigured", /Missing (URL|hostname)|must be a local instance/i],
+  ["unsupported_type", /unsupported monitor type/i],
+];
+
+export function classifyErrorType(
+  msg: string | null,
+  status: number,
+): string | null {
+  if (NON_FAILURE_STATES.includes(status)) return null;
+  if (!msg) return "unknown";
+
+  for (const [errorType, pattern] of ERROR_TYPE_PATTERNS) {
+    if (pattern.test(msg)) return errorType;
+  }
+  return "unknown";
+}

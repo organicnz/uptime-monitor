@@ -251,6 +251,29 @@ import { toast } from "sonner";
 Supported: `http`, `tcp`, `ping`, `keyword`, `dns`
 Schema supports (not implemented): `docker`, `steam`
 
+### Heartbeat Result Semantics
+
+`lib/monitor-status.ts` is the single source of truth for how a raw check
+result becomes a stored status. Change behaviour there, not in the checker.
+
+- `HEARTBEAT_STATUS` — 0 DOWN, 1 UP, 2 PENDING, 3 MAINTENANCE, 4 DEGRADED.
+  Only DOWN/UP/PENDING are ever emitted; DEGRADED is reserved, so treat it as
+  unreachable rather than a state to branch on.
+- `determineEffectiveStatus` — applies the retry window. It holds the previous
+  state only while that state represents health; MAINTENANCE and DEGRADED fall
+  back to PENDING so a monitor that starts failing during a maintenance window
+  surfaces the outage instead of staying "intentionally offline".
+- `nextConsecutiveUptime` — UP increments, DOWN resets, and PENDING /
+  MAINTENANCE suspend the streak (planned work must not erase uptime).
+- `classifyErrorType` — derives a stable category from the human-readable
+  `msg` so dashboards can group failures. Returns null for UP and
+  MAINTENANCE; PENDING still classifies because it means "failed, inside the
+  retry window". The existing `idx_heartbeats_error_type` index depends on
+  this column being written.
+
+Columns declared in `supabase/schema.sql` but not yet populated are marked
+`RESERVED:`. Do not read them as live data.
+
 ### Notification Channel Types
 
 `telegram`, `discord`, `slack`, `teams`, `pushover`, `webhook`, `email` (planned)
