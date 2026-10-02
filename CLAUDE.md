@@ -285,9 +285,10 @@ result becomes a stored status. Change behaviour there, not in the checker.
   back to PENDING so a monitor that starts failing during a maintenance window
   surfaces the outage instead of staying "intentionally offline".
 - `nextConsecutiveUptime` — UP increments, DOWN resets, and PENDING /
-  MAINTENANCE suspend the streak (planned work must not erase uptime).
+  DEGRADED / MAINTENANCE suspend the streak (planned work and slow-but-
+  answering checks must not erase uptime).
 - `classifyErrorType` — derives a stable category from the human-readable
-  `msg` so dashboards can group failures. Returns null for UP and
+  `msg` so dashboards can group failures. Returns null for UP, DEGRADED and
   MAINTENANCE; PENDING still classifies because it means "failed, inside the
   retry window". The existing `idx_heartbeats_error_type` index depends on
   this column being written.

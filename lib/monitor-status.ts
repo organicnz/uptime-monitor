@@ -73,10 +73,10 @@ function normalizeUptime(value: number): number {
  * Only conclusive verdicts move the counter:
  * - UP increments it,
  * - DOWN resets it to zero,
- * - PENDING (no verdict yet) and MAINTENANCE (window suspended) leave it
- *   untouched, because neither is evidence that the service is unhealthy.
- *   Resetting on maintenance would erase a long healthy streak every time
- *   planned work was scheduled.
+ * - PENDING (no verdict yet), DEGRADED (up, but slowly) and MAINTENANCE
+ *   (window suspended) leave it untouched, because none of them is evidence
+ *   that the service is unhealthy. Resetting on maintenance would erase a
+ *   long healthy streak every time planned work was scheduled.
  */
 export function nextConsecutiveUptime(
   currentUptime: number,
@@ -99,14 +99,16 @@ export function nextConsecutiveUptime(
  * `msg` is free text aimed at humans; this gives dashboards and alerting a
  * stable category to group and filter on without string-matching the message.
  *
- * Returns null when there is no failure to describe: a healthy check, or a
- * maintenance window (the monitor is intentionally suspended, so recording a
- * failure category would pollute the column). PENDING is still classified
- * because it means "failed, but inside the retry window".
+ * Returns null when there is no failure to describe: a healthy check, a
+ * degraded one (it succeeded, just slowly, so there is nothing to categorise
+ * and "unknown" would flood the buckets alongside real failures), or a
+ * maintenance window (the monitor is intentionally suspended). PENDING is
+ * still classified because it means "failed, but inside the retry window".
  */
 const NON_FAILURE_STATES: readonly number[] = [
   HEARTBEAT_STATUS.UP,
   HEARTBEAT_STATUS.MAINTENANCE,
+  HEARTBEAT_STATUS.DEGRADED,
 ];
 
 const ERROR_TYPE_PATTERNS: ReadonlyArray<readonly [string, RegExp]> = [

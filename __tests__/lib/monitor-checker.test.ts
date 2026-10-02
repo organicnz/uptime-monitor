@@ -156,6 +156,11 @@ describe("nextConsecutiveUptime", () => {
     expect(nextConsecutiveUptime(7, HEARTBEAT_STATUS.PENDING)).toBe(7);
   });
 
+  it("leaves the streak alone while degraded (up, but slowly)", () => {
+    // Slow is not down: the service is still answering, so the streak holds.
+    expect(nextConsecutiveUptime(500, HEARTBEAT_STATUS.DEGRADED)).toBe(500);
+  });
+
   it("survives a full up -> maintenance -> up cycle", () => {
     const first = nextConsecutiveUptime(10, HEARTBEAT_STATUS.UP);
     const held = nextConsecutiveUptime(first, HEARTBEAT_STATUS.MAINTENANCE);
@@ -190,6 +195,23 @@ describe("nextConsecutiveUptime", () => {
 describe("classifyErrorType", () => {
   it("returns null for a healthy check", () => {
     expect(classifyErrorType("200 - OK", HEARTBEAT_STATUS.UP)).toBeNull();
+  });
+
+  it("returns null for a degraded check, which succeeded but slowly", () => {
+    // A slow 200 is not a failure. Classifying it would file every degraded
+    // check under "unknown", indistinguishable from a real failure.
+    expect(
+      classifyErrorType(
+        "200 - OK (slow: 950ms > 800ms threshold)",
+        HEARTBEAT_STATUS.DEGRADED,
+      ),
+    ).toBeNull();
+  });
+
+  it("returns null under maintenance", () => {
+    expect(
+      classifyErrorType("Under maintenance", HEARTBEAT_STATUS.MAINTENANCE),
+    ).toBeNull();
   });
 
   it("classifies SSRF rejections ahead of other patterns", () => {
