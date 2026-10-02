@@ -74,23 +74,29 @@ export function useMonitorsWithHistory(monitorIds: string[]) {
     const ids = idsKey.split(",");
 
     const init = async () => {
-      // Fetch last 50 heartbeats per monitor
-      const { data } = await supabase
-        .from("heartbeats")
-        .select("*")
-        .in("monitor_id", ids)
-        .order("time", { ascending: false })
-        .limit(ids.length * 50);
+      // Bounded per-monitor history reads. The old single query used
+      // `limit(ids.length * 50)` globally, which could starve some monitors
+      // while still scanning far more than needed. Per-monitor limit(50)
+      // hits idx_heartbeats_monitor_time and stays proportional to the list.
+      const HEARTBEAT_COLS = "id,monitor_id,status,ping,msg,time";
+      const historyResults = await Promise.all(
+        ids.map((id) =>
+          supabase
+            .from("heartbeats")
+            .select(HEARTBEAT_COLS)
+            .eq("monitor_id", id)
+            .order("time", { ascending: false })
+            .limit(50),
+        ),
+      );
 
       if (cancelled) return;
 
-      if (data) {
+      {
         const byMonitor = new Map<string, Heartbeat[]>();
-        (data as Heartbeat[]).forEach((hb) => {
-          const existing = byMonitor.get(hb.monitor_id) || [];
-          if (existing.length < 50) {
-            byMonitor.set(hb.monitor_id, [...existing, hb]);
-          }
+        ids.forEach((id, index) => {
+          const rows = (historyResults[index]?.data ?? []) as Heartbeat[];
+          if (rows.length > 0) byMonitor.set(id, rows.slice(0, 50));
         });
 
         const newMonitors = new Map<string, MonitorWithHistory>();
