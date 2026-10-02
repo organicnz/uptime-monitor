@@ -14,8 +14,8 @@
     "typecheck": "tsc --noEmit",
     "test": "bun test __tests__",
     "test:unit": "bun test __tests__",
-    "e2e": "playwright test",
-    "e2e:ci": "bun run e2e:preflight && E2E_PRODUCTION=1 playwright test",
+    "e2e": "playwright test --project=chromium",
+    "e2e:ci": "bun run e2e:preflight && E2E_PRODUCTION=1 playwright test --project=chromium",
     "e2e:preflight": "bun scripts/e2e-preflight.ts",
     "e2e:install": "playwright install chromium",
     "e2e:install:ci": "playwright install --with-deps chromium",
@@ -30,7 +30,8 @@
     "hooks:install": "if [ -d .git ]; then lefthook install; fi",
     "hooks:uninstall": "if [ -d .git ]; then lefthook uninstall; fi",
     "build:audit": "if [ -d .git ]; then git submodule update --init --recursive; fi; if command -v cargo >/dev/null 2>&1; then (cd tools/audit && cargo build --release); elif [ ! -x tools/audit/target/release/audit ]; then exit 1; fi",
-    "postinstall": "bun run build:audit"
+    "postinstall": "bun run build:audit",
+    "verify:gpu": "playwright test --project=chromium-gpu"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
@@ -45,6 +46,7 @@
     "@supabase/supabase-js": "^2.87.0",
     "@upstash/qstash": "^2.8.4",
     "@vercel/analytics": "^1.6.1",
+    "@webgpu/types": "^0.1.74",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
@@ -58,6 +60,7 @@
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.4.0",
     "undici": "8.10.2",
+    "vgpu": "^0.5.0",
     "zod": "^4.1.13"
   },
   "devDependencies": {

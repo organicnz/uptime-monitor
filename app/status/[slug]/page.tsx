@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 
 import { Monitor, StatusPage } from "@/types/application";
+import { GPUStatusBackground } from "@/components/gpu-status-background-client";
 
 // Reusing types from dashboard
 const typeIcons: Record<string, typeof Globe> = {
@@ -83,9 +84,12 @@ export default async function PublicStatusPage({
       ? "All Systems Operational"
       : "Partial Outage"; // Simplified logic
 
+  const systemHealth = anyDown ? "down" : allUp ? "up" : "degraded";
+
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-neutral-950 text-neutral-900 dark:text-neutral-100 font-sans">
-      <div className="max-w-4xl mx-auto px-4 py-12">
+    <div className="relative min-h-screen bg-slate-50 dark:bg-neutral-950 text-neutral-900 dark:text-neutral-100 font-sans">
+      <GPUStatusBackground status={systemHealth} />
+      <div className="relative max-w-4xl mx-auto px-4 py-12">
         {/* Header */}
         <div className="mb-8 flex items-center justify-between">
           <div>

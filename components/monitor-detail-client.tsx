@@ -35,12 +35,14 @@ import {
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { formatDistanceToNow, differenceInDays } from "date-fns";
-import { useState, useTransition } from "react";
+import { useState, useTransition, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import { duplicateMonitor } from "@/lib/actions/monitors";
 import { toast } from "sonner";
 import { ResponseTimeChart } from "@/components/response-time-chart";
+import { GPUResponseChart } from "@/components/gpu-response-chart-client";
+import { RefreshCw } from "lucide-react";
 
 type Monitor = {
   id: string;
@@ -209,6 +211,36 @@ export function MonitorDetailClient({
     }
   };
 
+  const [isChecking, setIsChecking] = useState(false);
+
+  const triggerManualCheck = useCallback(async () => {
+    setIsChecking(true);
+    try {
+      const response = await fetch(`/api/monitors/${monitor.id}/check`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ force: true }),
+      });
+
+      if (response.ok) {
+        toast.success("Check triggered", {
+          description: "Monitor check has been queued.",
+        });
+      } else {
+        const data = await response.json().catch(() => ({}));
+        toast.error("Check failed", {
+          description: data.error || "Failed to trigger check.",
+        });
+      }
+    } catch {
+      toast.error("Check failed", {
+        description: "Network error while triggering check.",
+      });
+    } finally {
+      setIsChecking(false);
+    }
+  }, [monitor.id]);
+
   const handleDuplicate = () => {
     startDuplicateTransition(async () => {
       const result = await duplicateMonitor(monitor.id);
@@ -326,6 +358,19 @@ export function MonitorDetailClient({
                   <StatusIcon className="h-4 w-4" />
                   {statusConfig[currentStatus].label}
                 </span>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={triggerManualCheck}
+                  disabled={isChecking}
+                  title="Check now"
+                >
+                  {isChecking ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <RefreshCw className="h-4 w-4" />
+                  )}
+                </Button>
                 <Button variant="outline" size="icon" onClick={toggleActive}>
                   {monitor.active ? (
                     <Pause className="h-4 w-4" />
@@ -607,6 +652,29 @@ export function MonitorDetailClient({
             <span>Oldest</span>
             <span>Latest</span>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* GPU-accelerated trend */}
+      <Card className="glass-card">
+        <CardHeader className="pb-2 pt-4">
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2 text-sm font-medium">
+              <Activity className="h-4 w-4 text-primary" />
+              Latency Trend
+            </CardTitle>
+            <CardDescription className="text-xs">
+              WebGPU when available
+            </CardDescription>
+          </div>
+        </CardHeader>
+        <CardContent className="pt-0 pb-4">
+          <GPUResponseChart
+            points={displayHeartbeats.map((hb) => ({
+              ping: hb.ping,
+              status: hb.status,
+            }))}
+          />
         </CardContent>
       </Card>
 

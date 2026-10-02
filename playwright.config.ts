@@ -48,12 +48,38 @@ export default defineConfig({
       NEXT_PUBLIC_SUPABASE_ANON_KEY:
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "local-anon-key",
       CRON_SECRET: process.env.CRON_SECRET ?? "e2e-cron-secret",
+      // Unlocks the self-contained WebGPU fixture route (app/gpu-fixture).
+      // Left unset everywhere else, so the route 404s in a real deployment.
+      E2E_GPU_FIXTURE: "1",
     },
   },
   projects: [
     {
       name: "chromium",
+      testIgnore: /gpu\.e2e\.ts$/,
       use: { ...devices["Desktop Chrome"] },
+    },
+    {
+      // Split out from the default project because the WebGPU specs need a
+      // software adapter, which is slow to acquire on first use and absent on
+      // some machines. Keeping them here means the main suite keeps its short
+      // timeout and its launch flags, instead of inheriting both.
+      name: "chromium-gpu",
+      testMatch: /gpu\.e2e\.ts$/,
+      timeout: 180_000,
+      use: {
+        ...devices["Desktop Chrome"],
+        launchOptions: {
+          args: [
+            "--enable-unsafe-webgpu",
+            "--enable-features=Vulkan,WebGPU",
+            "--use-angle=swiftshader",
+            // Load-bearing: without it `navigator.gpu` exists but
+            // `requestAdapter()` yields nothing usable, so vgpu never starts.
+            "--enable-unsafe-swiftshader",
+          ],
+        },
+      },
     },
   ],
 });
