@@ -1,0 +1,16 @@
+{
+  "//": "Type-check config for the Supabase Edge Functions. Run with: deno check",
+  "compilerOptions": {
+    "lib": ["deno.ns", "deno.unstable", "dom", "dom.iterable", "esnext"],
+    "strict": true,
+    "noImplicitOverride": true
+  },
+  "tasks": {
+    "check": "deno check notification-dispatch/index.ts _shared/senders.ts _shared/egress.ts _shared/egress-policy.ts _shared/egress_test.ts",
+    "test": "deno test --allow-net _shared/egress_test.ts"
+  },
+  "fmt": {
+    "lineWidth": 80,
+    "semiColons": true
+  }
+}

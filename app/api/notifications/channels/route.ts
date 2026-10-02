@@ -1,84 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
-import { z } from "zod";
 import { withAuth } from "@/lib/api-utils/with-auth";
+import {
+  channelIdSchema,
+  createChannel,
+  createChannelSchema,
+  deleteChannel,
+  updateChannel,
+  updateChannelSchema,
+} from "@/lib/notification-channels";
 
-import { notificationTypes } from "@/lib/notification-types";
-
-// Config schemas for each notification type
-const telegramConfigSchema = z.object({
-  bot_token: z.string().min(1, "Bot token is required"),
-  chat_id: z.string().min(1, "Chat ID is required"),
-});
-
-const webhookConfigSchema = z.object({
-  url: z.string().url("Invalid webhook URL"),
-  method: z.enum(["GET", "POST"]).optional().default("POST"),
-  headers: z.record(z.string(), z.string()).optional(),
-});
-
-const discordSlackTeamsConfigSchema = z.object({
-  webhook_url: z.string().url("Invalid webhook URL"),
-});
-
-const pushoverConfigSchema = z.object({
-  user_key: z.string().min(1, "User key is required"),
-  token: z.string().min(1, "API token is required"),
-  priority: z.number().min(-2).max(2).optional(),
-  sound: z.string().optional(),
-});
-
-const emailConfigSchema = z.object({
-  smtp_host: z.string().min(1, "SMTP host is required"),
-  smtp_port: z
-    .number()
-    .min(1)
-    .max(65535, "SMTP port must be between 1 and 65535"),
-  username: z.string().min(1, "Username is required"),
-  password: z.string().min(1, "Password is required"),
-  to: z.string().email("Invalid email address"),
-});
-
-// Validate config based on type
-function validateConfig(
-  type: (typeof notificationTypes)[number],
-  config: Record<string, unknown>,
-) {
-  switch (type) {
-    case "telegram":
-      return telegramConfigSchema.safeParse(config);
-    case "discord":
-    case "slack":
-    case "teams":
-      return discordSlackTeamsConfigSchema.safeParse(config);
-    case "webhook":
-      return webhookConfigSchema.safeParse(config);
-    case "pushover":
-      return pushoverConfigSchema.safeParse(config);
-    case "email":
-      return emailConfigSchema.safeParse(config);
-    default:
-      return {
-        success: false,
-        error: { issues: [{ message: "Invalid type" }] },
-      };
-  }
-}
-
-const createChannelSchema = z.object({
-  name: z
-    .string()
-    .min(1, "Name is required")
-    .max(100, "Name must be less than 100 characters")
-    .trim(),
-  type: z.enum(notificationTypes),
-  config: z.record(z.string(), z.unknown()),
-});
+/**
+ * Notification channel CRUD.
+ *
+ * Credentials in `config` are split server-side and written to Supabase
+ * Vault, so no response body and no browser bundle ever holds one. See
+ * lib/notification-channels.ts.
+ */
 
 export async function POST(request: NextRequest) {
   return withAuth(
-    async (supabase, user) => {
-      // Parse and validate input
-      let body;
+    async (_supabase, user) => {
+      let body: unknown;
       try {
         body = await request.json();
       } catch {
@@ -88,60 +30,114 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      const validationResult = createChannelSchema.safeParse(body);
-      if (!validationResult.success) {
+      const parsed = createChannelSchema.safeParse(body);
+      if (!parsed.success) {
         return NextResponse.json(
-          { error: validationResult.error.issues[0].message },
+          { error: parsed.error.issues[0]?.message || "Invalid request" },
           { status: 400 },
         );
       }
 
-      const { name, type, config } = validationResult.data;
-
-      // Validate config based on type
-      const configValidation = validateConfig(type, config);
-      if (!configValidation.success) {
-        const errorMessage =
-          "error" in configValidation &&
-          "issues" in configValidation.error &&
-          Array.isArray(configValidation.error.issues) &&
-          configValidation.error.issues.length > 0 &&
-          configValidation.error.issues[0]?.message
-            ? configValidation.error.issues[0].message
-            : "Invalid configuration";
-        return NextResponse.json({ error: errorMessage }, { status: 400 });
-      }
-
-      const insertData = {
-        user_id: user.id,
-        name,
-        type,
-        config,
-        active: true,
-      };
-
-      const { data, error } = await supabase
-        .from("notification_channels")
-        .insert(insertData as never)
-        .select()
-        .single();
-
-      if (error) {
-        console.error("Error creating channel:", error);
+      const result = await createChannel(user.id, parsed.data);
+      if (!result.ok) {
         return NextResponse.json(
-          { error: "Failed to create notification channel" },
-          { status: 500 },
+          { error: result.error },
+          { status: result.status },
         );
       }
 
-      return NextResponse.json({ success: true, channel: data });
+      return NextResponse.json({ success: true, channel: result.channel });
     },
     { requireMfa: true },
   );
 }
 
-export async function GET() {
+export async function PATCH(request: NextRequest) {
+  return withAuth(
+    async (_supabase, user) => {
+      let body: unknown;
+      try {
+        body = await request.json();
+      } catch {
+        return NextResponse.json(
+          { error: "Invalid JSON body" },
+          { status: 400 },
+        );
+      }
+
+      const parsed = updateChannelSchema.safeParse(body);
+      if (!parsed.success) {
+        return NextResponse.json(
+          { error: parsed.error.issues[0]?.message || "Invalid request" },
+          { status: 400 },
+        );
+      }
+
+      const result = await updateChannel(user.id, parsed.data);
+      if (!result.ok) {
+        return NextResponse.json(
+          { error: result.error },
+          { status: result.status },
+        );
+      }
+
+      return NextResponse.json({ success: true, channel: result.channel });
+    },
+    { requireMfa: true },
+  );
+}
+
+export async function GET(request: NextRequest) {
   return withAuth(async (supabase, user) => {
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get("id");
+
+    if (id) {
+      const parsedId = channelIdSchema.safeParse(id);
+      if (!parsedId.success) {
+        return NextResponse.json(
+          { error: "Valid channel ID required" },
+          { status: 400 },
+        );
+      }
+
+      // `has_secret` tells the UI whether a credential is stored without
+      // revealing it, so the form can offer "replace" instead of "enter".
+      const { data: view, error } = await supabase
+        .from("notification_channels")
+        .select("id, name, type, config, active, is_default, secret_id")
+        .eq("id", parsedId.data)
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      if (error) {
+        console.error("Error fetching channel:", error);
+        return NextResponse.json(
+          { error: "Failed to fetch notification channel" },
+          { status: 500 },
+        );
+      }
+
+      if (!view) {
+        return NextResponse.json(
+          { error: "Channel not found" },
+          { status: 404 },
+        );
+      }
+
+      return NextResponse.json({
+        channel: {
+          id: view.id,
+          name: view.name,
+          type: view.type,
+          config: view.config,
+          active: view.active,
+          is_default: view.is_default,
+          has_secret: (view.secret_id as string | null) !== null,
+        },
+      });
+    }
+
     const { data: channels, error } = await supabase
       .from("notification_channels")
       .select("id, name, type, active, created_at, updated_at")
@@ -162,31 +158,22 @@ export async function GET() {
 
 export async function DELETE(request: NextRequest) {
   return withAuth(
-    async (supabase, user) => {
+    async (_supabase, user) => {
       const { searchParams } = new URL(request.url);
-      const id = searchParams.get("id");
+      const parsedId = channelIdSchema.safeParse(searchParams.get("id"));
 
-      // Validate UUID format
-      const uuidRegex =
-        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-      if (!id || !uuidRegex.test(id)) {
+      if (!parsedId.success) {
         return NextResponse.json(
           { error: "Valid channel ID required" },
           { status: 400 },
         );
       }
 
-      const { error } = await supabase
-        .from("notification_channels")
-        .delete()
-        .eq("id", id)
-        .eq("user_id", user.id);
-
-      if (error) {
-        console.error("Error deleting channel:", error);
+      const result = await deleteChannel(user.id, parsedId.data);
+      if (!result.ok) {
         return NextResponse.json(
-          { error: "Failed to delete notification channel" },
-          { status: 500 },
+          { error: result.error },
+          { status: result.status },
         );
       }
 

@@ -219,6 +219,64 @@ describe("supabase delivery: CI/CD workflow", () => {
     expect(yml).toContain("cancel-in-progress: false");
     expect(yml).toContain("needs: [validate, migrate]");
   });
+
+  it("gates both privileged jobs behind the production environment", () => {
+    const yml = workflow();
+    // An `if:` expression is the only machine-checkable half of the boundary.
+    // `environment: production` is the half a human approves, and it is what
+    // carries required reviewers and a wait timer.
+    const gateCount = (yml.match(/^\s+environment: production$/gm) ?? [])
+      .length;
+    expect(gateCount).toBe(2);
+    expect(yml).toContain("Settings -> Environments -> production");
+  });
+
+  it("provisions the edge function secret store from a repository secret", () => {
+    const yml = workflow();
+    expect(yml).toContain(
+      "NOTIFICATION_DISPATCH_SECRET: ${{ secrets.NOTIFICATION_DISPATCH_SECRET }}",
+    );
+    expect(yml).toContain("supabase secrets set");
+    expect(yml).toContain(
+      'NOTIFICATION_DISPATCH_SECRET="$NOTIFICATION_DISPATCH_SECRET"',
+    );
+    // The set must happen before the deploy, or a redeploy could ship a
+    // function whose secret is missing.
+    expect(yml.indexOf("supabase secrets set")).toBeLessThan(
+      yml.indexOf("supabase functions deploy"),
+    );
+    expect(yml).toContain("NOTIFICATION_DISPATCH_SECRET is not set, failing.");
+  });
+
+  it("never passes a secret through a shell command line", () => {
+    const yml = workflow();
+    // Step-level `env:` only: an interpolated secret in a `run:` string ends
+    // up in the process table and in any log that echoes the command.
+    for (const name of [
+      "SUPABASE_ACCESS_TOKEN",
+      "SUPABASE_PROJECT_REF",
+      "NOTIFICATION_DISPATCH_SECRET",
+    ]) {
+      const inline = new RegExp(
+        `run:[^\\n]*\\$\\{\\{\\s*(secrets|vars)\\.${name}`,
+      );
+      expect(yml).not.toMatch(inline);
+    }
+  });
+
+  it("type-checks the edge functions on PRs without any secret", () => {
+    const yml = workflow();
+    expect(yml).toContain("denoland/setup-deno@v2");
+    expect(yml).toContain("deno task check");
+    // These steps must be in the `validate` job, which is the only one that
+    // runs on pull_request.
+    const validateBlock = yml.slice(
+      yml.indexOf("  validate:"),
+      yml.indexOf("  migrate:"),
+    );
+    expect(validateBlock).toContain("deno task check");
+    expect(validateBlock).not.toContain("secrets.");
+  });
 });
 
 describe("supabase delivery: CLI config", () => {
@@ -228,5 +286,55 @@ describe("supabase delivery: CLI config", () => {
     expect(toml).toContain("project_id");
     expect(toml).not.toContain("[functions.build]");
     expect(toml).not.toContain("[functions.deploy]");
+  });
+
+  it("turns off gateway JWT verification only for the dispatch function", () => {
+    const toml = readFileSync(CONFIG_PATH, "utf-8");
+    // Server-to-server invocations carry a shared secret, not a user JWT, so
+    // the gateway check would reject every caller. The handler does its own
+    // constant-time compare.
+    expect(toml).toContain("[functions.notification-dispatch]");
+    expect(toml).toContain("verify_jwt = false");
+    const otherFunctions = toml.match(
+      /\[functions\.(?!notification-dispatch)/g,
+    );
+    expect(otherFunctions ?? []).toEqual([]);
+  });
+});
+
+describe("edge function sources", () => {
+  const functionsDir = join(ROOT, "supabase", "functions");
+
+  it("keeps the senders runtime-agnostic", () => {
+    const senders = readFileSync(
+      join(functionsDir, "_shared", "senders.ts"),
+      "utf-8",
+    );
+    // A `node:*` import would break the edge runtime; `Deno.*` would break
+    // `tsc` for the app. Neither may appear in the shared module.
+    const code = senders.replace(/\/\*[\s\S]*?\*\//g, "");
+    expect(code).not.toMatch(/from ["']node:/);
+    expect(code).not.toMatch(/\bDeno\.[A-Za-z]/);
+    expect(code).not.toMatch(/\bprocess\.env\b/);
+  });
+
+  it("fails the dispatch function closed when its own secret is missing", () => {
+    const index = readFileSync(
+      join(functionsDir, "notification-dispatch", "index.ts"),
+      "utf-8",
+    );
+    expect(index).toContain('Deno.env.get("NOTIFICATION_DISPATCH_SECRET")');
+    expect(index).toContain("Dispatch secret is not configured");
+    // The credential must come from Vault, not from the function's env.
+    expect(index).toContain("notification_channel_secrets");
+    expect(index).not.toContain("NOTIFICATION_SERVICE_ROLE");
+  });
+
+  it("keeps the Deno-only files out of the app typecheck", () => {
+    const tsconfig = readFileSync(join(ROOT, "tsconfig.json"), "utf-8");
+    expect(tsconfig).toContain("supabase/functions/notification-dispatch");
+    expect(tsconfig).toContain("supabase/functions/_shared/egress.ts");
+    // The shared senders must stay IN the app typecheck: the app imports them.
+    expect(tsconfig).not.toContain('"supabase/functions/_shared/senders.ts"');
   });
 });

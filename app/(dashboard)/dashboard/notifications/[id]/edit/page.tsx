@@ -23,10 +23,11 @@ import {
   CheckCircle2,
   AlertCircle,
   Bell,
+  ShieldCheck,
 } from "lucide-react";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
+import { splitChannelConfig } from "@/lib/notification-types";
 
 type ChannelType =
   "telegram" | "discord" | "slack" | "webhook" | "email" | "teams" | "pushover";
@@ -38,7 +39,10 @@ type NotificationChannel = {
   config: Record<string, string>;
   active: boolean;
   is_default: boolean;
+  has_secret: boolean;
 };
+
+const SECRET_PLACEHOLDER = "••••••••••••";
 
 const typeConfig = {
   telegram: { icon: MessageCircle, label: "Telegram" },
@@ -48,6 +52,47 @@ const typeConfig = {
   pushover: { icon: Bell, label: "Pushover" },
   webhook: { icon: Webhook, label: "Webhook" },
   email: { icon: Mail, label: "Email" },
+};
+
+/** Credential fields per type, and how to label them. */
+type FieldDef = { key: string; label: string; hint?: string; type?: string };
+
+const secretFields: Record<ChannelType, FieldDef[]> = {
+  telegram: [
+    {
+      key: "bot_token",
+      label: "Bot Token",
+      hint: "Get this from @BotFather",
+    },
+  ],
+  discord: [{ key: "webhook_url", label: "Webhook URL", type: "url" }],
+  slack: [{ key: "webhook_url", label: "Webhook URL", type: "url" }],
+  teams: [{ key: "webhook_url", label: "Webhook URL", type: "url" }],
+  webhook: [{ key: "url", label: "Webhook URL", type: "url" }],
+  pushover: [
+    { key: "user_key", label: "User Key" },
+    { key: "token", label: "API Token" },
+  ],
+  email: [
+    { key: "smtp_host", label: "SMTP Host" },
+    { key: "smtp_port", label: "SMTP Port" },
+    { key: "username", label: "Username" },
+    { key: "password", label: "Password", type: "password" },
+    { key: "to", label: "Recipient", type: "email" },
+  ],
+};
+
+/** Non-credential fields that stay in the `config` column. */
+const publicFields: Record<ChannelType, FieldDef[]> = {
+  telegram: [
+    { key: "chat_id", label: "Chat ID", hint: "Your user ID or group chat ID" },
+  ],
+  discord: [],
+  slack: [],
+  teams: [],
+  webhook: [],
+  pushover: [],
+  email: [],
 };
 
 export default function EditNotificationPage(props: {
@@ -66,38 +111,38 @@ export default function EditNotificationPage(props: {
     name: "",
     active: true,
     is_default: false,
-    bot_token: "",
-    chat_id: "",
-    webhook_url: "",
-    user_key: "",
-    api_token: "",
   });
+  const [publicForm, setPublicForm] = useState<Record<string, string>>({});
+  // Credential inputs start empty on purpose. A stored credential is never
+  // sent to the browser, so an empty field means "keep what is stored".
+  const [secretForm, setSecretForm] = useState<Record<string, string>>({});
 
   useEffect(() => {
     const loadChannel = async () => {
       try {
-        const supabase = createClient();
-        const { data, error } = await supabase
-          .from("notification_channels")
-          .select("*")
-          .eq("id", params.id)
-          .single();
+        const response = await fetch(
+          `/api/notifications/channels?id=${encodeURIComponent(params.id)}`,
+        );
+        if (!response.ok) throw new Error("Channel not found");
 
-        if (error) throw error;
+        const body = (await response.json()) as {
+          channel?: NotificationChannel;
+        };
+        if (!body.channel) throw new Error("Channel not found");
 
-        const channelData = data as unknown as NotificationChannel;
-        setChannel(channelData);
+        const loaded = body.channel;
+        setChannel(loaded);
 
-        const config = channelData.config || {};
+        const config = loaded.config || {};
+        const publicValues: Record<string, string> = {};
+        for (const field of publicFields[loaded.type] ?? []) {
+          publicValues[field.key] = config[field.key] ?? "";
+        }
+        setPublicForm(publicValues);
         setFormData({
-          name: channelData.name || "",
-          active: channelData.active ?? true,
-          is_default: channelData.is_default ?? false,
-          bot_token: config.bot_token || "",
-          chat_id: config.chat_id || "",
-          webhook_url: config.webhook_url || config.url || "",
-          user_key: config.user_key || "",
-          api_token: config.api_token || "",
+          name: loaded.name || "",
+          active: loaded.active ?? true,
+          is_default: loaded.is_default ?? false,
         });
         setLoading(false);
       } catch (err) {
@@ -117,39 +162,30 @@ export default function EditNotificationPage(props: {
     try {
       if (!channel) throw new Error("Channel not loaded");
 
-      let config: Record<string, string> = {};
-      switch (channel.type) {
-        case "telegram":
-          config = { bot_token: formData.bot_token, chat_id: formData.chat_id };
-          break;
-        case "discord":
-        case "slack":
-        case "teams":
-          config = { webhook_url: formData.webhook_url };
-          break;
-        case "webhook":
-          config = { url: formData.webhook_url, method: "POST" };
-          break;
-        case "pushover":
-          config = {
-            user_key: formData.user_key,
-            api_token: formData.api_token,
-          };
-          break;
-      }
+      // splitChannelConfig is a belt-and-braces guard: the server splits
+      // again, so a credential can never be persisted in `config`.
+      const { config, secret } = splitChannelConfig(channel.type, {
+        ...publicForm,
+        ...secretForm,
+      } as Record<string, unknown>);
 
-      const supabase = createClient();
-      const { error: updateError } = await supabase
-        .from("notification_channels")
-        .update({
+      const response = await fetch("/api/notifications/channels", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: params.id,
           name: formData.name,
-          config,
           active: formData.active,
           is_default: formData.is_default,
-        } as unknown as never)
-        .eq("id", params.id);
+          config,
+          secret,
+        }),
+      });
 
-      if (updateError) throw updateError;
+      if (!response.ok) {
+        const body = (await response.json()) as { error?: string };
+        throw new Error(body.error || "Failed to update channel");
+      }
 
       setSuccess(true);
       toast.success("Channel updated successfully");
@@ -173,13 +209,15 @@ export default function EditNotificationPage(props: {
     setError(null);
 
     try {
-      const supabase = createClient();
-      const { error: deleteError } = await supabase
-        .from("notification_channels")
-        .delete()
-        .eq("id", params.id);
+      const response = await fetch(
+        `/api/notifications/channels?id=${encodeURIComponent(params.id)}`,
+        { method: "DELETE" },
+      );
 
-      if (deleteError) throw deleteError;
+      if (!response.ok) {
+        const body = (await response.json()) as { error?: string };
+        throw new Error(body.error || "Failed to delete channel");
+      }
 
       toast.success("Channel deleted");
       router.push("/dashboard/notifications");
@@ -300,86 +338,73 @@ export default function EditNotificationPage(props: {
                 />
               </div>
 
-              {channel.type === "telegram" && (
-                <>
-                  <div className="space-y-2">
-                    <Label htmlFor="bot_token">Bot Token</Label>
-                    <Input
-                      id="bot_token"
-                      value={formData.bot_token}
-                      onChange={(e) =>
-                        setFormData({ ...formData, bot_token: e.target.value })
-                      }
-                      placeholder="123456789:ABCdefGHIjklMNOpqrsTUVwxyz"
-                      required
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Get this from @BotFather
-                    </p>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="chat_id">Chat ID</Label>
-                    <Input
-                      id="chat_id"
-                      value={formData.chat_id}
-                      onChange={(e) =>
-                        setFormData({ ...formData, chat_id: e.target.value })
-                      }
-                      placeholder="-1001234567890 or 123456789"
-                      required
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Your user ID or group chat ID
-                    </p>
-                  </div>
-                </>
-              )}
-
-              {(channel.type === "discord" ||
-                channel.type === "slack" ||
-                channel.type === "teams" ||
-                channel.type === "webhook") && (
-                <div className="space-y-2">
-                  <Label htmlFor="webhook_url">Webhook URL</Label>
+              {(publicFields[channel.type] ?? []).map((field) => (
+                <div className="space-y-2" key={field.key}>
+                  <Label htmlFor={field.key}>{field.label}</Label>
                   <Input
-                    id="webhook_url"
-                    type="url"
-                    value={formData.webhook_url}
+                    id={field.key}
+                    value={publicForm[field.key] ?? ""}
                     onChange={(e) =>
-                      setFormData({ ...formData, webhook_url: e.target.value })
+                      setPublicForm({
+                        ...publicForm,
+                        [field.key]: e.target.value,
+                      })
                     }
-                    placeholder="https://..."
+                    placeholder="-1001234567890 or 123456789"
                     required
                   />
+                  {field.hint && (
+                    <p className="text-xs text-muted-foreground">
+                      {field.hint}
+                    </p>
+                  )}
+                </div>
+              ))}
+
+              {channel.has_secret && (
+                <div className="flex items-start gap-3 rounded-lg border border-neutral-800 bg-neutral-900/50 px-4 py-3 text-xs text-muted-foreground">
+                  <ShieldCheck className="h-4 w-4 mt-0.5 flex-shrink-0 text-emerald-500" />
+                  <span>
+                    Credentials are encrypted at rest in Supabase Vault and are
+                    never sent to this page. Leave a field below empty to keep
+                    the stored value.
+                  </span>
                 </div>
               )}
 
-              {channel.type === "pushover" && (
-                <>
-                  <div className="space-y-2">
-                    <Label htmlFor="user_key">User Key</Label>
-                    <Input
-                      id="user_key"
-                      value={formData.user_key}
-                      onChange={(e) =>
-                        setFormData({ ...formData, user_key: e.target.value })
-                      }
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="api_token">API Token</Label>
-                    <Input
-                      id="api_token"
-                      value={formData.api_token}
-                      onChange={(e) =>
-                        setFormData({ ...formData, api_token: e.target.value })
-                      }
-                      required
-                    />
-                  </div>
-                </>
-              )}
+              {(secretFields[channel.type] ?? []).map((field) => (
+                <div className="space-y-2" key={field.key}>
+                  <Label htmlFor={field.key}>{field.label}</Label>
+                  <Input
+                    id={field.key}
+                    type={
+                      field.type ??
+                      (field.key === "webhook_url" ? "url" : "text")
+                    }
+                    autoComplete="off"
+                    value={secretForm[field.key] ?? ""}
+                    onChange={(e) =>
+                      setSecretForm({
+                        ...secretForm,
+                        [field.key]: e.target.value,
+                      })
+                    }
+                    placeholder={
+                      channel.has_secret
+                        ? SECRET_PLACEHOLDER
+                        : field.key === "bot_token"
+                          ? "123456789:ABCdefGHIjklMNOpqrsTUVwxyz"
+                          : "https://..."
+                    }
+                    required={!channel.has_secret}
+                  />
+                  {field.hint && (
+                    <p className="text-xs text-muted-foreground">
+                      {field.hint}
+                    </p>
+                  )}
+                </div>
+              ))}
 
               <div className="flex items-center justify-between pt-4 border-t">
                 <div className="space-y-0.5">

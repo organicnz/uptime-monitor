@@ -7,3 +7,13 @@
 # See .github/workflows/supabase-migrations.yml.
 
 project_id = "uptime-monitor"
+
+# `deno.json` for the edge functions lives in supabase/functions/.
+
+# The dispatch function authenticates with a shared secret from its own
+# secret store, so JWT verification is turned off: the gateway check would
+# reject every caller because these are server-to-server invocations, not
+# user JWTs. The handler does a constant-time compare of
+# x-dispatch-secret against NOTIFICATION_DISPATCH_SECRET instead.
+[functions.notification-dispatch]
+verify_jwt = false

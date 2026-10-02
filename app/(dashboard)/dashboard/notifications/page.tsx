@@ -88,9 +88,11 @@ export default async function NotificationsPage() {
     redirect("/login");
   }
 
+  // Explicit columns, not `select("*"`: the row also carries `secret_id`,
+  // and this is a server component whose props are serialised to the client.
   const { data: channelsData } = await supabase
     .from("notification_channels")
-    .select("*")
+    .select("id, name, type, active, is_default, created_at, updated_at")
     .eq("user_id", user.id)
     .order("created_at", { ascending: false });
 

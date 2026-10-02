@@ -15,14 +15,17 @@ import { Label } from "@/components/ui/label";
 import { ArrowLeft, Mail, Webhook, Loader2 } from "lucide-react";
 import Link from "next/link";
 import {
+  splitChannelConfig,
+  type NotificationType,
+} from "@/lib/notification-types";
+import {
   TelegramIcon,
   DiscordIcon,
   SlackIcon,
   TeamsIcon,
 } from "@/components/icons";
 
-type ChannelType =
-  "telegram" | "discord" | "slack" | "webhook" | "email" | "teams";
+type ChannelType = NotificationType;
 
 const channelTypes: {
   type: ChannelType;
@@ -100,29 +103,43 @@ export default function NewNotificationPage() {
     email: "",
   });
 
+  /**
+   * Everything the form collected, before it is split. The split happens
+   * client-side for a tidy request and again on the server, so a credential
+   * cannot reach the `config` column even if this call is bypassed.
+   */
+  const collectedConfig = (): Record<string, unknown> => {
+    if (selectedType === "telegram") {
+      return { bot_token: formData.bot_token, chat_id: formData.chat_id };
+    }
+    if (
+      selectedType === "teams" ||
+      selectedType === "discord" ||
+      selectedType === "slack"
+    ) {
+      return { webhook_url: formData.webhook_url };
+    }
+    if (selectedType === "webhook") {
+      return { url: formData.webhook_url, method: "POST" };
+    }
+    if (selectedType === "email") {
+      return { email: formData.email };
+    }
+    return {};
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setError(null);
 
     try {
-      let config = {};
-      switch (selectedType) {
-        case "telegram":
-          config = { bot_token: formData.bot_token, chat_id: formData.chat_id };
-          break;
-        case "teams":
-        case "discord":
-        case "slack":
-          config = { webhook_url: formData.webhook_url };
-          break;
-        case "webhook":
-          config = { url: formData.webhook_url, method: "POST" };
-          break;
-        case "email":
-          config = { email: formData.email };
-          break;
-      }
+      if (!selectedType) throw new Error("Select a channel type first");
+
+      const { config, secret } = splitChannelConfig(
+        selectedType,
+        collectedConfig(),
+      );
 
       const response = await fetch("/api/notifications/channels", {
         method: "POST",
@@ -131,6 +148,7 @@ export default function NewNotificationPage() {
           name: formData.name,
           type: selectedType,
           config,
+          secret,
         }),
       });
 
@@ -154,25 +172,15 @@ export default function NewNotificationPage() {
     setError(null);
 
     try {
-      let config = {};
-      switch (selectedType) {
-        case "telegram":
-          config = { bot_token: formData.bot_token, chat_id: formData.chat_id };
-          break;
-        case "teams":
-        case "discord":
-        case "slack":
-          config = { webhook_url: formData.webhook_url };
-          break;
-        case "webhook":
-          config = { url: formData.webhook_url, method: "POST" };
-          break;
-      }
+      if (!selectedType) throw new Error("Select a channel type first");
 
       const response = await fetch("/api/notifications/test", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type: selectedType, config }),
+        body: JSON.stringify({
+          type: selectedType,
+          config: collectedConfig(),
+        }),
       });
 
       const data = await response.json();

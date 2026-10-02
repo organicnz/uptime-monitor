@@ -7,7 +7,13 @@ name: Supabase Migrations
 # - push to main / workflow_dispatch: apply migrations, verify live schema,
 #   then deploy edge functions.
 #
-# Required secrets: SUPABASE_ACCESS_TOKEN, SUPABASE_PROJECT_REF.
+# Required repository secrets: SUPABASE_ACCESS_TOKEN,
+#   NOTIFICATION_DISPATCH_SECRET.
+# Required repository variables: SUPABASE_PROJECT_REF.
+#
+#   SUPABASE_PROJECT_REF is the subdomain of https://<ref>.supabase.co and
+#   is already public via NEXT_PUBLIC_SUPABASE_URL, so it is a variable, not a
+#   secret. Only SUPABASE_ACCESS_TOKEN (a personal access token) is a secret.
 
 on:
   pull_request:
@@ -46,6 +52,29 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+
+      - name: Setup Deno
+        if: hashFiles('supabase/functions/deno.json') != ''
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: "v2.x"
+
+      # The edge runtime has its own type environment, so `tsc` cannot see
+      # Deno.serve / Deno.env / Deno.resolveDns. This also proves that
+      # _shared/senders.ts really is runtime-agnostic: it must type-check
+      # under Deno's lib and the app's DOM lib.
+      - name: Type-check edge functions
+        if: hashFiles('supabase/functions/deno.json') != ''
+        working-directory: supabase/functions
+        run: deno task check
+
+      # Offline tests for the edge egress guard. The address classifier is
+      # covered much more thoroughly (and against the Next.js runtime) by
+      # `bun test`; these cover the transport's pre-network rejections.
+      - name: Test edge functions
+        if: hashFiles('supabase/functions/deno.json') != ''
+        working-directory: supabase/functions
+        run: deno task test
 
       - name: Compile delivery scripts
         run: python3 -m py_compile scripts/supabase-migrate.py scripts/supabase-verify-schema.py
@@ -105,6 +134,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     needs: validate
+    # Environment gate: add required reviewers / a wait timer under
+    # Settings -> Environments -> production. The `if:` below is the
+    # machine-checkable half; this is the human one.
+    environment: production
     # NEVER run on pull_request: PRs must not write to the production database.
     if: >-
       (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
@@ -132,19 +165,20 @@ jobs:
       - name: Apply database migrations (Management API)
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+          SUPABASE_PROJECT_REF: ${{ vars.SUPABASE_PROJECT_REF }}
         run: python3 scripts/supabase-migrate.py
 
       - name: Verify live schema matches expectations
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+          SUPABASE_PROJECT_REF: ${{ vars.SUPABASE_PROJECT_REF }}
         run: python3 scripts/supabase-verify-schema.py
 
   edge-functions:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     needs: [validate, migrate]
+    environment: production
     # Deploy only after migrations land on the main branch, never from a PR.
     if: >-
       (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
@@ -177,7 +211,8 @@ jobs:
       - name: Deploy edge functions (if any)
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+          SUPABASE_PROJECT_REF: ${{ vars.SUPABASE_PROJECT_REF }}
+          NOTIFICATION_DISPATCH_SECRET: ${{ secrets.NOTIFICATION_DISPATCH_SECRET }}
         run: |
           if [ ! -d supabase/functions ] || [ -z "$(ls -A supabase/functions 2>/dev/null)" ]; then
             echo "No supabase/functions sources, skipping deploy."
@@ -187,6 +222,17 @@ jobs:
             echo "Missing Supabase credentials on a main-branch deploy, failing."
             exit 1
           fi
+          # Provision the function's own secret store from a repository
+          # secret before deploying, so the deployed function is never
+          # missing it. `supabase secrets set` is idempotent.
+          if [ -z "$NOTIFICATION_DISPATCH_SECRET" ]; then
+            echo "NOTIFICATION_DISPATCH_SECRET is not set, failing."
+            exit 1
+          fi
+          supabase secrets set \
+            --project-ref "$SUPABASE_PROJECT_REF" \
+            NOTIFICATION_DISPATCH_SECRET="$NOTIFICATION_DISPATCH_SECRET"
+
           # --project-ref keeps this non-interactive: no `supabase link`
           # (which would need a DB password / manual step) required.
           supabase functions deploy --project-ref "$SUPABASE_PROJECT_REF"
