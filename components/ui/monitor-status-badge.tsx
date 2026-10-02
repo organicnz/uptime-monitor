@@ -1,5 +1,11 @@
 import { cn } from "@/lib/utils";
-import { AlertCircle, CheckCircle2, Search } from "lucide-react";
+import {
+  AlertCircle,
+  CheckCircle2,
+  Search,
+  AlertTriangle,
+  Wrench,
+} from "lucide-react";
 
 const statusConfig = {
   0: {
@@ -23,12 +29,28 @@ const statusConfig = {
     bg: "bg-amber-500/10",
     border: "border-amber-500/30",
   },
+  3: {
+    label: "Maintenance",
+    icon: Wrench,
+    color: "text-sky-500",
+    bg: "bg-sky-500/10",
+    border: "border-sky-500/30",
+  },
+  4: {
+    label: "Degraded",
+    icon: AlertTriangle,
+    color: "text-orange-500",
+    bg: "bg-orange-500/10",
+    border: "border-orange-500/30",
+  },
 };
 
 const statusLabels: Record<number, string> = {
   0: "Down",
   1: "Up",
   2: "Pending",
+  3: "Maintenance",
+  4: "Degraded",
 };
 
 export function MonitorStatusBadge({ status }: { status: number }) {

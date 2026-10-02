@@ -1,6 +1,12 @@
 "use client";
 
-import { CheckCircle2, XCircle, AlertCircle } from "lucide-react";
+import {
+  CheckCircle2,
+  XCircle,
+  AlertCircle,
+  AlertTriangle,
+  Wrench,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
@@ -28,6 +34,7 @@ type Monitor = {
   active: boolean;
   status?: "up" | "down" | "pending" | "degraded" | "maintenance";
   ping?: number | null;
+  tags?: string[];
 };
 
 type MonitorCardProps = {
@@ -78,14 +85,14 @@ export function MonitorCard({ monitor }: MonitorCardProps) {
         color: "text-amber-500",
         bgColor: "bg-amber-500/10",
         borderColor: "border-amber-500/30 hover:border-amber-500/50",
-        icon: AlertCircle,
+        icon: AlertTriangle,
         label: "Degraded",
       },
       maintenance: {
         color: "text-sky-400",
         bgColor: "bg-sky-500/10",
         borderColor: "border-sky-500/30 hover:border-sky-500/50",
-        icon: AlertCircle,
+        icon: Wrench,
         label: "Maintenance",
       },
     };
@@ -182,6 +189,20 @@ export function MonitorCard({ monitor }: MonitorCardProps) {
             >
               {monitor.url || monitor.hostname || "No endpoint"}
             </p>
+
+            {/* Tags */}
+            {monitor.tags && monitor.tags.length > 0 && (
+              <div className="flex flex-wrap gap-1 mb-3">
+                {monitor.tags.map((tag) => (
+                  <span
+                    key={tag}
+                    className="px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
+                  >
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            )}
 
             {/* Footer */}
             <div className="flex items-center justify-between text-xs">

@@ -11,6 +11,7 @@ import {
   shouldWarnSslExpiry,
   SSL_DAYS_REMAINING_UNKNOWN,
 } from "@/lib/ssl-utils";
+import { updateMonitorAnalytics } from "@/lib/analytics";
 
 import type { Heartbeat, Monitor } from "@/types/application";
 import {
@@ -53,6 +54,7 @@ type HeartbeatInsert = {
   down_count: number;
   time: string;
   error_type: string | null;
+  checked_by?: string | null;
 };
 
 type PreviousHeartbeat = Pick<Heartbeat, "status" | "down_count">;
@@ -540,9 +542,32 @@ export async function checkMonitor(
  * 6. Only DOWN/UP/PENDING are produced here; DEGRADED (4) is reserved and
  *    never emitted, so it must not be treated as a reachable state
  */
+function getDegradedThresholdMs(monitor: Monitor): number {
+  return Math.max(500, Math.floor(monitor.timeout * 1000 * 0.8));
+}
+
+function applyDegradedStatus(
+  result: CheckResult,
+  monitor: Monitor,
+): CheckResult {
+  if (result.status !== HEARTBEAT_STATUS.UP) return result;
+  if (result.ping === null) return result;
+
+  const threshold = getDegradedThresholdMs(monitor);
+  if (result.ping >= threshold) {
+    return {
+      ...result,
+      status: HEARTBEAT_STATUS.DEGRADED,
+      msg: `${result.msg} (slow: ${result.ping}ms > ${threshold}ms threshold)`,
+    };
+  }
+  return result;
+}
+
 export async function processMonitorCheck(
   monitor: Monitor,
   deadlineAt?: number,
+  options?: { triggeredBy?: string },
 ): Promise<void> {
   const supabase = createServiceClient();
   assertBeforeDeadline(deadlineAt);
@@ -591,7 +616,8 @@ export async function processMonitorCheck(
   const previousStatus = previousHeartbeat?.status ?? null;
 
   // Perform the actual check
-  const result = await checkMonitor(monitor, deadlineAt);
+  const rawResult = await checkMonitor(monitor, deadlineAt);
+  const result = applyDegradedStatus(rawResult, monitor);
   const duration = Date.now() - checkStartTime;
 
   // Calculate new down_count and effective status (Uptime Kuma logic)
@@ -614,6 +640,7 @@ export async function processMonitorCheck(
     down_count: downCount,
     time: checkedAt,
     error_type: classifyErrorType(result.msg, effectiveStatus),
+    ...(options?.triggeredBy && { checked_by: options.triggeredBy }),
   });
 
   const { error: monitorUpdateError } = await supabase
@@ -637,6 +664,8 @@ export async function processMonitorCheck(
       `Failed to update monitor state: ${monitorUpdateError.message}`,
     );
   }
+
+  await updateMonitorAnalytics(monitor);
 
   // SSL Certificate check for HTTPS monitors (runs periodically, not every check)
   if (

@@ -43,13 +43,21 @@ app/                    # Next.js App Router pages
 lib/                   # Utilities and services
 ├── supabase/          # Supabase clients (server, client, service, middleware)
 ├── actions/           # Server actions
+├── env.ts             # Required-env accessors; fail closed
 ├── security.ts        # Security utilities (SSRF protection, secure compare)
+├── notification-types.ts    # Which config fields are credentials
+├── notification-channels.ts # Vault-backed channel CRUD (server only)
 ├── notifications.ts   # Notification dispatchers
 ├── monitor-checker.ts # Monitor check logic
 components/            # Reusable UI components
 ├── ui/                # shadcn/ui components
 types/                 # TypeScript type definitions
 supabase/              # Database schema
+├── schema.sql         # Reference schema
+├── migrations/        # Applied in order, all idempotent
+└── functions/         # Edge Functions
+    ├── _shared/senders.ts  # Shared by the app and the edge runtime
+    └── notification-dispatch/
 ```
 
 ## Key Features
@@ -76,13 +84,17 @@ npm run build:audit                        # Build audit tool
 
 ## Environment Variables
 
-See `.env.local.example` for all required variables:
+`lib/env.ts` is the single source of truth. Read env through it, never
+`process.env.X!` — the assertion suppresses the type error and turns a missing
+value into a throw from inside the SDK. `.env.local.example` is the documented
+list, and `__tests__/lib/vault-secrets.test.ts` fails if the two drift.
 
-- `NEXT_PUBLIC_SUPABASE_URL` - Supabase project URL
-- `NEXT_PUBLIC_SUPABASE_ANON_KEY` - Supabase anon key
-- `SUPABASE_SERVICE_ROLE_KEY` - Service role key (server-side only)
-- `CRON_SECRET` - Secret for cron job authentication
-- `VERCEL_AUTOMATION_BYPASS_SECRET` - Bypass secret for Vercel Authentication (QStash/Tests)
+- `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` - required
+- `SUPABASE_SERVICE_ROLE_KEY` - required, server-side only
+- `CRON_SECRET` - Vercel only; not read by any workflow
+- `VERCEL_AUTOMATION_BYPASS_SECRET` - Vercel Deployment Protection
+- `NOTIFICATION_DISPATCH_SECRET` - shared with the dispatch Edge Function;
+  CI provisions the function's copy via `supabase secrets set`
 
 ## Database
 
@@ -94,7 +106,11 @@ See `.env.local.example` for all required variables:
 ## Security Features
 
 - Row Level Security (RLS) on all tables
-- SSRF protection for monitor URLs
+- Tenant notification credentials in Supabase Vault, reachable only through
+  owner-checked `SECURITY DEFINER` functions; a CHECK constraint keeps them out
+  of `notification_channels.config`
+- `CREATE` on the `public` schema revoked from every role
+- SSRF protection for monitor URLs and outbound webhooks, in both runtimes
 - Rate limiting on auth endpoints
 - Constant-time token comparison
 - Strong password requirements (8+ chars, mixed case, numbers)
@@ -115,6 +131,10 @@ See `.env.local.example` for all required variables:
 - Signups are disabled (private instance)
 - Uses `proxy.ts` for middleware (Next.js 16 pattern)
 - Cron runs via GitHub Actions or QStash
+- `SUPABASE_PROJECT_REF` is a GitHub **Variable**, not a Secret: it is the
+  subdomain of `https://<ref>.supabase.co` and is already public
+- `migrate` and `edge-functions` declare `environment: production`; add
+  required reviewers under Settings -> Environments
 
 ---
 
@@ -257,8 +277,9 @@ Schema supports (not implemented): `docker`, `steam`
 result becomes a stored status. Change behaviour there, not in the checker.
 
 - `HEARTBEAT_STATUS` — 0 DOWN, 1 UP, 2 PENDING, 3 MAINTENANCE, 4 DEGRADED.
-  Only DOWN/UP/PENDING are ever emitted; DEGRADED is reserved, so treat it as
-  unreachable rather than a state to branch on.
+  `lib/monitor-checker.ts` emits DEGRADED when a check succeeds but exceeds
+  `getDegradedThresholdMs` (80% of the monitor's timeout), so it is a live
+  state, not a reserved one.
 - `determineEffectiveStatus` — applies the retry window. It holds the previous
   state only while that state represents health; MAINTENANCE and DEGRADED fall
   back to PENDING so a monitor that starts failing during a maintenance window
@@ -277,3 +298,22 @@ Columns declared in `supabase/schema.sql` but not yet populated are marked
 ### Notification Channel Types
 
 `telegram`, `discord`, `slack`, `teams`, `pushover`, `webhook`, `email` (planned)
+
+### Notification Credentials (Vault)
+
+Channels are written server-side through `lib/notification-channels.ts`; the
+browser never talks to `notification_channels` directly.
+
+- `splitChannelConfig(type, config)` in `lib/notification-types.ts` decides what
+  is a credential. `SENSITIVE_CONFIG_KEYS` must stay in lockstep with the
+  backfill and the CHECK constraint in
+  `supabase/migrations/20260927094500_add_vault_notification_secrets.sql`.
+- The server splits again on write, so a client that puts a credential in
+  `config` still cannot get it stored there.
+- Reads go through the `notification_channel_secret` /
+  `notification_channel_secrets` RPCs. An update's `secret` is **partial**:
+  an omitted key keeps the stored credential.
+- `resolveChannelConfigs()` batches a fan-out into one vault read.
+- `supabase/functions/_shared/senders.ts` must stay runtime-agnostic: no
+  `node:*` imports, no `Deno.*`, no `process.env`. Each caller injects its own
+  `NotificationTransport`, which is where its egress policy lives.

@@ -81,24 +81,26 @@ export function useRealtimeMonitors(monitorIds: string[]) {
     const ids = idsKey.split(",");
 
     const init = async () => {
-      // Fetch initial statuses
-      const { data } = await supabase
-        .from("heartbeats")
-        .select("*")
-        .in("monitor_id", ids)
-        .order("time", { ascending: false });
+      // Fetch latest heartbeat per monitor with bounded per-monitor queries.
+      // The previous single `select("*")` with no limit pulled the entire
+      // heartbeat history on every dashboard load and burned Disk IO.
+      const HEARTBEAT_COLS = "id,monitor_id,status,ping,msg,time";
+      const latestResults = await Promise.all(
+        ids.map((id) =>
+          supabase
+            .from("heartbeats")
+            .select(HEARTBEAT_COLS)
+            .eq("monitor_id", id)
+            .order("time", { ascending: false })
+            .limit(1)
+            .maybeSingle(),
+        ),
+      );
 
       if (cancelled) return;
 
-      if (data) {
-        const latestByMonitor = new Map<string, Heartbeat>();
-        (data as Heartbeat[]).forEach((hb: Heartbeat) => {
-          if (!latestByMonitor.has(hb.monitor_id)) {
-            latestByMonitor.set(hb.monitor_id, hb);
-          }
-        });
-
-        latestByMonitor.forEach((hb) => updateStatus(hb));
+      for (const { data } of latestResults) {
+        if (data) updateStatus(data as Heartbeat);
       }
 
       if (cancelled) return;
@@ -185,10 +187,10 @@ export function useRealtimeMonitor(monitorId: string) {
     };
 
     const init = async () => {
-      // Fetch initial heartbeats
+      // Fetch initial heartbeats (bounded, indexed latest-first read)
       const { data } = await supabase
         .from("heartbeats")
-        .select("*")
+        .select("id,monitor_id,status,ping,msg,time")
         .eq("monitor_id", monitorId)
         .order("time", { ascending: false })
         .limit(100);
