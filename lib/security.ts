@@ -34,21 +34,26 @@ export function sanitizeHtml(input: string): string {
 
 import * as dns from "dns/promises";
 import ipaddr from "ipaddr.js";
+import { BLOCKED_HOSTNAME_SUFFIXES } from "../supabase/functions/_shared/egress-policy";
 
-const BLOCKED_HOSTNAME_SUFFIXES = [
-  ".local",
-  ".internal",
-  ".lan",
-  ".home.arpa",
-  "metadata.google.internal",
-];
+/**
+ * Hostnames that are never a legitimate destination. One list, shared with the
+ * Supabase Edge runtime via _shared/egress-policy.ts, so the two runtimes
+ * cannot drift apart.
+ */
+export const blockedHostnameSuffixes: readonly string[] =
+  BLOCKED_HOSTNAME_SUFFIXES;
 
 /**
  * Validates whether an IP address is safe to connect to.
  * Blocks private, loopback, link-local, multicast, and unspecified IPs.
  * Automatically unwraps IPv4-mapped IPv6 addresses.
+ *
+ * Exported for `__tests__/lib/egress-policy.test.ts`, which uses it as the
+ * oracle proving the edge runtime's hand-rolled classifier is never weaker
+ * than `ipaddr.js`.
  */
-function isSafeIp(ipString: string): boolean {
+export function isSafeIp(ipString: string): boolean {
   try {
     let addr = ipaddr.parse(ipString);
 

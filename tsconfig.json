@@ -31,5 +31,10 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts"
   ],
-  "exclude": ["node_modules"]
+  "exclude": [
+    "node_modules",
+    "supabase/functions/notification-dispatch",
+    "supabase/functions/_shared/egress.ts",
+    "supabase/functions/_shared/egress_test.ts"
+  ]
 }
