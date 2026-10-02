@@ -101,16 +101,15 @@ CREATE TABLE IF NOT EXISTS monitors (
   last_status_change_at TIMESTAMPTZ, -- Time of last status change
   
   -- Advanced: AI/Analytics fields
-  -- NOTE: only consecutive_uptime is currently written (see
-  -- nextConsecutiveUptime in lib/monitor-status.ts). avg_response_time_ms and
-  -- success_rate_percent are reserved for a rolling-stats pass and are NOT
-  -- populated yet - do not read them as live data.
-  avg_response_time_ms INTEGER DEFAULT 0, -- RESERVED: not yet populated
-  success_rate_percent INTEGER DEFAULT 100, -- RESERVED: not yet populated
+  -- avg_response_time_ms and success_rate_percent are populated by
+  -- lib/analytics.ts after each check (rolling 24h window).
+  avg_response_time_ms INTEGER DEFAULT 0,
+  success_rate_percent INTEGER DEFAULT 100,
   consecutive_uptime INTEGER DEFAULT 0, -- Consecutive UP checks; suspended during maintenance
   
   -- Meta
   description TEXT,
+  tags TEXT[] DEFAULT '{}', -- User-defined tags for organization and filtering
   parent_id UUID REFERENCES monitors(id), -- RESERVED: grouped monitors not implemented
   
   -- SSL Info
@@ -147,25 +146,49 @@ CREATE TABLE IF NOT EXISTS heartbeats (
   created_at TIMESTAMPTZ DEFAULT NOW(),
   
   -- Enhanced analytics fields
-  -- NOTE: only error_type is currently written (see classifyErrorType in
-  -- lib/monitor-status.ts). The rest are reserved - do not read as live data.
   rtt_ms INTEGER, -- RESERVED: duplicates ping, not populated
   ssl_valid BOOLEAN DEFAULT false, -- RESERVED: not populated (SSL results land on monitors.ssl_expiry)
   error_type TEXT, -- Machine-readable failure category; NULL when the check passed
   ip_resolved INET, -- RESERVED: not populated
   status_reason TEXT, -- RESERVED: duplicates msg, not populated
-  
+
   -- Audit fields
-  checked_by UUID REFERENCES auth.users(id) -- RESERVED: manual checks not implemented
+  checked_by UUID REFERENCES auth.users(id) -- Set when a manual check is triggered
 );
 
 -- Indexes for heartbeat performance and querying
-CREATE INDEX IF NOT EXISTS idx_heartbeats_monitor_id ON heartbeats(monitor_id);
+-- NOTE: idx_heartbeats_monitor_id was dropped (redundant prefix of
+-- idx_heartbeats_monitor_time) and idx_heartbeats_ssl_valid was dropped
+-- (ssl_valid is RESERVED, always false). Each extra index is paid on every
+-- heartbeat insert, which is what depleted the Disk IO budget.
 CREATE INDEX IF NOT EXISTS idx_heartbeats_time ON heartbeats(time DESC);
 CREATE INDEX IF NOT EXISTS idx_heartbeats_status ON heartbeats(status);
 CREATE INDEX IF NOT EXISTS idx_heartbeats_monitor_time ON heartbeats(monitor_id, time DESC);
 CREATE INDEX IF NOT EXISTS idx_heartbeats_error_type ON heartbeats(error_type);
-CREATE INDEX IF NOT EXISTS idx_heartbeats_ssl_valid ON heartbeats(ssl_valid);
+
+-- ============================================================
+-- HEARTBEAT_DAILY TABLE - Per-monitor per-day rollups for retention
+-- ============================================================
+-- Raw heartbeats are retained for 7 days (see retention_rollup_and_cleanup
+-- in supabase/migrations/20261002000000_heartbeat_retention_and_rollups.sql).
+-- This table keeps 30/90d reports working after raw rows are trimmed:
+-- one row per monitor per UTC day, recomputed from heartbeats before delete.
+CREATE TABLE IF NOT EXISTS heartbeat_daily (
+  monitor_id UUID NOT NULL REFERENCES monitors(id) ON DELETE CASCADE,
+  day DATE NOT NULL,
+  total_checks INTEGER NOT NULL DEFAULT 0,
+  up_checks INTEGER NOT NULL DEFAULT 0,
+  down_checks INTEGER NOT NULL DEFAULT 0,
+  degraded_checks INTEGER NOT NULL DEFAULT 0,
+  pending_checks INTEGER NOT NULL DEFAULT 0,
+  maintenance_checks INTEGER NOT NULL DEFAULT 0,
+  avg_ping INTEGER,
+  min_ping INTEGER,
+  max_ping INTEGER,
+  PRIMARY KEY (monitor_id, day)
+);
+
+CREATE INDEX IF NOT EXISTS idx_heartbeat_daily_monitor_day ON heartbeat_daily(monitor_id, day DESC);
 
 CREATE TABLE IF NOT EXISTS cron_failures (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -212,7 +235,12 @@ CREATE TABLE IF NOT EXISTS notification_channels (
   user_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
   type TEXT NOT NULL CHECK (type IN ('email', 'discord', 'slack', 'webhook', 'telegram', 'teams', 'pushover')),
+  -- Non-sensitive settings only (e.g. a Telegram chat_id). Credentials live in
+  -- Supabase Vault and are reachable only through the
+  -- notification_channel_secret(s) functions; the
+  -- notification_channels_config_has_no_secrets constraint enforces it.
   config JSONB NOT NULL,
+  secret_id UUID, -- vault.secrets row holding this channel's credentials
   is_default BOOLEAN DEFAULT false, -- Send for all new monitors?
   active BOOLEAN DEFAULT true,
   created_at TIMESTAMPTZ DEFAULT NOW(),
@@ -409,6 +437,7 @@ ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE monitor_groups ENABLE ROW LEVEL SECURITY;
 ALTER TABLE monitors ENABLE ROW LEVEL SECURITY;
 ALTER TABLE heartbeats ENABLE ROW LEVEL SECURITY;
+ALTER TABLE heartbeat_daily ENABLE ROW LEVEL SECURITY;
 ALTER TABLE cron_failures ENABLE ROW LEVEL SECURITY;
 ALTER TABLE incidents ENABLE ROW LEVEL SECURITY;
 ALTER TABLE notification_channels ENABLE ROW LEVEL SECURITY;
@@ -531,6 +560,11 @@ CREATE POLICY "Users can delete own monitors" ON monitors FOR DELETE USING (auth
 -- Heartbeats (View own, System inserts via service role)
 CREATE POLICY "Users view own monitor heartbeats" ON heartbeats FOR SELECT USING (
   EXISTS (SELECT 1 FROM monitors WHERE monitors.id = heartbeats.monitor_id AND monitors.user_id = auth.uid())
+);
+
+-- Heartbeat daily rollups (owner-only; service_role bypasses for cleanup)
+CREATE POLICY "Users can view own daily rollups" ON heartbeat_daily FOR SELECT USING (
+  EXISTS (SELECT 1 FROM monitors WHERE monitors.id = heartbeat_daily.monitor_id AND monitors.user_id = auth.uid())
 );
 
 -- Notification Channels

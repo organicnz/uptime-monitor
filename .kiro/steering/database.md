@@ -167,6 +167,23 @@ END;
 
 ---
 
+## Notification Credentials (Vault)
+
+`notification_channels.config` holds non-sensitive settings only. Credentials
+live in `vault.secrets`, referenced by `notification_channels.secret_id`, and
+are reachable only through these owner-checked `SECURITY DEFINER` functions:
+
+- `notification_channel_secret(channel_id)` / `notification_channel_secrets(ids)`
+- `notification_channel_set_secret(channel_id, partial_jsonb)`
+- `notification_channel_clear_secret(channel_id)`
+- `notification_channel_secret_id(channel_id)` - the owner gate; not callable by
+  `anon` or `authenticated`
+
+`anon` and `authenticated` have no direct grants on `vault.secrets` or
+`vault.decrypted_secrets`. `notification_channels_config_has_no_secrets`
+refuses a credential in `config`. Keep `SENSITIVE_CONFIG_KEYS` in
+`lib/notification-types.ts` in lockstep with the backfill and the constraint.
+
 ## Edge Functions
 
 **Status:** No edge functions deployed.
@@ -181,14 +198,14 @@ END;
 
 ## Installed Extensions
 
-| Extension            | Schema     | Description             |
-| -------------------- | ---------- | ----------------------- |
-| `uuid-ossp`          | extensions | UUID generation         |
-| `pgcrypto`           | extensions | Cryptographic functions |
-| `pg_graphql`         | graphql    | GraphQL support         |
-| `pg_stat_statements` | extensions | Query statistics        |
-| `supabase_vault`     | vault      | Secrets management      |
-| `plpgsql`            | pg_catalog | PL/pgSQL language       |
+| Extension            | Schema     | Description                                                                        |
+| -------------------- | ---------- | ---------------------------------------------------------------------------------- |
+| `uuid-ossp`          | extensions | UUID generation                                                                    |
+| `pgcrypto`           | extensions | Cryptographic functions                                                            |
+| `pg_graphql`         | graphql    | GraphQL support                                                                    |
+| `pg_stat_statements` | extensions | Query statistics                                                                   |
+| `supabase_vault`     | vault      | Secrets management; created by `20260927094500_add_vault_notification_secrets.sql` |
+| `plpgsql`            | pg_catalog | PL/pgSQL language                                                                  |
 
 ---
 
@@ -198,15 +215,10 @@ END;
 
 #### Tables Missing RLS Policies
 
-| Table                  | Issue                             |
-| ---------------------- | --------------------------------- |
-| `incidents`            | RLS enabled but no policies exist |
-| `maintenance`          | RLS enabled but no policies exist |
-| `maintenance_monitors` | RLS enabled but no policies exist |
-| `status_pages`         | RLS enabled but no policies exist |
-| `status_page_monitors` | RLS enabled but no policies exist |
-
-**Fix:** Add RLS policies for these tables to prevent unauthorized access.
+None. The snapshot below predates `20260821_add_incidents_rls_policies.sql`;
+`supabase/schema.sql` now defines owner-scoped SELECT/INSERT/UPDATE/DELETE
+policies for all five tables. Re-check with the advisor before trusting this
+file again.
 
 #### Functions with Mutable Search Path
 

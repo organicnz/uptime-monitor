@@ -38,6 +38,12 @@ EXPECTED: dict[str, list[str]] = {
         "status_reason",
         "checked_by",
     ],
+    "notification_channels": [
+        "id",
+        "type",
+        "config",
+        "secret_id",
+    ],
     "incidents": ["severity", "source", "resolved_by", "acknowledgment_at"],
     "cron_failures": [
         "message_id",

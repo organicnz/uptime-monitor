@@ -242,6 +242,48 @@ export interface Database {
         };
         Relationships: any[];
       };
+      heartbeat_daily: {
+        Row: {
+          monitor_id: string;
+          day: string;
+          total_checks: number;
+          up_checks: number;
+          down_checks: number;
+          degraded_checks: number;
+          pending_checks: number;
+          maintenance_checks: number;
+          avg_ping: number | null;
+          min_ping: number | null;
+          max_ping: number | null;
+        };
+        Insert: {
+          monitor_id: string;
+          day: string;
+          total_checks?: number;
+          up_checks?: number;
+          down_checks?: number;
+          degraded_checks?: number;
+          pending_checks?: number;
+          maintenance_checks?: number;
+          avg_ping?: number | null;
+          min_ping?: number | null;
+          max_ping?: number | null;
+        };
+        Update: {
+          monitor_id?: string;
+          day?: string;
+          total_checks?: number;
+          up_checks?: number;
+          down_checks?: number;
+          degraded_checks?: number;
+          pending_checks?: number;
+          maintenance_checks?: number;
+          avg_ping?: number | null;
+          min_ping?: number | null;
+          max_ping?: number | null;
+        };
+        Relationships: any[];
+      };
       cron_failures: {
         Row: {
           id: string;
@@ -331,6 +373,7 @@ export interface Database {
           type: NotificationChannelType;
           name: string;
           config: Json;
+          secret_id: string | null;
           is_default: boolean;
           active: boolean;
           created_at: string;
@@ -342,6 +385,7 @@ export interface Database {
           type: NotificationChannelType;
           name: string;
           config: Json;
+          secret_id?: string | null;
           is_default?: boolean;
           active?: boolean;
           created_at?: string;
@@ -353,6 +397,7 @@ export interface Database {
           type?: NotificationChannelType;
           name?: string;
           config?: Json;
+          secret_id?: string | null;
           is_default?: boolean;
           active?: boolean;
           created_at?: string;
@@ -564,14 +609,81 @@ export interface Database {
           },
         ];
       };
+      audit_log: {
+        Row: {
+          id: string;
+          user_id: string;
+          action: string;
+          entity_type: string;
+          entity_id: string;
+          metadata: Json;
+          ip_address: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          action: string;
+          entity_type: string;
+          entity_id: string;
+          metadata?: Json;
+          ip_address?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          action?: string;
+          entity_type?: string;
+          entity_id?: string;
+          metadata?: Json;
+          ip_address?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "audit_log_user_id_fkey";
+            columns: ["user_id"];
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
     };
     Views: {
       [_ in never]: never;
     };
     Functions: {
+      retention_rollup_and_cleanup: {
+        Args: {
+          p_retention_days?: number;
+          p_batch_size?: number;
+          p_max_batches?: number;
+        };
+        Returns: Array<{
+          rolled_up_days: number;
+          deleted_rows: number;
+        }>;
+      };
       mfa_mutation_allowed: {
         Args: Record<string, never>;
         Returns: boolean;
+      };
+      notification_channel_secret: {
+        Args: { p_channel_id: string };
+        Returns: Json | null;
+      };
+      notification_channel_secrets: {
+        Args: { p_channel_ids: string[] };
+        Returns: Array<{ out_channel_id: string; out_secret: Json }>;
+      };
+      notification_channel_set_secret: {
+        Args: { p_channel_id: string; p_secret: Json };
+        Returns: string | null;
+      };
+      notification_channel_clear_secret: {
+        Args: { p_channel_id: string };
+        Returns: undefined;
       };
       create_status_page_with_monitors: {
         Args: {
