@@ -133,25 +133,25 @@ enum Commands {
 }
 
 const SECRET_PATTERNS: &[&str] = &[
-    r#"api[_-]?key\s*[:=]\s*['"][a-zA-Z0-9]"#,
-    r#"api[_-]?secret\s*[:=]\s*['"][a-zA-Z0-9]"#,
-    r#"access[_-]?token\s*[:=]\s*['"][a-zA-Z0-9]"#,
-    r#"auth[_-]?token\s*[:=]\s*['"][a-zA-Z0-9]"#,
+    r#"(?i)api[_-]?key\w*\s*[:=]\s*['"][a-zA-Z0-9]"#,
+    r#"(?i)api[_-]?secret\w*\s*[:=]\s*['"][a-zA-Z0-9]"#,
+    r#"(?i)access[_-]?token\w*\s*[:=]\s*['"][a-zA-Z0-9]"#,
+    r#"(?i)auth[_-]?token\w*\s*[:=]\s*['"][a-zA-Z0-9]"#,
     r"bearer\s+[a-zA-Z0-9_-]{20,}",
     r"AKIA[0-9A-Z]{16}",
-    r"aws[_-]?secret",
+    r#"(?i)aws[_-]?secret\w*\s*[:=]\s*['"][^'"]{8,}"#,
     r"sbp_[a-zA-Z0-9]{30,}",
     r"sb_secret_[a-zA-Z0-9_-]{20,}",
     r"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9\.",
     r#"QSTASH_TOKEN\s*[:=]\s*['"]eyJ"#,
     r"sig_[a-zA-Z0-9]{20,}",
     r"-----BEGIN (RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----",
-    r"-----BEGIN PGP PRIVATE KEY BLOCK-----",
-    r#"password\s*[:=]\s*['"][^'"]{8,}"#,
-    r"postgres://[^:]+:[^@]+@",
-    r"mysql://[^:]+:[^@]+@",
-    r"mongodb://[^:]+:[^@]+@",
-    r#"secret[_-]?key\s*[:=]\s*['"][a-zA-Z0-9]"#,
+    r"-----BEGIN PGP PRIVATE KEY BLOCK-----", // audit-ignore
+    r#"(?i)password\w*\s*[:=]\s*['"][^'"]{8,}"#,
+    r"postgres://[^:]+:[^@]+@", // audit-ignore
+    r"mysql://[^:]+:[^@]+@", // audit-ignore
+    r"mongodb://[^:]+:[^@]+@", // audit-ignore
+    r#"(?i)secret[_-]?key\w*\s*[:=]\s*['"][a-zA-Z0-9]"#,
 ];
 
 const SKIP_PATTERNS: &[&str] = &[".example", ".sample", ".md", ".lock"];
@@ -426,25 +426,25 @@ fn check_ssrf(urls: Vec<String>, config: &Config) -> Result<CheckResult> {
 
     // SSRF secret patterns (also used in secrets check)
     const SECRET_PATTERNS: &[&str] = &[
-        r#"api[_-]?key\s*[:=]\s*['"][a-zA-Z0-9]"#,
-        r#"api[_-]?secret\s*[:=]\s*['"][a-zA-Z0-9]"#,
-        r#"access[_-]?token\s*[:=]\s*['"][a-zA-Z0-9]"#,
-        r#"auth[_-]?token\s*[:=]\s*['"][a-zA-Z0-9]"#,
+        r#"(?i)api[_-]?key\w*\s*[:=]\s*['"][a-zA-Z0-9]"#,
+        r#"(?i)api[_-]?secret\w*\s*[:=]\s*['"][a-zA-Z0-9]"#,
+        r#"(?i)access[_-]?token\w*\s*[:=]\s*['"][a-zA-Z0-9]"#,
+        r#"(?i)auth[_-]?token\w*\s*[:=]\s*['"][a-zA-Z0-9]"#,
         r"bearer\s+[a-zA-Z0-9_-]{20,}",
         r"AKIA[0-9A-Z]{16}",
-        r"aws[_-]?secret",
+        r#"(?i)aws[_-]?secret\w*\s*[:=]\s*['"][^'"]{8,}"#,
         r"sbp_[a-zA-Z0-9]{30,}",
         r"sb_secret_[a-zA-Z0-9_-]{20,}",
         r"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9\.",
         r#"QSTASH_TOKEN\s*[:=]\s*['"]eyJ"#,
         r"sig_[a-zA-Z0-9]{20,}",
         r"-----BEGIN (RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----",
-        r"-----BEGIN PGP PRIVATE KEY BLOCK-----",
-        r#"password\s*[:=]\s*['"][^'"]{8,}"#,
-        r"postgres://[^:]+:[^@]+@",
-        r"mysql://[^:]+:[^@]+@",
-        r"mongodb://[^:]+:[^@]+@",
-        r#"secret[_-]?key\s*[:=]\s*['"][a-zA-Z0-9]"#,
+        r"-----BEGIN PGP PRIVATE KEY BLOCK-----", // audit-ignore // audit-ignore
+        r#"(?i)password\w*\s*[:=]\s*['"][^'"]{8,}"#,
+        r"postgres://[^:]+:[^@]+@", // audit-ignore // audit-ignore
+        r"mysql://[^:]+:[^@]+@", // audit-ignore // audit-ignore
+        r"mongodb://[^:]+:[^@]+@", // audit-ignore // audit-ignore
+        r#"(?i)secret[_-]?key\w*\s*[:=]\s*['"][a-zA-Z0-9]"#,
     ];
 
     // IP safety check

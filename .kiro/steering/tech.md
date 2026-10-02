@@ -39,12 +39,21 @@ tools/audit/target/release/audit --help  # Show help
 
 ## Environment Variables
 
+`lib/env.ts` is the single source of truth. Read env through it, never
+`process.env.X!`. `.env.local.example` is the documented list; a test fails if
+the two drift.
+
 Required in `.env.local` or Vercel:
 
 - `NEXT_PUBLIC_SUPABASE_URL` - Supabase project URL
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY` - Supabase anonymous key
+- `SUPABASE_SERVICE_ROLE_KEY` - Service role key, server-side only
+- `NEXT_PUBLIC_SITE_URL` - Public URL of the deployment
 - `CRON_SECRET` - Secret for authenticating cron job requests
-- `VERCEL_AUTOMATION_BYPASS_SECRET` - Secret for bypassing Vercel Authentication
+- `VERCEL_AUTOMATION_BYPASS_SECRET` - Secret for bypassing Vercel Deployment Protection
+- `QSTASH_TOKEN`, `QSTASH_CURRENT_SIGNING_KEY`, `QSTASH_NEXT_SIGNING_KEY` -
+  required together if QStash is used; the cron route fails closed without them
+- `NOTIFICATION_DISPATCH_SECRET` - shared with the dispatch Edge Function
 
 ## Database
 

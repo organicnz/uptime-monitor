@@ -55,7 +55,7 @@ pre-commit:
     # Check for secrets/credentials
     secrets-check:
       priority: 3
-      glob: "*.{ts,tsx,js,jsx,json,env*}"
+      glob: "*.{ts,tsx,js,jsx,json,yml,yaml,toml,sql,env*}"
       run: tools/audit/target/release/audit secrets-check {staged_files}
       fail_text: "❌ Potential secrets detected. Never commit credentials!"
 

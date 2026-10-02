@@ -191,18 +191,26 @@ npm run build:audit
 
 See `.env.local.example` for all required variables:
 
-| Variable                          | Description                        | Required |
-| --------------------------------- | ---------------------------------- | -------- |
-| `NEXT_PUBLIC_SUPABASE_URL`        | Supabase project URL               | Yes      |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY`   | Supabase anonymous key             | Yes      |
-| `SUPABASE_SERVICE_ROLE_KEY`       | Supabase service role key          | Yes      |
-| `NEXT_PUBLIC_SITE_URL`            | Public URL of deployment           | Yes      |
-| `CRON_SECRET`                     | Secret for cron job authentication | Yes      |
-| `QSTASH_TOKEN`                    | QStash API token                   | Yes      |
-| `QSTASH_CURRENT_SIGNING_KEY`      | QStash signing key                 | Yes      |
-| `QSTASH_NEXT_SIGNING_KEY`         | QStash next signing key            | Yes      |
-| `VERCEL_AUTOMATION_BYPASS_SECRET` | Bypass secret for Vercel Auth      | No       |
-| `NEXT_PUBLIC_SENTRY_DSN`          | Sentry DSN for error tracking      | Yes      |
+| Variable                          | Description                                  | Required          |
+| --------------------------------- | -------------------------------------------- | ----------------- |
+| `NEXT_PUBLIC_SUPABASE_URL`        | Supabase project URL                         | Yes               |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY`   | Supabase anonymous key                       | Yes               |
+| `SUPABASE_SERVICE_ROLE_KEY`       | Supabase service role key                    | Yes               |
+| `NEXT_PUBLIC_SITE_URL`            | Public URL of deployment                     | Yes               |
+| `CRON_SECRET`                     | Secret for cron job authentication           | Yes               |
+| `QSTASH_TOKEN`                    | QStash API token                             | If QStash is used |
+| `QSTASH_CURRENT_SIGNING_KEY`      | QStash signing key                           | If QStash is used |
+| `QSTASH_NEXT_SIGNING_KEY`         | QStash next signing key                      | If QStash is used |
+| `VERCEL_AUTOMATION_BYPASS_SECRET` | Bypass secret for Vercel Auth                | No                |
+| `NOTIFICATION_DISPATCH_SECRET`    | Shared secret for the dispatch Edge Function | No                |
+| `ADMIN_USER_IDS`                  | Users allowed to change the schedule         | No                |
+| `NEXT_PUBLIC_SENTRY_DSN`          | Sentry DSN for error tracking                | Yes               |
+
+`lib/env.ts` is the single source of truth: it is the only place that reads
+these, and it fails with the variable name instead of the `process.env.X!`
+non-null assertion that used to turn a missing value into a throw from inside
+the Supabase SDK. `__tests__/lib/vault-secrets.test.ts` fails if this table and
+`.env.local.example` drift apart.
 
 ### Secret Management
 
@@ -212,35 +220,83 @@ Secrets are **never** committed. `.env.local` is gitignored; only
 
 **Where secrets live**
 
-| Scope          | Mechanism                                        | Used for                                                                                 |
-| -------------- | ------------------------------------------------ | ---------------------------------------------------------------------------------------- |
-| CI/CD          | GitHub Actions repository/org **Secrets**        | `SUPABASE_ACCESS_TOKEN`, `SUPABASE_SERVICE_ROLE_KEY`, `CRON_SECRET`, `SENTRY_AUTH_TOKEN` |
-| Local dev      | `.env.local` (gitignored)                        | Same variables for `next dev`, tests, and `audit local-cron`                             |
-| Migrations     | `SUPABASE_ACCESS_TOKEN` secret + `--project-ref` | `supabase db push` in `supabase-migrations.yml`; never hardcoded in `config.toml`        |
-| Runtime (prod) | Vercel project environment variables             | Same set, injected at build/runtime                                                      |
+| Scope           | Mechanism                                         | Used for                                                                      |
+| --------------- | ------------------------------------------------- | ----------------------------------------------------------------------------- |
+| CI/CD           | GitHub Actions repository **Secrets**             | `SUPABASE_ACCESS_TOKEN`, `SENTRY_AUTH_TOKEN`, `NOTIFICATION_DISPATCH_SECRET`  |
+| CI/CD           | GitHub Actions repository **Variables**           | `SUPABASE_PROJECT_REF`                                                        |
+| Local dev       | `.env.local` (gitignored)                         | Same variables for `next dev`, tests, and `audit local-cron`                  |
+| Migrations      | `SUPABASE_ACCESS_TOKEN` + `--project-ref`         | `scripts/supabase-migrate.py` over the Management API; never in `config.toml` |
+| Runtime (prod)  | Vercel project environment                        | `SUPABASE_SERVICE_ROLE_KEY`, `CRON_SECRET`, `QSTASH_*`, Sentry                |
+| Edge Function   | `supabase secrets set` (the function's own store) | `NOTIFICATION_DISPATCH_SECRET`                                                |
+| **Tenant data** | **Supabase Vault** (`vault.secrets`)              | Per-tenant notification credentials, one row per channel                      |
 
-**Why there is no Supabase Vault or Edge Functions secret store**
+Non-secret configuration belongs in GitHub **Variables**, not Secrets.
+`SUPABASE_PROJECT_REF` is the subdomain of `https://<ref>.supabase.co` and is
+already public through `NEXT_PUBLIC_SUPABASE_URL`, so it is a variable.
 
-This app has no `supabase/functions/` directory, so there is no Edge Function
-whose secrets need co-locating. Access control is enforced in the **database**
-via RLS on all tables, which is strictly stronger than relying on a
-function-held secret: a leaked service key still cannot read another tenant's
-rows through the anon/authenticated roles. Vault would only add value if we
-needed secret _rotation without a redeploy_, which this workload does not.
+`SUPABASE_SERVICE_ROLE_KEY` and `CRON_SECRET` are Vercel-only. They used to be
+listed as required CI secrets, which led to two secrets being set in GitHub that
+nothing read.
 
-Adopt Vault/Edge Functions when — and only when — one of these becomes true:
+### Supabase Vault: tenant notification credentials
 
-- secrets must rotate without a deploy or app restart, or
-- privileged logic must run close to the database (e.g. outbound webhooks that
-  must not traverse the Next.js runtime), or
-- a non-Human actor (Edge Function) needs its own scoped credential.
+`notification_channels.config` used to hold every credential a channel needs —
+Telegram bot tokens, Discord/Slack/Teams webhook URLs, Pushover tokens, SMTP
+passwords. The dashboard read that column straight from the browser, so any XSS,
+malicious extension, or devtools session on the edit page recovered all of it in
+cleartext.
+
+Credentials now live in `vault.secrets`:
+
+- `notification_channels.secret_id` points at the vault row. `config` holds only
+  non-sensitive settings (a Telegram `chat_id`, a webhook `method`).
+- The vault is reachable **only** through owner-checked `SECURITY DEFINER`
+  functions: `notification_channel_secret`, `notification_channel_secrets`,
+  `notification_channel_set_secret`, `notification_channel_clear_secret`. Direct
+  grants on `vault.secrets` and `vault.decrypted_secrets` are revoked from
+  `anon` and `authenticated`.
+- The `notification_channels_config_has_no_secrets` CHECK constraint refuses a
+  credential written into `config`, so the split cannot silently regress.
+- The edit form never receives a credential. It shows a "stored" state and
+  treats an empty field as "keep what is stored"; rotation is a partial write.
+- Deleting a channel deletes its vault row, via a `BEFORE DELETE` trigger.
+
+RLS already gave strict tenant isolation — Vault adds what RLS cannot: the
+credential is not readable by the browser at all, and a tenant can rotate a
+token without a redeploy.
+
+### Edge Functions
+
+`supabase/functions/notification-dispatch` sends a notification for a saved
+channel without the credential entering the Next.js runtime. It authenticates
+with `NOTIFICATION_DISPATCH_SECRET` from its own secret store, then reads the
+credential from Vault.
+
+`_shared/senders.ts` holds the message formats and is imported by **both** the
+app and the function, so the two paths cannot drift. Each side injects its own
+egress policy: the app uses `lib/security.ts` (`node:dns`), the function uses
+`_shared/egress.ts` (`Deno.resolveDns`). The shared module may not import
+`node:*` or use `Deno.*`; a test enforces that, and `deno task check` runs in
+the PR-only `validate` job.
+
+Delivery of downtime alerts still runs in the Next.js runtime. Moving it behind
+the function is a follow-up, gated on measuring the function's latency and
+reliability rather than assuming them.
 
 **Required GitHub repository secrets**
 
-`SUPABASE_ACCESS_TOKEN`, `SUPABASE_SERVICE_ROLE_KEY`, `CRON_SECRET`, and
-`SENTRY_AUTH_TOKEN` (the last only for source-map upload; builds succeed
-without it). Non-secret configuration (project ref, site URL) belongs in
-GitHub **Variables**, not Secrets.
+`SUPABASE_ACCESS_TOKEN`, `SENTRY_AUTH_TOKEN` (source-map upload only; builds
+succeed without it), and `NOTIFICATION_DISPATCH_SECRET`.
+
+**Required GitHub repository variables**
+
+`SUPABASE_PROJECT_REF`.
+
+**One-time setup**
+
+`migrate` and `edge-functions` declare `environment: production`. Add required
+reviewers and a wait timer under **Settings → Environments → production**, or
+the environment is a label rather than a gate.
 
 ## Project Structure
 
@@ -259,26 +315,38 @@ GitHub **Variables**, not Secrets.
 ├── lib/                      # Utilities and services
 │   ├── supabase/             # Supabase clients
 │   ├── actions/              # Server actions
+│   ├── env.ts                # Single source of truth for required env vars
+│   ├── notification-channels.ts  # Vault-backed channel CRUD (server only)
+│   ├── notification-types.ts    # Which config fields are credentials
 │   ├── notifications.ts      # Notification dispatchers
 │   └── monitor-checker.ts    # Monitor check logic
 ├── supabase/                 # Database schema and migrations
+│   ├── schema.sql            # Reference schema
+│   ├── migrations/           # Applied in order, all idempotent
+│   └── functions/            # Edge Functions
+│       ├── _shared/senders.ts  # Shared by the app and the edge runtime
+│       └── notification-dispatch/
 ├── tools/audit/              # Rust CLI tool
 ├── types/                    # TypeScript type definitions
 └── .github/                  # GitHub Actions workflows
     ├── workflows/
     │   ├── typecheck.yml
     │   ├── build.yml
-    │   └── lint.yml
-└── sentry/
-    ├── sentry.client.config.ts
-    ├── sentry.server.config.ts
-    └── sentry.edge.config.ts
+    │   ├── lint.yml
+    │   ├── test.yml
+    │   ├── quality-gate.yml
+    │   ├── supabase-migrations.yml
+    │   └── audit.yml
+├── sentry.server.config.ts
+└── sentry.edge.config.ts
 ```
 
 ## Security
 
 - Row Level Security (RLS) on all database tables
-- SSRF protection for monitor URLs
+- Tenant notification credentials in Supabase Vault, not readable by the browser
+- `CREATE` on the `public` schema revoked from every role
+- SSRF protection for monitor URLs and outbound webhooks, in both runtimes
 - Rate limiting on auth endpoints
 - MFA support with TOTP
 - Security headers (HSTS, CSP, X-Frame-Options)
