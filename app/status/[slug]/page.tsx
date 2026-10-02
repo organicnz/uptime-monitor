@@ -78,11 +78,17 @@ export default async function PublicStatusPage({
   // Calculate Overall System Status
   const allUp = Array.from(monitorStatus.values()).every((s) => s === 1);
   const anyDown = Array.from(monitorStatus.values()).some((s) => s === 0);
+  // A degraded monitor is answering, just slowly. Treating it as a failure
+  // here would announce an outage for a latency regression, which is exactly
+  // what lib/analytics.ts counts DEGRADED as success to avoid.
+  const anyDegraded = Array.from(monitorStatus.values()).some((s) => s === 4);
   const systemStatus = anyDown
     ? "Systems Down"
-    : allUp
-      ? "All Systems Operational"
-      : "Partial Outage"; // Simplified logic
+    : anyDegraded
+      ? "Degraded Performance"
+      : allUp
+        ? "All Systems Operational"
+        : "Partial Outage"; // Simplified logic
 
   const systemHealth = anyDown ? "down" : allUp ? "up" : "degraded";
 
@@ -130,7 +136,9 @@ export default async function PublicStatusPage({
             <p className="opacity-90">
               {anyDown
                 ? "Some services are currently experiencing issues."
-                : "All services are running smoothly."}
+                : anyDegraded
+                  ? "Some services are responding slower than usual."
+                  : "All services are running smoothly."}
             </p>
           </div>
         </div>
@@ -150,6 +158,7 @@ export default async function PublicStatusPage({
 
               const isUp = status === 1;
               const isDown = status === 0;
+              const isDegraded = status === 4;
 
               return (
                 <div
@@ -163,13 +172,17 @@ export default async function PublicStatusPage({
                           ? "bg-green-100 dark:bg-green-900/20 text-green-600 dark:text-green-400"
                           : isDown
                             ? "bg-red-100 dark:bg-red-900/20 text-red-600 dark:text-red-400"
-                            : "bg-neutral-100 dark:bg-neutral-800 text-neutral-500"
+                            : isDegraded
+                              ? "bg-amber-100 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400"
+                              : "bg-neutral-100 dark:bg-neutral-800 text-neutral-500"
                       }`}
                     >
                       {isUp ? (
                         <CheckCircle2 className="h-5 w-5" />
                       ) : isDown ? (
                         <XCircle className="h-5 w-5" />
+                      ) : isDegraded ? (
+                        <AlertTriangle className="h-5 w-5" />
                       ) : (
                         <Clock className="h-5 w-5" />
                       )}
@@ -197,10 +210,18 @@ export default async function PublicStatusPage({
                           ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
                           : isDown
                             ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
-                            : "bg-neutral-100 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-400"
+                            : isDegraded
+                              ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                              : "bg-neutral-100 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-400"
                       }`}
                     >
-                      {isUp ? "Operational" : isDown ? "Outage" : "Unknown"}
+                      {isUp
+                        ? "Operational"
+                        : isDown
+                          ? "Outage"
+                          : isDegraded
+                            ? "Degraded"
+                            : "Unknown"}
                     </span>
                   </div>
                 </div>

@@ -75,12 +75,16 @@ type DailySummary = {
 /**
  * Rolling uptime for one monitor over `period`.
  *
- * `uptimePercent` deliberately counts only conclusive UP checks, matching
- * `lib/analytics.ts`. MAINTENANCE and PENDING are excluded rather than
- * counted as failures, so a planned window does not read as downtime. Because
- * excluded checks are also not counted as up, `coveredPercent` is reported
- * alongside it: it is the share of the window that actually produced a
- * verdict, which is what tells you whether the uptime figure is trustworthy.
+ * `uptimePercent` deliberately counts only conclusive UP checks. Note that
+ * DEGRADED is conclusive but not "up", so it dilutes uptime - the opposite of
+ * `lib/analytics.ts`, whose `success_rate_percent` counts a slow-but-answering
+ * check as a success. Both are intentional: this figure is an availability
+ * record, that one is a latency signal. MAINTENANCE and PENDING are excluded
+ * rather than counted as failures, so a planned window does not read as
+ * downtime. Because excluded checks are also not counted as up,
+ * `coveredPercent` is reported alongside it: it is the share of the window that
+ * actually produced a verdict, which is what tells you whether the uptime
+ * figure is trustworthy.
  *
  * For 30/90d windows the raw table only covers the last
  * HEARTBEAT_RAW_RETENTION_DAYS days; older full days are merged in from

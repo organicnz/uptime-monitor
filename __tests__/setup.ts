@@ -15,6 +15,14 @@ mock.module("next/navigation", () => ({
   usePathname: () => "/",
   useSearchParams: () => new URLSearchParams(),
   useParams: () => ({}),
+  // Pages under test import these. Both throw in production, and returning
+  // normally would let a component render past a guard it relies on.
+  notFound: () => {
+    throw new Error("NEXT_NOT_FOUND");
+  },
+  redirect: () => {
+    throw new Error("NEXT_REDIRECT");
+  },
 }));
 
 mock.module("@/lib/actions/monitors", () => ({
