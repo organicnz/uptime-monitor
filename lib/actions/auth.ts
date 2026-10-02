@@ -1,4 +1,5 @@
 "use server";
+import { getSiteUrl } from "@/lib/env";
 
 import { createClient } from "@/lib/supabase/server";
 import { getMfaVerificationError } from "@/lib/mfa";
@@ -99,7 +100,7 @@ export async function signInWithOAuth(provider: "google" | "github") {
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider,
     options: {
-      redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3001"}/auth/callback`,
+      redirectTo: `${getSiteUrl() ?? "http://localhost:3001"}/auth/callback`,
     },
   });
 
@@ -130,7 +131,7 @@ export async function resetPassword(formData: FormData) {
   }
 
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3001"}/reset-password`,
+    redirectTo: `${getSiteUrl() ?? "http://localhost:3001"}/reset-password`,
   });
 
   // Always return success to prevent user enumeration
@@ -233,7 +234,7 @@ export async function updateEmail(formData: FormData) {
   const { error } = await supabase.auth.updateUser(
     { email },
     {
-      emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3001"}/auth/callback`,
+      emailRedirectTo: `${getSiteUrl() ?? "http://localhost:3001"}/auth/callback`,
     },
   );
 
@@ -283,7 +284,7 @@ export async function resendVerificationEmail(email: string) {
     type: "signup",
     email,
     options: {
-      emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3001"}/auth/callback`,
+      emailRedirectTo: `${getSiteUrl() ?? "http://localhost:3001"}/auth/callback`,
     },
   });
 

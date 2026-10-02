@@ -4,6 +4,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { processMonitorCheck } from "@/lib/monitor-checker";
 import { getCheckInterval } from "@/lib/monitor-status";
 import { secureCompare } from "@/lib/security";
+import { getCronSecret, getQstashConfig } from "@/lib/env";
 import type { Monitor } from "@/types/application";
 
 export const runtime = "nodejs";
@@ -58,20 +59,38 @@ async function withDeadline<T>(
 // Canonical Monitor row type is imported from types/application.
 // Do not redefine locally so schema changes propagate.
 
-// QStash receiver for signature verification
-const qstashReceiver = new Receiver({
-  currentSigningKey: process.env.QSTASH_CURRENT_SIGNING_KEY || "",
-  nextSigningKey: process.env.QSTASH_NEXT_SIGNING_KEY || "",
-});
+/**
+ * QStash signature verification.
+ *
+ * The receiver used to be built from `process.env.X || ""`, which produced a
+ * Receiver that rejects every signature: a missing signing key looked exactly
+ * like a forged request, so a config error surfaced as a silent 401 with no
+ * log line. Fail closed and say why instead.
+ */
+function getQstashReceiver(): Receiver {
+  const { currentSigningKey, nextSigningKey } = getQstashConfig();
+  return new Receiver({ currentSigningKey, nextSigningKey });
+}
 
 // Verify QStash signature
 async function verifyQStashSignature(request: NextRequest): Promise<boolean> {
   const signature = request.headers.get("upstash-signature");
   if (!signature) return false;
 
+  let receiver: Receiver;
+  try {
+    receiver = getQstashReceiver();
+  } catch (error) {
+    console.error(
+      "[cron] QStash signature verification is misconfigured:",
+      error instanceof Error ? error.message : "missing signing keys",
+    );
+    return false;
+  }
+
   try {
     const body = await request.text();
-    return await qstashReceiver.verify({ signature, body });
+    return await receiver.verify({ signature, body });
   } catch {
     return false;
   }
@@ -81,9 +100,15 @@ async function verifyQStashSignature(request: NextRequest): Promise<boolean> {
 // Uses constant-time comparison to prevent timing attacks
 function verifyBearerToken(request: NextRequest): boolean {
   const authHeader = request.headers.get("authorization");
-  const expectedToken = process.env.CRON_SECRET;
+  const expectedToken = getCronSecret();
 
-  if (!authHeader || !expectedToken) return false;
+  if (!expectedToken) {
+    console.error(
+      "[cron] CRON_SECRET is unset, so bearer auth can never succeed",
+    );
+    return false;
+  }
+  if (!authHeader) return false;
   if (!authHeader.startsWith("Bearer ")) return false;
 
   const receivedToken = authHeader.slice(7); // Remove "Bearer " prefix
@@ -201,10 +226,16 @@ async function runMonitorChecks(
   const supabase = createServiceClient();
   const now = new Date();
 
-  // Fetch all active monitors
+  // Fetch all active monitors with only the columns needed for scheduling.
+  // Scheduling state lives on monitors.* (last_check_at/status/down_count),
+  // which processMonitorCheck maintains after every check. Reading heartbeats
+  // here used to full-scan the entire history on every cron tick and blew
+  // through the Disk IO budget once the table grew.
   const { data: monitors, error } = await supabase
     .from("monitors")
-    .select("*")
+    .select(
+      "id, user_id, name, type, active, url, method, hostname, port, keyword, headers, body, interval, retry_interval, timeout, max_retries, upside_down, status, down_count, consecutive_uptime, last_check_at",
+    )
     .eq("active", true);
 
   if (error) {
@@ -222,54 +253,27 @@ async function runMonitorChecks(
     };
   }
 
-  // Get last heartbeat times in a single query
-  const monitorIds = (monitors as Monitor[]).map((m) => m.id);
-  const { data: lastHeartbeats, error: heartbeatError } = await supabase
-    .from("heartbeats")
-    .select("monitor_id, time, status, down_count")
-    .in("monitor_id", monitorIds)
-    .order("time", { ascending: false });
-
-  if (heartbeatError) {
-    throw new Error("Failed to fetch last heartbeat times");
-  }
-
-  const lastHeartbeatMap = new Map<
-    string,
-    { time: Date; status: number; downCount: number }
-  >();
-  for (const hb of (lastHeartbeats || []) as {
-    monitor_id: string;
-    time: string;
-    status: number;
-    down_count: number | null;
-  }[]) {
-    if (!lastHeartbeatMap.has(hb.monitor_id)) {
-      lastHeartbeatMap.set(hb.monitor_id, {
-        time: new Date(hb.time),
-        status: hb.status,
-        downCount: hb.down_count ?? 0,
-      });
-    }
-  }
-
-  // Filter monitors that are due for a check, prioritize by longest wait
+  // Filter monitors that are due for a check, prioritize by longest wait.
+  // Uses monitors.last_check_at/status/down_count directly so this tick costs
+  // one small indexed read instead of a full heartbeats table scan.
   const monitorsToCheck = (monitors as Monitor[])
     .map((monitor) => {
-      const lastHeartbeat = lastHeartbeatMap.get(monitor.id);
-      const secondsSinceLastCheck = lastHeartbeat
-        ? (now.getTime() - lastHeartbeat.time.getTime()) / 1000
+      const lastCheck = monitor.last_check_at
+        ? new Date(monitor.last_check_at)
+        : null;
+      const secondsSinceLastCheck = lastCheck
+        ? (now.getTime() - lastCheck.getTime()) / 1000
         : Infinity;
       const checkInterval = getCheckInterval(
         monitor.interval,
         monitor.retry_interval,
-        lastHeartbeat?.status ?? null,
-        lastHeartbeat?.downCount ?? 0,
+        monitor.status ?? null,
+        monitor.down_count ?? 0,
       );
       return {
         monitor,
         secondsSinceLastCheck,
-        isDue: !lastHeartbeat || secondsSinceLastCheck >= checkInterval,
+        isDue: !lastCheck || secondsSinceLastCheck >= checkInterval,
       };
     })
     .filter((m) => m.isDue)

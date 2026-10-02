@@ -1,14 +1,12 @@
 import { Client } from "@upstash/qstash";
+import { getQstashConfig, getVercelAutomationBypassSecret } from "@/lib/env";
 
 // QStash client singleton
 let qstashClient: Client | null = null;
 
 export function getQStashClient(): Client {
   if (!qstashClient) {
-    const token = process.env.QSTASH_TOKEN;
-    if (!token) {
-      throw new Error("QSTASH_TOKEN environment variable is not set");
-    }
+    const { token } = getQstashConfig();
     qstashClient = new Client({ token });
   }
   return qstashClient;
@@ -92,7 +90,7 @@ export async function createSchedule(params: {
 
   // Build headers for authentication bypass if Vercel Authentication is enabled
   const headers: Record<string, string> = {};
-  const bypassSecret = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
+  const bypassSecret = getVercelAutomationBypassSecret();
   if (bypassSecret) {
     headers["x-vercel-protection-bypass"] = bypassSecret;
   }
@@ -119,7 +117,7 @@ export async function updateSchedule(
 
   // Build headers for authentication bypass if Vercel Authentication is enabled
   const headers: Record<string, string> = {};
-  const bypassSecret = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
+  const bypassSecret = getVercelAutomationBypassSecret();
   if (bypassSecret) {
     headers["x-vercel-protection-bypass"] = bypassSecret;
   }

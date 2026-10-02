@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getMfaVerificationError } from "@/lib/mfa";
+import { getAdminUserIds, getSiteUrl } from "@/lib/env";
 import type { User } from "@supabase/supabase-js";
 import {
   listSchedules,
@@ -15,19 +16,10 @@ import {
 
 const MONITOR_SCHEDULE_SUFFIX = "/api/cron/check-monitors";
 
-function getSiteUrl(): string | null {
-  const configured =
-    process.env.NEXT_PUBLIC_SITE_URL ||
-    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : undefined);
-  return configured?.replace(/\/+$/, "") || null;
-}
-
 function isScheduleAdmin(user: User): boolean {
-  const configuredIds = (process.env.ADMIN_USER_IDS || "")
-    .split(",")
-    .map((id) => id.trim())
-    .filter(Boolean);
-  return user.app_metadata?.role === "admin" || configuredIds.includes(user.id);
+  return (
+    user.app_metadata?.role === "admin" || getAdminUserIds().includes(user.id)
+  );
 }
 
 function findMonitorSchedule(

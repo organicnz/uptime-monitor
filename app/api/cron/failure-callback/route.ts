@@ -1,21 +1,40 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Receiver } from "@upstash/qstash";
 import { createServiceClient } from "@/lib/supabase/service";
+import { getQstashConfig } from "@/lib/env";
 
-// QStash receiver for signature verification
-const qstashReceiver = new Receiver({
-  currentSigningKey: process.env.QSTASH_CURRENT_SIGNING_KEY || "",
-  nextSigningKey: process.env.QSTASH_NEXT_SIGNING_KEY || "",
-});
+/**
+ * QStash signature verification.
+ *
+ * The receiver used to be built from `process.env.X || ""`, which produced a
+ * Receiver that rejects every signature: a missing signing key looked exactly
+ * like a forged request, so a config error surfaced as a silent 401 with no
+ * log line. Fail closed and say why instead.
+ */
+function getQstashReceiver(): Receiver {
+  const { currentSigningKey, nextSigningKey } = getQstashConfig();
+  return new Receiver({ currentSigningKey, nextSigningKey });
+}
 
 // Verify QStash signature
 async function verifyQStashSignature(request: NextRequest): Promise<boolean> {
   const signature = request.headers.get("upstash-signature");
   if (!signature) return false;
 
+  let receiver: Receiver;
+  try {
+    receiver = getQstashReceiver();
+  } catch (error) {
+    console.error(
+      "[cron] QStash signature verification is misconfigured:",
+      error instanceof Error ? error.message : "missing signing keys",
+    );
+    return false;
+  }
+
   try {
     const body = await request.text();
-    return await qstashReceiver.verify({ signature, body });
+    return await receiver.verify({ signature, body });
   } catch {
     return false;
   }

@@ -1,14 +1,32 @@
 import type { NextConfig } from "next";
 import { withSentryConfig } from "@sentry/nextjs";
 
+// A local Supabase origin has to be in the CSP `connect-src` allowlist. When
+// the variable is missing the block is silently dropped, which turns into
+// "why is my local realtime connection blocked?" hours later.
 const configuredSupabaseOrigin = (() => {
+  const configured = process.env.NEXT_PUBLIC_SUPABASE_URL;
+
+  if (!configured) {
+    if (process.env.NODE_ENV !== "test") {
+      console.warn(
+        "[next.config] NEXT_PUBLIC_SUPABASE_URL is unset; the CSP " +
+          "connect-src allowlist cannot include it.",
+      );
+    }
+    return "";
+  }
+
   try {
-    const origin = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").origin;
+    const origin = new URL(configured).origin;
     return origin.startsWith("http://127.0.0.1:") ||
       origin.startsWith("http://localhost:")
       ? origin
       : "";
   } catch {
+    console.warn(
+      `[next.config] NEXT_PUBLIC_SUPABASE_URL is not a valid URL: ${configured}`,
+    );
     return "";
   }
 })();
