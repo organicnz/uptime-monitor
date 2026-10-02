@@ -2,6 +2,7 @@ import {
   HEARTBEAT_STATUS,
   MAX_CONSECUTIVE_UPTIME,
   classifyErrorType,
+  classifyStatusTransition,
   determineEffectiveStatus,
   getCheckInterval,
   nextConsecutiveUptime,
@@ -189,6 +190,55 @@ describe("nextConsecutiveUptime", () => {
     expect(
       nextConsecutiveUptime(MAX_CONSECUTIVE_UPTIME, HEARTBEAT_STATUS.UP),
     ).toBe(MAX_CONSECUTIVE_UPTIME);
+  });
+});
+
+describe("classifyStatusTransition", () => {
+  it("opens an incident on a move to DOWN", () => {
+    expect(classifyStatusTransition(1, HEARTBEAT_STATUS.DOWN)).toEqual({
+      isDown: true,
+      isRecovery: false,
+    });
+  });
+
+  it("recovers from DOWN and from MAINTENANCE", () => {
+    expect(
+      classifyStatusTransition(HEARTBEAT_STATUS.DOWN, HEARTBEAT_STATUS.UP),
+    ).toEqual({ isDown: false, isRecovery: true });
+    expect(
+      classifyStatusTransition(
+        HEARTBEAT_STATUS.MAINTENANCE,
+        HEARTBEAT_STATUS.UP,
+      ),
+    ).toEqual({ isDown: false, isRecovery: true });
+  });
+
+  it("recovers when the service comes back through a slow phase", () => {
+    // The regression this guards: DOWN -> DEGRADED -> UP used to leave the
+    // incident open forever, because the final UP did not qualify as a
+    // recovery and so no resolution or notification was ever sent.
+    const recovering = classifyStatusTransition(
+      HEARTBEAT_STATUS.DOWN,
+      HEARTBEAT_STATUS.DEGRADED,
+    );
+    expect(recovering).toEqual({ isDown: false, isRecovery: false });
+
+    const recovered = classifyStatusTransition(
+      HEARTBEAT_STATUS.DEGRADED,
+      HEARTBEAT_STATUS.UP,
+    );
+    expect(recovered.isRecovery).toBe(true);
+  });
+
+  it("does not treat a first-time UP or a slowdown as a transition", () => {
+    expect(classifyStatusTransition(null, HEARTBEAT_STATUS.UP)).toEqual({
+      isDown: false,
+      isRecovery: false,
+    });
+    expect(classifyStatusTransition(1, HEARTBEAT_STATUS.DEGRADED)).toEqual({
+      isDown: false,
+      isRecovery: false,
+    });
   });
 });
 

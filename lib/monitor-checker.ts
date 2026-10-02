@@ -17,6 +17,7 @@ import type { Heartbeat, Monitor } from "@/types/application";
 import {
   determineEffectiveStatus,
   classifyErrorType,
+  classifyStatusTransition,
   nextConsecutiveUptime,
   HEARTBEAT_STATUS,
 } from "@/lib/monitor-status";
@@ -816,11 +817,10 @@ async function handleStatusChange(
   if (previousStatus === currentStatus) return;
   if (previousStatus === null && currentStatus === HEARTBEAT_STATUS.UP) return;
 
-  const isDown = currentStatus === HEARTBEAT_STATUS.DOWN;
-  const isRecovery =
-    (previousStatus === HEARTBEAT_STATUS.DOWN ||
-      previousStatus === HEARTBEAT_STATUS.MAINTENANCE) &&
-    currentStatus === HEARTBEAT_STATUS.UP;
+  const { isDown, isRecovery } = classifyStatusTransition(
+    previousStatus,
+    currentStatus,
+  );
 
   if (isDown) {
     // Create incident if none exists

@@ -59,6 +59,36 @@ export function determineEffectiveStatus(
   return { status: resultStatus, downCount: 0 };
 }
 
+export type StatusTransition = {
+  isDown: boolean;
+  isRecovery: boolean;
+};
+
+/**
+ * Which incident actions a change in stored status implies.
+ *
+ * Every state that means "not answering healthily" counts as a previous
+ * unhealthy state, because a UP after any of them is a recovery. DEGRADED has
+ * to be in that set: a service can come back through a slow phase, so the real
+ * sequence is DOWN -> DEGRADED -> UP. Were DEGRADED treated as healthy here,
+ * that final UP would not qualify as a recovery, leaving the incident open
+ * with no recovery notification ever sent.
+ */
+export function classifyStatusTransition(
+  previousStatus: number | null,
+  currentStatus: number,
+): StatusTransition {
+  const wasUnhealthy =
+    previousStatus === HEARTBEAT_STATUS.DOWN ||
+    previousStatus === HEARTBEAT_STATUS.MAINTENANCE ||
+    previousStatus === HEARTBEAT_STATUS.DEGRADED;
+
+  return {
+    isDown: currentStatus === HEARTBEAT_STATUS.DOWN,
+    isRecovery: wasUnhealthy && currentStatus === HEARTBEAT_STATUS.UP,
+  };
+}
+
 /** Upper bound for the uptime streak so a bad interval cannot overflow INTEGER. */
 export const MAX_CONSECUTIVE_UPTIME = 2_000_000_000;
 
