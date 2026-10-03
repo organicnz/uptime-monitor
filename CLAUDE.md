@@ -91,7 +91,10 @@ list, and `__tests__/lib/vault-secrets.test.ts` fails if the two drift.
 
 - `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` - required
 - `SUPABASE_SERVICE_ROLE_KEY` - required, server-side only
-- `CRON_SECRET` - Vercel only; not read by any workflow
+- `CRON_SECRET` - authenticates the cron endpoints; the retention-cleanup
+  workflow reads it as a repository secret, so rotating it means updating both
+- `SITE_URL` (GitHub **Variable**, not a Secret: the app's public URL) -
+  where the retention-cleanup workflow posts the daily rollup job
 - `VERCEL_AUTOMATION_BYPASS_SECRET` - Vercel Deployment Protection
 - `NOTIFICATION_DISPATCH_SECRET` - shared with the dispatch Edge Function;
   CI provisions the function's copy via `supabase secrets set`
