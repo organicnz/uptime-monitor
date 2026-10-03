@@ -41,14 +41,23 @@ export async function GET(request: NextRequest) {
         );
       }
 
-      const report = await generateUptimeReport(
-        supabase,
-        parsed.data.monitorId,
-        parsed.data.period,
-      ).catch((error: unknown) => {
+      // generateUptimeReport returns null only when the monitor row is not
+      // visible. Mapping a thrown error to the same 404 would tell the caller
+      // "no such monitor" on a transient read failure.
+      let report: Awaited<ReturnType<typeof generateUptimeReport>>;
+      try {
+        report = await generateUptimeReport(
+          supabase,
+          parsed.data.monitorId,
+          parsed.data.period,
+        );
+      } catch (error) {
         console.error("[reports] GET failed:", error);
-        return null;
-      });
+        return NextResponse.json(
+          { error: "Failed to generate report" },
+          { status: 500 },
+        );
+      }
 
       if (!report) {
         return NextResponse.json(
