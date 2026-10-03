@@ -1,0 +1,59 @@
+# Daily heartbeat retention.
+#
+# Rolls full UTC days older than HEARTBEAT_RAW_RETENTION_DAYS into
+# heartbeat_daily and prunes the raw rows they came from, by calling
+# POST /api/cron/cleanup (auth: CRON_SECRET bearer, same as check-monitors).
+#
+# This is not optional housekeeping: the 30d/90d uptime reports read raw
+# rows only for the last HEARTBEAT_RAW_RETENTION_DAYS and older days from
+# heartbeat_daily. If this job never runs, those reports silently cover
+# only the raw window while labelling it with the full period.
+#
+# Required repository variable: SITE_URL (the app's public URL, no secret).
+# Required repository secret: CRON_SECRET.
+#
+# Notes: scheduled runs only fire from the default branch, and GitHub pauses
+# them after 60 days of repository inactivity. Use "Run workflow" to backfill.
+name: Retention cleanup
+
+on:
+  # 03:17 UTC, daily: off-peak for the runner fleet and outside the :00 stampede.
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+
+    steps:
+      - name: Check configuration
+        shell: bash
+        run: |
+          missing=0
+          if [ -z "${{ vars.SITE_URL }}" ]; then
+            echo "::error::Repository variable SITE_URL is not set. It must hold the app's public URL."
+            missing=1
+          fi
+          if [ -z "${{ secrets.CRON_SECRET }}" ]; then
+            echo "::error::Repository secret CRON_SECRET is not set. It must match the app's CRON_SECRET."
+            missing=1
+          fi
+          if [ "$missing" -eq 1 ]; then exit 1; fi
+
+      - name: Run retention cleanup
+        shell: bash
+        env:
+          SITE_URL: ${{ vars.SITE_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          curl --fail-with-body -sS -X POST \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            "$SITE_URL/api/cron/cleanup"
