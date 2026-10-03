@@ -14,6 +14,7 @@ function stubClient(options: {
   monitor?: Row | null;
   heartbeats?: Row[];
   incidents?: Row[];
+  summaries?: Row[];
   monitorError?: { message: string } | null;
   heartbeatsError?: { message: string } | null;
 }) {
@@ -69,9 +70,15 @@ function stubClient(options: {
             }),
         };
       }
+      if (table === "incidents") {
+        return {
+          select: () =>
+            make(table, { data: options.incidents ?? [], error: null }),
+        };
+      }
       return {
         select: () =>
-          make(table, { data: options.incidents ?? [], error: null }),
+          make(table, { data: options.summaries ?? [], error: null }),
       };
     },
   } as unknown as SupabaseQueryClient;
@@ -226,5 +233,81 @@ describe("generateUptimeReport", () => {
 
     // Two samples across a 24h window imply 12h per check, so both were down.
     expect(report?.totalDowntimeSeconds).toBe(86_400);
+  });
+});
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+const utcDay = (whenMs: number) => new Date(whenMs).toISOString().slice(0, 10);
+
+const summaryDay = (day: string, up: number, down: number) => ({
+  day,
+  total_checks: up + down,
+  up_checks: up,
+  down_checks: down,
+  degraded_checks: 0,
+  pending_checks: 0,
+  maintenance_checks: 0,
+  avg_ping: 60,
+  min_ping: 5,
+  max_ping: 400,
+});
+
+describe("report window coverage", () => {
+  it("spans the whole window when rollups fill the older days", async () => {
+    const now = Date.now();
+    const { client } = stubClient({
+      heartbeats: [
+        {
+          status: HEARTBEAT_STATUS.UP,
+          ping: 90,
+          duration: 90,
+          time: new Date(now).toISOString(),
+        },
+      ],
+      summaries: [
+        summaryDay(utcDay(now - 29 * DAY_MS), 1430, 10),
+        summaryDay(utcDay(now - 8 * DAY_MS), 1440, 0),
+        // Lands inside the raw window: it must not inflate the totals.
+        summaryDay(utcDay(now - 2 * DAY_MS), 9999, 0),
+      ],
+    });
+
+    const report = await generateUptimeReport(client, "m1", "30d");
+
+    expect(report?.upChecks).toBe(1 + 1430 + 1440);
+    expect(report?.downChecks).toBe(10);
+    expect(report?.totalChecks).toBe(1 + 1440 + 1440);
+    expect(report?.dataFrom).toBe(`${utcDay(now - 29 * DAY_MS)}T00:00:00.000Z`);
+    expect(report?.windowCoveragePercent).toBeGreaterThanOrEqual(96);
+  });
+
+  it("admits the gap when rollups are missing", async () => {
+    // This is what a 30d report looked like before the retention job was
+    // scheduled: 7 days of raw data presented as a full window, with
+    // coveredPercent insisting everything was fine.
+    const now = Date.now();
+    const rows = [now, now - DAY_MS].map((when) => ({
+      status: HEARTBEAT_STATUS.UP,
+      ping: 100,
+      duration: 100,
+      time: new Date(when).toISOString(),
+    }));
+    const { client } = stubClient({ heartbeats: rows, summaries: [] });
+
+    const report = await generateUptimeReport(client, "m1", "30d");
+
+    expect(report?.coveredPercent).toBe(100);
+    expect(report?.windowCoveragePercent).toBeLessThan(10);
+    expect(report?.dataFrom).toBe(new Date(now - DAY_MS).toISOString());
+  });
+
+  it("reports zero window coverage with no data at all", async () => {
+    const { client } = stubClient({ heartbeats: [], summaries: [] });
+
+    const report = await generateUptimeReport(client, "m1", "24h");
+
+    expect(report?.dataFrom).toBeNull();
+    expect(report?.dataTo).toBeNull();
+    expect(report?.windowCoveragePercent).toBe(0);
   });
 });

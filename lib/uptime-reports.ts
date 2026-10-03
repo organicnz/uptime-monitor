@@ -38,8 +38,23 @@ export type UptimeReport = {
   degradedChecks: number;
   unknownChecks: number;
   uptimePercent: number;
-  /** Share of elapsed window covered by an UP or DEGRADED check. */
+  /** Share of retrieved checks that produced a verdict. */
   coveredPercent: number;
+  /**
+   * Earliest and latest data actually included. A gap after `since` is how a
+   * report admits it is truncated: the retention job never ran, or the raw
+   * table was pruned without rollups, so the older part of the window has
+   * neither rows nor summaries. Null when there is no data at all.
+   */
+  dataFrom: string | null;
+  dataTo: string | null;
+  /**
+   * Share of the requested window backed by data. Unlike coveredPercent this
+   * is anchored to the window, not to the rows retrieved: a 90d report
+   * computed from 7 days of raw data scores around 8 here and says so,
+   * instead of reading 100% covered next to a misleading "since".
+   */
+  windowCoveragePercent: number;
   avgResponseTimeMs: number;
   minResponseTimeMs: number;
   maxResponseTimeMs: number;
@@ -231,6 +246,41 @@ export async function generateUptimeReport(
     .map((h) => h.ping ?? h.duration)
     .filter((v): v is number => v !== null && v > 0);
 
+  const summaryDays = summaries.map((s) => s.day).sort();
+  const rawTimes = heartbeats
+    .map((h) => new Date(h.time).getTime())
+    .filter((ms) => Number.isFinite(ms));
+
+  const dataFromMs =
+    summaryDays.length > 0
+      ? new Date(`${summaryDays[0]}T00:00:00.000Z`).getTime()
+      : rawTimes.length > 0
+        ? Math.min(...rawTimes)
+        : null;
+  const dataToMs =
+    rawTimes.length > 0
+      ? Math.max(...rawTimes)
+      : summaryDays.length > 0
+        ? new Date(
+            `${summaryDays[summaryDays.length - 1]}T23:59:59.999Z`,
+          ).getTime()
+        : null;
+
+  const nowMs = Date.now();
+  const sinceMs = new Date(since).getTime();
+  const dataFrom =
+    dataFromMs === null ? null : new Date(dataFromMs).toISOString();
+  const dataTo = dataToMs === null ? null : new Date(dataToMs).toISOString();
+  const windowCoveragePercent =
+    dataFromMs === null || dataToMs === null || nowMs <= sinceMs
+      ? 0
+      : round2(
+          Math.min(
+            100,
+            Math.max(0, ((dataToMs - dataFromMs) / (nowMs - sinceMs)) * 100),
+          ),
+        );
+
   const uptimePercent =
     conclusive === 0 ? 100 : round2((upChecks / conclusive) * 100);
   const coveredPercent =
@@ -311,6 +361,9 @@ export async function generateUptimeReport(
     unknownChecks,
     uptimePercent,
     coveredPercent,
+    dataFrom,
+    dataTo,
+    windowCoveragePercent,
     avgResponseTimeMs:
       mergedLatencyCount > 0
         ? Math.round(mergedLatencySum / mergedLatencyCount)
