@@ -198,19 +198,20 @@ describe("classifyStatusTransition", () => {
     expect(classifyStatusTransition(1, HEARTBEAT_STATUS.DOWN)).toEqual({
       isDown: true,
       isRecovery: false,
+      isDegraded: false,
     });
   });
 
   it("recovers from DOWN and from MAINTENANCE", () => {
     expect(
       classifyStatusTransition(HEARTBEAT_STATUS.DOWN, HEARTBEAT_STATUS.UP),
-    ).toEqual({ isDown: false, isRecovery: true });
+    ).toEqual({ isDown: false, isRecovery: true, isDegraded: false });
     expect(
       classifyStatusTransition(
         HEARTBEAT_STATUS.MAINTENANCE,
         HEARTBEAT_STATUS.UP,
       ),
-    ).toEqual({ isDown: false, isRecovery: true });
+    ).toEqual({ isDown: false, isRecovery: true, isDegraded: false });
   });
 
   it("recovers when the service comes back through a slow phase", () => {
@@ -221,23 +222,42 @@ describe("classifyStatusTransition", () => {
       HEARTBEAT_STATUS.DOWN,
       HEARTBEAT_STATUS.DEGRADED,
     );
-    expect(recovering).toEqual({ isDown: false, isRecovery: false });
+    expect(recovering).toEqual({
+      isDown: false,
+      isRecovery: false,
+      isDegraded: true,
+    });
 
     const recovered = classifyStatusTransition(
       HEARTBEAT_STATUS.DEGRADED,
       HEARTBEAT_STATUS.UP,
     );
     expect(recovered.isRecovery).toBe(true);
+    expect(recovered.isDegraded).toBe(false);
   });
 
-  it("does not treat a first-time UP or a slowdown as a transition", () => {
+  it("flags entering DEGRADED but not staying in it", () => {
+    expect(
+      classifyStatusTransition(HEARTBEAT_STATUS.UP, HEARTBEAT_STATUS.DEGRADED),
+    ).toEqual({ isDown: false, isRecovery: false, isDegraded: true });
+    expect(
+      classifyStatusTransition(
+        HEARTBEAT_STATUS.DEGRADED,
+        HEARTBEAT_STATUS.DEGRADED,
+      ),
+    ).toEqual({ isDown: false, isRecovery: false, isDegraded: false });
+  });
+
+  it("does not treat a first-time UP or a slowdown as a recovery", () => {
     expect(classifyStatusTransition(null, HEARTBEAT_STATUS.UP)).toEqual({
       isDown: false,
       isRecovery: false,
+      isDegraded: false,
     });
     expect(classifyStatusTransition(1, HEARTBEAT_STATUS.DEGRADED)).toEqual({
       isDown: false,
       isRecovery: false,
+      isDegraded: true,
     });
   });
 });

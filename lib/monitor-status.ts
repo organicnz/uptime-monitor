@@ -62,6 +62,8 @@ export function determineEffectiveStatus(
 export type StatusTransition = {
   isDown: boolean;
   isRecovery: boolean;
+  /** Entering DEGRADED from anything else: slow now, answering still. */
+  isDegraded: boolean;
 };
 
 /**
@@ -86,6 +88,9 @@ export function classifyStatusTransition(
   return {
     isDown: currentStatus === HEARTBEAT_STATUS.DOWN,
     isRecovery: wasUnhealthy && currentStatus === HEARTBEAT_STATUS.UP,
+    isDegraded:
+      currentStatus === HEARTBEAT_STATUS.DEGRADED &&
+      previousStatus !== HEARTBEAT_STATUS.DEGRADED,
   };
 }
 

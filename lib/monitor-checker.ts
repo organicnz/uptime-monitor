@@ -817,7 +817,7 @@ async function handleStatusChange(
   if (previousStatus === currentStatus) return;
   if (previousStatus === null && currentStatus === HEARTBEAT_STATUS.UP) return;
 
-  const { isDown, isRecovery } = classifyStatusTransition(
+  const { isDown, isRecovery, isDegraded } = classifyStatusTransition(
     previousStatus,
     currentStatus,
   );
@@ -912,6 +912,31 @@ async function handleStatusChange(
       );
     } catch (error) {
       console.error(`[${monitor.name}] Failed to send UP notification:`, error);
+    }
+  }
+
+  // Deliberately no incident: the service is answering, only slower than the
+  // monitor tolerates. The alert tells a human to look; the outage machinery
+  // stays for a service that stops answering altogether.
+  if (isDegraded) {
+    try {
+      await sendStatusNotification(
+        monitor,
+        {
+          title: `🟡 ${monitor.name} is DEGRADED`,
+          message: msg,
+          monitorName: monitor.name,
+          monitorUrl: monitor.url || monitor.hostname || undefined,
+          status: "degraded",
+          timestamp: new Date().toISOString(),
+        },
+        deadlineAt,
+      );
+    } catch (error) {
+      console.error(
+        `[${monitor.name}] Failed to send DEGRADED notification:`,
+        error,
+      );
     }
   }
 }

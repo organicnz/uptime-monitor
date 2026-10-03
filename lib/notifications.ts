@@ -237,6 +237,8 @@ export async function notifyMonitor(
         safeTrack("Downtime Alert Triggered", { channel: channel.type });
       } else if (payload.status === "up") {
         safeTrack("Recovery Alert Triggered", { channel: channel.type });
+      } else if (payload.status === "degraded") {
+        safeTrack("Degraded Alert Triggered", { channel: channel.type });
       }
     } else {
       console.error(
