@@ -1,10 +1,10 @@
 "use server";
 
-import { createClient } from "@/lib/supabase/server";
-import { getMfaVerificationError } from "@/lib/mfa";
-import { revalidatePath } from "next/cache";
 import { track } from "@vercel/analytics/server";
-import type { Monitor } from "@/types/application";
+import { revalidatePath } from "next/cache";
+
+import { getMfaVerificationError } from "@/lib/mfa";
+import { createClient } from "@/lib/supabase/server";
 
 /**
  * Fire-and-forget analytics that can never fail a server action.
@@ -183,7 +183,7 @@ export async function createMonitor(payload: unknown) {
           keyword: parsed.data.keyword || null,
           description: parsed.data.description || null,
         },
-      ] as unknown as never)
+      ])
       .select()
       .single();
 
@@ -203,7 +203,7 @@ export async function createMonitor(payload: unknown) {
 
     revalidatePath("/dashboard");
     revalidatePath("/dashboard/monitors");
-    return { success: true, monitor: data as unknown as Monitor };
+    return { success: true, monitor: data };
   } catch (err) {
     console.error("[createMonitor] Unhandled error:", err);
     return { error: "Failed to create monitor. Please try again." };
@@ -240,7 +240,7 @@ export async function updateMonitor(id: string, payload: unknown) {
         hostname: parsed.data.hostname || null,
         keyword: parsed.data.keyword || null,
         description: parsed.data.description || null,
-      } as unknown as never)
+      })
       .eq("id", id)
       .eq("user_id", user.id);
 

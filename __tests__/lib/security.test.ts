@@ -1,9 +1,11 @@
+import { describe, expect, it } from "bun:test";
+
 import {
+  fetchWithSsrfProtection,
   formatHostForUrl,
   generateSecureToken,
   resolveAndValidateHost,
   resolveAndValidateUrl,
-  fetchWithSsrfProtection,
   sanitizeHtml,
   secureCompare,
 } from "@/lib/security";
@@ -80,6 +82,31 @@ describe("generateSecureToken", () => {
 
   it("generates unique tokens", () => {
     expect(generateSecureToken()).not.toBe(generateSecureToken());
+  });
+
+  it("draws every character with the same probability", () => {
+    // The alphabet has 62 characters, which does not divide 256. A plain
+    // `byte % 62` therefore makes the first eight characters of the
+    // alphabet about 25% more likely than the rest; rejection sampling is
+    // what removes that. A million characters is enough for the biased
+    // version to show a gap far outside the tolerance below.
+    const sample = Array.from({ length: 1000 }, () =>
+      generateSecureToken(1000),
+    ).join("");
+    const counts = new Map<string, number>();
+    for (const character of sample) {
+      counts.set(character, (counts.get(character) ?? 0) + 1);
+    }
+
+    expect(counts.size).toBe(62);
+
+    const frequencies = [...counts.values()];
+    const lowest = Math.min(...frequencies);
+    const highest = Math.max(...frequencies);
+
+    // Uniform sampling puts the spread at a few percent; the biased
+    // version puts it at 25%.
+    expect(highest / lowest).toBeLessThan(1.1);
   });
 });
 
@@ -172,6 +199,7 @@ describe("resolveAndValidateUrl", () => {
     expect(result).toEqual({
       safeUrl: "http://8.8.8.8/health",
       resolvedIp: "8.8.8.8",
+      hostname: "8.8.8.8",
     });
   });
 
@@ -186,5 +214,134 @@ describe("resolveAndValidateUrl", () => {
 
   it("rejects malformed URLs", async () => {
     await expect(resolveAndValidateUrl("not a url")).rejects.toThrow();
+  });
+});
+
+/**
+ * DNS pinning.
+ *
+ * The socket has to go to the address that was validated, otherwise a second
+ * DNS answer can point the request at a private address. Bun's resolver is
+ * stubbed so the tests never depend on the network.
+ */
+describe("DNS pinning", () => {
+  type StubAnswers = { 4: string[]; 6: string[] };
+
+  async function withStubbedDns(
+    answers: StubAnswers,
+    run: () => Promise<void>,
+  ): Promise<void> {
+    const original = Bun.dns.lookup;
+    Bun.dns.lookup = (async (
+      _hostname: string,
+      options?: { family?: number },
+    ) => {
+      const family = options?.family === 6 ? 6 : 4;
+      const resolved = answers[family];
+      if (resolved.length === 0) {
+        // Bun reports "no records of this family" as ENOTFOUND.
+        const error = new Error("getaddrinfo ENOTFOUND") as Error & {
+          code?: string;
+        };
+        error.code = "DNS_ENOTFOUND";
+        throw error;
+      }
+      return resolved.map((address) => ({
+        address,
+        family,
+        ttl: 0,
+      }));
+    }) as unknown as typeof Bun.dns.lookup;
+
+    try {
+      await run();
+    } finally {
+      Bun.dns.lookup = original;
+    }
+  }
+
+  it("connects to the resolved IP, not to the hostname", async () => {
+    const originalFetch = globalThis.fetch;
+    const requested: string[] = [];
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+      requested.push(
+        typeof input === "string"
+          ? input
+          : input instanceof URL
+            ? input.href
+            : input.url,
+      );
+      return new Response("ok");
+    }) as unknown as typeof fetch;
+
+    try {
+      await withStubbedDns({ 4: ["93.184.216.34"], 6: [] }, async () => {
+        await fetchWithSsrfProtection("https://example.com/health");
+      });
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+
+    expect(requested).toEqual(["https://93.184.216.34/health"]);
+  });
+
+  it("keeps the hostname in the Host header and the TLS server name", async () => {
+    const originalFetch = globalThis.fetch;
+    const requests: {
+      url: string;
+      headers: Headers;
+      tls?: { servername?: string };
+    }[] = [];
+    globalThis.fetch = (async (
+      input: RequestInfo | URL,
+      init?: RequestInit & { tls?: { servername?: string } },
+    ) => {
+      requests.push({
+        url:
+          typeof input === "string"
+            ? input
+            : input instanceof URL
+              ? input.href
+              : input.url,
+        headers: new Headers(init?.headers),
+        tls: init?.tls,
+      });
+      return new Response("ok");
+    }) as unknown as typeof fetch;
+
+    try {
+      await withStubbedDns({ 4: ["93.184.216.34"], 6: [] }, async () => {
+        await fetchWithSsrfProtection("https://example.com:8443/health", {
+          headers: { "X-Trace": "abc" },
+        });
+      });
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+
+    expect(requests).toHaveLength(1);
+    expect(requests[0].url).toBe("https://93.184.216.34:8443/health");
+    expect(requests[0].headers.get("host")).toBe("example.com:8443");
+    expect(requests[0].headers.get("x-trace")).toBe("abc");
+    expect(requests[0].tls?.servername).toBe("example.com");
+  });
+
+  it("rejects a host that answers with a private address", async () => {
+    await withStubbedDns(
+      { 4: ["93.184.216.34"], 6: ["10.0.0.5"] },
+      async () => {
+        await expect(resolveAndValidateHost("rebind.example")).rejects.toThrow(
+          "blocked",
+        );
+      },
+    );
+  });
+
+  it("rejects a host whose only answer is a private address", async () => {
+    await withStubbedDns({ 4: ["192.168.10.10"], 6: [] }, async () => {
+      await expect(resolveAndValidateHost("rebind.example")).rejects.toThrow(
+        "blocked",
+      );
+    });
   });
 });

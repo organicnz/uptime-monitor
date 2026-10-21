@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { Activity, ArrowLeft, CheckCircle2 } from "lucide-react";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/client";
+import { useState } from "react";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Activity, ArrowLeft, CheckCircle2 } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
@@ -34,24 +35,24 @@ export default function ForgotPasswordPage() {
   };
 
   return (
-    <div className="min-h-screen grid lg:grid-cols-2">
+    <div className="grid min-h-screen lg:grid-cols-2">
       {/* Left: Branding */}
-      <div className="hidden lg:flex flex-col justify-between bg-neutral-900 p-12 text-white relative overflow-hidden">
+      <div className="relative hidden flex-col justify-between overflow-hidden bg-neutral-900 p-12 text-white lg:flex">
         <div className="absolute inset-0 z-0 opacity-20">
-          <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-blue-500 rounded-full blur-[120px]" />
-          <div className="absolute bottom-[-10%] right-[-10%] w-[500px] h-[500px] bg-purple-500 rounded-full blur-[120px]" />
+          <div className="absolute top-[-10%] left-[-10%] h-[500px] w-[500px] rounded-full bg-blue-500 blur-[120px]" />
+          <div className="absolute right-[-10%] bottom-[-10%] h-[500px] w-[500px] rounded-full bg-purple-500 blur-[120px]" />
         </div>
 
         <div className="relative z-10 flex items-center gap-2">
           <Activity className="h-6 w-6 text-blue-400" />
-          <span className="font-bold text-xl tracking-tight">
+          <span className="text-xl font-bold tracking-tight">
             Uptime Monitor
           </span>
         </div>
 
         <div className="relative z-10">
           <blockquote className="space-y-2">
-            <p className="text-2xl font-medium leading-relaxed">
+            <p className="text-2xl leading-relaxed font-medium">
               &ldquo;Security and reliability are at the core of everything we
               do. Your account is always protected.&rdquo;
             </p>
@@ -67,11 +68,11 @@ export default function ForgotPasswordPage() {
       </div>
 
       {/* Right: Form */}
-      <div className="flex items-center justify-center p-8 bg-white dark:bg-neutral-950">
+      <div className="flex items-center justify-center bg-white p-8 dark:bg-neutral-950">
         <div className="w-full max-w-sm space-y-8">
           {success ? (
             <div className="space-y-6 text-center">
-              <div className="mx-auto w-12 h-12 bg-green-100 dark:bg-green-900/20 rounded-full flex items-center justify-center">
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/20">
                 <CheckCircle2 className="h-6 w-6 text-green-600 dark:text-green-400" />
               </div>
               <div className="space-y-2">
@@ -86,7 +87,7 @@ export default function ForgotPasswordPage() {
                 </p>
               </div>
               <Link href="/login">
-                <Button variant="outline" className="w-full h-11">
+                <Button variant="outline" className="h-11 w-full">
                   Back to login
                 </Button>
               </Link>
@@ -96,7 +97,7 @@ export default function ForgotPasswordPage() {
               <div className="space-y-2 text-center lg:text-left">
                 <Link
                   href="/login"
-                  className="inline-flex items-center text-sm text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100 mb-4 transition-colors"
+                  className="mb-4 inline-flex items-center text-sm text-neutral-500 transition-colors hover:text-neutral-900 dark:hover:text-neutral-100"
                 >
                   <ArrowLeft className="mr-2 h-4 w-4" />
                   Back to login
@@ -111,7 +112,7 @@ export default function ForgotPasswordPage() {
 
               <form onSubmit={handleSubmit} className="space-y-6">
                 {error && (
-                  <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 px-4 py-3 rounded-md text-sm">
+                  <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600 dark:border-red-800 dark:bg-red-900/20 dark:text-red-400">
                     {error}
                   </div>
                 )}
@@ -132,7 +133,7 @@ export default function ForgotPasswordPage() {
 
                 <Button
                   type="submit"
-                  className="w-full h-11"
+                  className="h-11 w-full"
                   size="lg"
                   disabled={loading}
                 >

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
-import { generateUptimeReport } from "@/lib/uptime-reports";
+
 import { HEARTBEAT_STATUS } from "@/lib/monitor-status";
+import { generateUptimeReport } from "@/lib/uptime-reports";
 import type { SupabaseQueryClient } from "@/lib/uptime-reports";
 
 type Row = Record<string, unknown>;

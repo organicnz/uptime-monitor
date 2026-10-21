@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useEffect, useRef, useMemo } from "react";
-import { useMonitorsWithHistory } from "@/hooks/use-monitors-with-history";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Plus, Search, Pause } from "lucide-react";
+import { Pause, Plus, Search } from "lucide-react";
 import Link from "next/link";
+import { useEffect, useMemo, useRef, useState } from "react";
+
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { useMonitorsWithHistory } from "@/hooks/use-monitors-with-history";
 import { cn } from "@/lib/utils";
 
 type Monitor = {
@@ -72,12 +73,12 @@ export function MonitorSidebar({
   }, [filteredMonitors, selectedId, onSelect]);
 
   return (
-    <div className="flex flex-col h-full bg-neutral-900/40 backdrop-blur-sm">
+    <div className="flex h-full flex-col bg-neutral-900/40 backdrop-blur-sm">
       {/* Add Monitor Button */}
-      <div className="p-3 border-b border-white/5">
+      <div className="border-b border-white/5 p-3">
         <Link href="/dashboard/monitors/new">
           <Button
-            className="w-full gap-2 bg-green-600/90 hover:bg-green-600 backdrop-blur-sm"
+            className="w-full gap-2 bg-green-600/90 backdrop-blur-sm hover:bg-green-600"
             size="sm"
           >
             <Plus className="h-4 w-4" />
@@ -87,25 +88,25 @@ export function MonitorSidebar({
       </div>
 
       {/* Search */}
-      <div className="p-3 border-b border-white/5">
+      <div className="border-b border-white/5 p-3">
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-neutral-500" />
+          <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-neutral-500" />
           <Input
             placeholder="Search..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-9 h-9 bg-white/5 border-white/10 text-sm backdrop-blur-sm"
+            className="h-9 border-white/10 bg-white/5 pl-9 text-sm backdrop-blur-sm"
           />
         </div>
       </div>
 
       {/* Connection indicator + count */}
-      <div className="px-3 py-1.5 border-b border-white/5 flex items-center justify-between text-xs">
+      <div className="flex items-center justify-between border-b border-white/5 px-3 py-1.5 text-xs">
         <div className="flex items-center gap-2">
           <span
             className={cn(
               "h-2 w-2 rounded-full",
-              isConnected ? "bg-green-500 animate-pulse" : "bg-neutral-600",
+              isConnected ? "animate-pulse bg-green-500" : "bg-neutral-600",
             )}
           />
           <span className={isConnected ? "text-green-400" : "text-neutral-500"}>
@@ -134,16 +135,16 @@ export function MonitorSidebar({
               key={monitor.id}
               onClick={() => onSelect(monitor.id)}
               className={cn(
-                "w-full flex items-center gap-2 px-3 py-2.5 text-left transition-all duration-200 border-l-2",
+                "flex w-full items-center gap-2 border-l-2 px-3 py-2.5 text-left transition-all duration-200",
                 isSelected
-                  ? "bg-white/10 border-l-green-500 backdrop-blur-sm"
+                  ? "border-l-green-500 bg-white/10 backdrop-blur-sm"
                   : "border-l-transparent hover:bg-white/5",
               )}
             >
               {/* Uptime Badge */}
               <div
                 className={cn(
-                  "flex-shrink-0 px-2 py-0.5 rounded text-xs font-bold min-w-[44px] text-center",
+                  "min-w-[44px] flex-shrink-0 rounded px-2 py-0.5 text-center text-xs font-bold",
                   isPaused && "bg-amber-500/20 text-amber-400",
                   !isPaused && isUp && "bg-green-500/20 text-green-400",
                   !isPaused && isDown && "bg-red-500/20 text-red-400",
@@ -154,7 +155,7 @@ export function MonitorSidebar({
                 )}
               >
                 {isPaused ? (
-                  <Pause className="h-3 w-3 mx-auto" />
+                  <Pause className="mx-auto h-3 w-3" />
                 ) : uptimePercent !== null ? (
                   `${uptimePercent}%`
                 ) : (
@@ -163,19 +164,19 @@ export function MonitorSidebar({
               </div>
 
               {/* Monitor Name + Type Badge */}
-              <div className="flex-1 min-w-0">
+              <div className="min-w-0 flex-1">
                 <span className="block truncate text-sm font-medium">
                   {monitor.name}
                 </span>
                 {monitor.type !== "http" && (
-                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-neutral-700 text-neutral-400 uppercase">
+                  <span className="rounded bg-neutral-700 px-1.5 py-0.5 text-[10px] text-neutral-400 uppercase">
                     {monitor.type}
                   </span>
                 )}
               </div>
 
               {/* Heartbeat Bars */}
-              <div className="flex gap-[2px] flex-shrink-0">
+              <div className="flex flex-shrink-0 gap-[2px]">
                 {heartbeats.length > 0
                   ? heartbeats
                       .slice(0, 15)
@@ -184,7 +185,7 @@ export function MonitorSidebar({
                         <div
                           key={hb.id || i}
                           className={cn(
-                            "w-[3px] h-[16px] rounded-sm",
+                            "h-[16px] w-[3px] rounded-sm",
                             hb.status === 1 && "bg-green-500",
                             hb.status === 0 && "bg-red-500",
                             hb.status === 2 && "bg-neutral-600",
@@ -198,7 +199,7 @@ export function MonitorSidebar({
                       .map((_, i) => (
                         <div
                           key={i}
-                          className="w-[3px] h-[16px] rounded-sm bg-neutral-700"
+                          className="h-[16px] w-[3px] rounded-sm bg-neutral-700"
                         />
                       ))}
               </div>

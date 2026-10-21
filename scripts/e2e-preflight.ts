@@ -24,17 +24,18 @@ const HINT = [
   "",
 ].join("\n");
 
-async function main() {
+async function main(): Promise<number> {
   let browser;
   try {
     browser = await chromium.launch();
   } catch (error) {
     const detail = error instanceof Error ? error.message.split("\n")[0] : "";
     console.error(`${HINT}   Underlying error: ${detail}\n`);
-    process.exit(1);
+    return 1;
   }
 
   await browser.close();
+  return 0;
 }
 
-await main();
+process.exitCode = await main();

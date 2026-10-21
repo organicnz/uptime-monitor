@@ -1,6 +1,7 @@
-import { createClient } from "@/lib/supabase/server";
 import { notFound, redirect } from "next/navigation";
+
 import { MonitorDetailClient } from "@/components/monitor-detail-client";
+import { createClient } from "@/lib/supabase/server";
 
 export default async function MonitorDetailPage({
   params,

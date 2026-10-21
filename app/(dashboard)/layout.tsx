@@ -1,18 +1,19 @@
-import { createClient } from "@/lib/supabase/server";
-import { redirect } from "next/navigation";
-import Link from "next/link";
-import { Button } from "@/components/ui/button";
-import { ThemeToggle } from "@/components/theme-toggle";
 import {
   Activity,
-  LayoutDashboard,
+  AlertTriangle,
   Bell,
   Globe,
+  LayoutDashboard,
   Menu,
   Settings,
   Wrench,
-  AlertTriangle,
 } from "lucide-react";
+import Link from "next/link";
+import { redirect } from "next/navigation";
+
+import { ThemeToggle } from "@/components/theme-toggle";
+import { Button } from "@/components/ui/button";
+import { createClient } from "@/lib/supabase/server";
 
 export default async function DashboardLayout({
   children,
@@ -45,32 +46,32 @@ export default async function DashboardLayout({
   ];
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="flex min-h-screen flex-col bg-background">
       {/* Header */}
-      <header className="sticky top-0 z-50 border-b border-border/50 bg-background/80 backdrop-blur-xl flex-shrink-0">
+      <header className="sticky top-0 z-50 flex-shrink-0 border-b border-border/50 bg-background/80 backdrop-blur-xl">
         <div className="container mx-auto px-4 lg:px-6">
           <div className="flex h-16 items-center justify-between">
             {/* Logo & Nav */}
             <div className="flex items-center gap-8">
               <Link
                 href="/dashboard"
-                className="flex items-center gap-2.5 group"
+                className="group flex items-center gap-2.5"
               >
-                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-green-600 shadow-lg shadow-emerald-500/20 group-hover:shadow-emerald-500/30 transition-shadow">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-green-600 shadow-lg shadow-emerald-500/20 transition-shadow group-hover:shadow-emerald-500/30">
                   <Activity className="h-5 w-5 text-white" />
                 </div>
-                <span className="font-bold text-lg tracking-tight hidden sm:block">
+                <span className="hidden text-lg font-bold tracking-tight sm:block">
                   Uptime<span className="text-primary">Monitor</span>
                 </span>
               </Link>
 
-              <nav className="hidden md:flex items-center gap-1">
+              <nav className="hidden items-center gap-1 md:flex">
                 {navItems.map((item) => (
                   <Link key={item.href} href={item.href}>
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="gap-2 text-muted-foreground hover:text-foreground hover:bg-accent"
+                      className="gap-2 text-muted-foreground hover:bg-accent hover:text-foreground"
                     >
                       <item.icon className="h-4 w-4" />
                       {item.label}
@@ -82,9 +83,9 @@ export default async function DashboardLayout({
 
             {/* Right side */}
             <div className="flex items-center gap-3">
-              <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-muted/50 text-sm">
-                <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                <span className="text-muted-foreground truncate max-w-[150px]">
+              <div className="hidden items-center gap-2 rounded-full bg-muted/50 px-3 py-1.5 text-sm sm:flex">
+                <div className="h-2 w-2 animate-pulse rounded-full bg-emerald-500" />
+                <span className="max-w-[150px] truncate text-muted-foreground">
                   {user.email}
                 </span>
               </div>
@@ -96,7 +97,7 @@ export default async function DashboardLayout({
                   variant="outline"
                   size="sm"
                   type="submit"
-                  className="border-border/50 hover:bg-destructive/10 hover:text-destructive hover:border-destructive/50"
+                  className="border-border/50 hover:border-destructive/50 hover:bg-destructive/10 hover:text-destructive"
                 >
                   Sign out
                 </Button>

@@ -1,17 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
+
 import { withAuth } from "@/lib/api-utils/with-auth";
-import { notificationTypes } from "@/lib/notification-types";
+import { getNotificationDispatchSecret, getSupabaseEnv } from "@/lib/env";
 import {
   channelIdSchema,
   resolveChannelConfigs,
 } from "@/lib/notification-channels";
-import { createServiceClient } from "@/lib/supabase/service";
-import { sendNotification, type NotificationType } from "@/lib/notifications";
-import { getNotificationDispatchSecret, getSupabaseEnv } from "@/lib/env";
-
+import { notificationTypes } from "@/lib/notification-types";
 import type { NotificationConfig } from "@/lib/notification-types";
-
-export const runtime = "nodejs";
+import { type NotificationType, sendNotification } from "@/lib/notifications";
+import { createServiceClient } from "@/lib/supabase/service";
 
 /**
  * Sends a test notification.
@@ -146,7 +144,7 @@ export async function POST(request: NextRequest) {
           );
         }
 
-        if ((row.secret_id as string | null) === null) {
+        if (row.secret_id === null) {
           return NextResponse.json(
             { error: "Channel has no stored credentials" },
             { status: 400 },
@@ -178,12 +176,12 @@ export async function POST(request: NextRequest) {
 
         const configs = await resolveChannelConfigs([
           {
-            id: row.id as string,
-            type: row.type as NotificationType,
-            config: row.config as Record<string, unknown>,
+            id: row.id,
+            type: row.type,
+            config: row.config,
           },
         ]);
-        const resolved = configs.get(row.id as string);
+        const resolved = configs.get(row.id);
 
         if (!resolved) {
           return NextResponse.json(
@@ -193,8 +191,8 @@ export async function POST(request: NextRequest) {
         }
 
         const result = await sendNotification(
-          row.type as NotificationType,
-          resolved as NotificationConfig,
+          row.type,
+          resolved,
           testPayload(),
         );
 

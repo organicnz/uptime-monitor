@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+
 import { createClient } from "@/lib/supabase/server";
 
 export async function GET(request: Request) {
@@ -12,7 +13,7 @@ export async function GET(request: Request) {
 
     if (!error) {
       const forwardedHost = request.headers.get("x-forwarded-host");
-      const isLocalEnv = process.env.NODE_ENV === "development";
+      const isLocalEnv = Bun.env.NODE_ENV === "development";
 
       if (isLocalEnv) {
         return NextResponse.redirect(`${origin}${next}`);

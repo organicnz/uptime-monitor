@@ -1,7 +1,20 @@
 "use client";
 
-import { useState } from "react";
+import {
+  AlertCircle,
+  ArrowLeft,
+  CheckCircle2,
+  Globe,
+  Loader2,
+  Radio,
+  Search,
+  Server,
+  Zap,
+} from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
+
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -14,18 +27,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { createMonitor } from "@/lib/actions/monitors";
-import {
-  ArrowLeft,
-  Globe,
-  Server,
-  Zap,
-  Search,
-  Radio,
-  CheckCircle2,
-  AlertCircle,
-  Loader2,
-} from "lucide-react";
-import Link from "next/link";
 import { cn } from "@/lib/utils";
 
 const monitorTypes = [
@@ -147,32 +148,32 @@ export default function NewMonitorPage() {
   };
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6">
+    <div className="mx-auto max-w-3xl space-y-6">
       {/* Header */}
       <div>
         <Link
           href="/dashboard/monitors"
-          className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground transition-colors mb-4"
+          className="mb-4 inline-flex items-center text-sm text-muted-foreground transition-colors hover:text-foreground"
         >
-          <ArrowLeft className="h-4 w-4 mr-1" />
+          <ArrowLeft className="mr-1 h-4 w-4" />
           Back to Monitors
         </Link>
-        <h1 className="text-3xl font-bold gradient-text">Create New Monitor</h1>
-        <p className="text-muted-foreground mt-1">
+        <h1 className="gradient-text text-3xl font-bold">Create New Monitor</h1>
+        <p className="mt-1 text-muted-foreground">
           Set up monitoring for your services
         </p>
       </div>
 
       {/* Alerts */}
       {error && (
-        <div className="flex items-center gap-3 bg-destructive/10 border border-destructive/30 text-destructive px-4 py-3 rounded-xl">
+        <div className="flex items-center gap-3 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-destructive">
           <AlertCircle className="h-5 w-5 flex-shrink-0" />
           {error}
         </div>
       )}
 
       {success && (
-        <div className="flex items-center gap-3 bg-emerald-500/10 border border-emerald-500/30 text-emerald-500 px-4 py-3 rounded-xl">
+        <div className="flex items-center gap-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-emerald-500">
           <CheckCircle2 className="h-5 w-5 flex-shrink-0" />
           Monitor created successfully! Redirecting...
         </div>
@@ -188,7 +189,7 @@ export default function NewMonitorPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
               {monitorTypes.map((type) => {
                 const Icon = type.icon;
                 const isSelected = formData.type === type.id;
@@ -198,24 +199,24 @@ export default function NewMonitorPage() {
                     type="button"
                     onClick={() => updateField("type", type.id)}
                     className={cn(
-                      "p-4 rounded-xl border-2 transition-all text-left",
+                      "rounded-xl border-2 p-4 text-left transition-all",
                       isSelected
                         ? `${type.border} ${type.bg}`
                         : "border-border hover:border-border/80 hover:bg-muted/50",
                     )}
                   >
-                    <div className={cn("p-2 rounded-lg w-fit mb-2", type.bg)}>
+                    <div className={cn("mb-2 w-fit rounded-lg p-2", type.bg)}>
                       <Icon className={cn("h-5 w-5", type.color)} />
                     </div>
                     <p
                       className={cn(
-                        "font-medium text-sm",
+                        "text-sm font-medium",
                         isSelected ? type.color : "",
                       )}
                     >
                       {type.name}
                     </p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
+                    <p className="mt-0.5 text-xs text-muted-foreground">
                       {type.description}
                     </p>
                   </button>
@@ -230,7 +231,7 @@ export default function NewMonitorPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               {selectedType && (
-                <div className={cn("p-1.5 rounded-lg", selectedType.bg)}>
+                <div className={cn("rounded-lg p-1.5", selectedType.bg)}>
                   <selectedType.icon
                     className={cn("h-4 w-4", selectedType.color)}
                   />
@@ -243,7 +244,7 @@ export default function NewMonitorPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid sm:grid-cols-2 gap-4">
+            <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="name">Monitor Name *</Label>
                 <Input
@@ -264,7 +265,7 @@ export default function NewMonitorPage() {
                     id="method"
                     value={formData.method}
                     onChange={(e) => updateField("method", e.target.value)}
-                    className="flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    className="flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
                   >
                     <option value="GET">GET</option>
                     <option value="POST">POST</option>
@@ -315,7 +316,7 @@ export default function NewMonitorPage() {
             {(formData.type === "tcp" ||
               formData.type === "ping" ||
               formData.type === "dns") && (
-              <div className="grid sm:grid-cols-2 gap-4">
+              <div className="grid gap-4 sm:grid-cols-2">
                 <div className={formData.type === "tcp" ? "" : "sm:col-span-2"}>
                   <div className="space-y-2">
                     <Label htmlFor="hostname">Hostname *</Label>
@@ -388,7 +389,7 @@ export default function NewMonitorPage() {
                     }
                     className="h-11 pr-12"
                   />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">
+                  <span className="absolute top-1/2 right-3 -translate-y-1/2 text-sm text-muted-foreground">
                     sec
                   </span>
                 </div>
@@ -408,7 +409,7 @@ export default function NewMonitorPage() {
                     }
                     className="h-11 pr-12"
                   />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">
+                  <span className="absolute top-1/2 right-3 -translate-y-1/2 text-sm text-muted-foreground">
                     sec
                   </span>
                 </div>
@@ -441,16 +442,16 @@ export default function NewMonitorPage() {
           <Button
             type="submit"
             disabled={loading || success}
-            className="flex-1 h-11 shadow-lg shadow-primary/20"
+            className="h-11 flex-1 shadow-lg shadow-primary/20"
           >
             {loading ? (
               <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 Creating...
               </>
             ) : success ? (
               <>
-                <CheckCircle2 className="h-4 w-4 mr-2" />
+                <CheckCircle2 className="mr-2 h-4 w-4" />
                 Created!
               </>
             ) : (

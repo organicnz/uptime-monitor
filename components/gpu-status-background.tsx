@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { effect, frame, frameLoop, clock, uniforms, surface } from "vgpu";
-import { statusBackdropShader } from "./shaders/status-backdrop";
+import { clock, effect, frame, frameLoop, surface, uniforms } from "vgpu";
+
 import { acquireGpu, prefersReducedMotion } from "./gpu-runtime";
+import { statusBackdropShader } from "./shaders/status-backdrop";
 
 type GPUStatusBackgroundProps = {
   status: "up" | "down" | "pending" | "degraded" | "maintenance";
@@ -50,7 +51,7 @@ export function GPUStatusBackground({
     let cancelled = false;
     let teardown: (() => void) | undefined;
 
-    (async () => {
+    void (async () => {
       try {
         const gpu = await acquireGpu();
         if (cancelled) return;

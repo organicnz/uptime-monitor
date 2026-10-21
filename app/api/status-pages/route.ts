@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+
 import { withAuth } from "@/lib/api-utils/with-auth";
 
 // Input validation schema for creating a status page
@@ -30,7 +31,7 @@ export async function POST(request: NextRequest) {
   return withAuth(
     async (supabase) => {
       // Parse and validate input
-      let body;
+      let body: unknown;
       try {
         body = await request.json();
       } catch {

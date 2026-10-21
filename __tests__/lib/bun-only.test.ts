@@ -1,0 +1,571 @@
+import { existsSync, readdirSync, readFileSync } from "bun:fs";
+import { join } from "bun:path";
+import { describe, expect, it } from "bun:test";
+
+/**
+ * The repository has no Node.js runtime anywhere in its stack.
+ *
+ * Bun is the package manager, the task runner, the bundler, the test runner,
+ * the build tool and the production runtime. Nothing in this repo may pull
+ * Node.js back in: not as a runtime, not as a module specifier, not as a
+ * type dependency, and not as a package manager in a CI step.
+ *
+ * These assertions are the enforcement mechanism for that rule. They are
+ * cheap to run and they fail loudly the moment a dependency, a script or a
+ * stray import reintroduces Node.js.
+ */
+
+const ROOT = join(import.meta.dir, "..", "..");
+
+/** Directories that hold first-party source. */
+const SOURCE_DIRS = ["app", "components", "hooks", "lib", "scripts", "e2e"];
+
+/** Files at the repository root that are first-party source. */
+const ROOT_SOURCE_FILES = [
+  "instrumentation.ts",
+  "instrumentation-client.ts",
+  "next.config.ts",
+  "playwright.config.ts",
+  "proxy.ts",
+  "sentry.edge.config.ts",
+  "sentry.server.config.ts",
+];
+
+/** Source extensions worth scanning. */
+const SOURCE_EXTENSIONS = [".ts", ".tsx", ".mts", ".mjs", ".js", ".jsx"];
+
+/** Directories that never hold first-party source. */
+const IGNORED_DIRS = new Set([
+  "node_modules",
+  ".next",
+  ".git",
+  ".bundle",
+  "test-results",
+  "playwright-report",
+  "target",
+  ".turbo",
+]);
+
+/**
+ * Every file under `dir`, recursively.
+ *
+ * `Bun.Glob` is the runtime's own matcher, so the traversal is one pass
+ * over the tree rather than a readdir per directory. The ignored
+ * directories are filtered out of the result rather than pruned during
+ * the walk, because the glob has no exclusion of its own.
+ */
+const ALL_FILES = new Bun.Glob("**/*");
+
+function* walk(dir: string): Generator<string> {
+  for (const relative of ALL_FILES.scanSync({ cwd: dir, onlyFiles: true })) {
+    const segments = relative.split("/");
+    if (segments.some((segment) => IGNORED_DIRS.has(segment))) continue;
+    yield join(dir, relative);
+  }
+}
+
+/** Every first-party source file in the repository. */
+function* sourceFiles(): Generator<string> {
+  for (const dir of SOURCE_DIRS) {
+    const full = join(ROOT, dir);
+    if (!existsSync(full)) continue;
+    yield* walk(full);
+  }
+  for (const file of ROOT_SOURCE_FILES) {
+    const full = join(ROOT, file);
+    if (existsSync(full)) yield full;
+  }
+  // Type declarations, including the ambient Bun module declarations.
+  const types = join(ROOT, "types");
+  if (existsSync(types)) yield* walk(types);
+}
+
+function isSource(path: string): boolean {
+  return SOURCE_EXTENSIONS.some((ext) => path.endsWith(ext));
+}
+
+/**
+ * Strip comments so that a mention of a Node.js API in prose does not read
+ * as a use of it.
+ *
+ * Block comments and whole-line comments only. A trailing `//` comment is
+ * left in place, because `//` also occurs inside URL strings and cutting
+ * there would mangle the code.
+ */
+function codeOnly(source: string): string {
+  return source
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .split("\n")
+    .filter((line) => !/^\s*(\*|\/\/)/.test(line))
+    .join("\n");
+}
+
+const files = [...sourceFiles()].filter(isSource);
+
+/**
+ * The runtime's own parser, used to find the specifiers a module really
+ * imports rather than every quoted string that looks like one.
+ */
+const transpiler = new Bun.Transpiler({ loader: "tsx" });
+
+describe("bun-only toolchain: no Node.js runtime", () => {
+  it("finds the source files it is meant to guard", () => {
+    // A silent scan of zero files would pass every assertion below.
+    expect(files.length).toBeGreaterThan(50);
+  });
+
+  it("never imports a node: module", () => {
+    const offenders: string[] = [];
+
+    for (const file of files) {
+      const source = readFileSync(file, "utf-8");
+      // `from "node:fs"`, `import("node:path")`, `require("node:os")`.
+      const matches = source.match(/["'](node:[a-z_/]+)["']/g);
+      if (matches) offenders.push(`${file}: ${matches.join(", ")}`);
+    }
+
+    expect(offenders).toEqual([]);
+  });
+
+  it("never uses the CommonJS or Node.js-only module globals", () => {
+    const offenders: string[] = [];
+
+    for (const file of files) {
+      const source = readFileSync(file, "utf-8");
+      if (/\b__dirname\b/.test(source)) offenders.push(`${file}: __dirname`);
+      if (/\b__filename\b/.test(source)) offenders.push(`${file}: __filename`);
+      // `require(` at the start of an expression, not inside a string or a
+      // word like `require(` in a comment.
+      if (/^\s*(?:const|let|var)?\s*[\w{,\s]*=\s*require\(/m.test(source)) {
+        offenders.push(`${file}: require()`);
+      }
+      if (/^\s*module\.exports\s*=/m.test(source)) {
+        offenders.push(`${file}: module.exports`);
+      }
+    }
+
+    expect(offenders).toEqual([]);
+  });
+
+  it("never imports Node.js built-ins through the bare specifier", () => {
+    // `from "fs"` resolves to the Node.js core module, not to a package.
+    //
+    // `Bun.Transpiler.scan` is the runtime's own parser: it reports the
+    // specifiers the module actually imports, static and dynamic, rather
+    // than every quoted string that happens to follow the word "from". A
+    // regular expression over the source cannot tell an import from a
+    // string that reads like one.
+    const core = new Set([
+      "fs",
+      "path",
+      "os",
+      "crypto",
+      "child_process",
+      "http",
+      "https",
+      "net",
+      "tls",
+      "dns",
+      "zlib",
+      "stream",
+      "util",
+      "url",
+      "buffer",
+      "events",
+      "assert",
+      "worker_threads",
+    ]);
+    const offenders: string[] = [];
+
+    for (const file of files) {
+      const source = readFileSync(file, "utf-8");
+      for (const entry of transpiler.scan(source).imports) {
+        if (core.has(entry.path) || entry.path.startsWith("node:")) {
+          offenders.push(`${file}: ${entry.path}`);
+        }
+      }
+    }
+
+    expect(offenders).toEqual([]);
+  });
+
+  it("finds the dynamic imports too", () => {
+    // A parser that only reported the static ones would miss
+    // `await import("node:fs")`, which resolves just the same.
+    const scanned = transpiler.scan(`const p = await import("node:path");`);
+
+    expect(scanned.imports).toContainEqual({
+      kind: "dynamic-import",
+      path: "node:path",
+    });
+  });
+});
+
+describe("bun-only toolchain: no Node.js type surface", () => {
+  it("does not opt into the @types/node globals in tsconfig", () => {
+    const tsconfig = readFileSync(join(ROOT, "tsconfig.json"), "utf-8");
+    const types = /"types"\s*:\s*\[([^\]]*)\]/.exec(tsconfig)?.[1] ?? "";
+
+    expect(types).not.toContain('"node"');
+    // The Bun types must stay: they are the whole type environment.
+    expect(types).toContain('"bun-types"');
+  });
+
+  it("does not depend on @types/node directly", () => {
+    const pkg = JSON.parse(
+      readFileSync(join(ROOT, "package.json"), "utf-8"),
+    ) as {
+      devDependencies?: Record<string, string>;
+      dependencies?: Record<string, string>;
+    };
+
+    expect(pkg.devDependencies?.["@types/node"]).toBeUndefined();
+    expect(pkg.dependencies?.["@types/node"]).toBeUndefined();
+  });
+
+  it("declares the bun: modules against Bun's own API", () => {
+    // The ambient declarations used to re-export the @types/node shapes for
+    // `node:fs` and friends. They must now describe Bun's API directly.
+    const declarations = readFileSync(
+      join(ROOT, "types", "bun-modules.d.ts"),
+      "utf-8",
+    );
+
+    expect(declarations).not.toMatch(/["']node:/);
+    expect(declarations).toContain('declare module "bun:fs"');
+    expect(declarations).toContain('declare module "bun:path"');
+  });
+});
+
+describe("bun-only toolchain: no Node.js process API", () => {
+  /**
+   * `process.env` survives in exactly one shape: Next.js substitutes
+   * `process.env.NEXT_PUBLIC_*` into the browser bundle at build time by
+   * matching that literal text. Every other file must read the environment
+   * through `Bun.env`.
+   */
+  const PROCESS_ENV_ALLOWLIST = new Set([
+    "lib/client-env.ts",
+    "lib/env.ts",
+    "instrumentation.ts",
+    "instrumentation-client.ts",
+    "sentry.edge.config.ts",
+  ]);
+
+  it("reads the environment through Bun.env outside the build-time allowlist", () => {
+    const offenders: string[] = [];
+
+    for (const file of files) {
+      const relative = file.slice(ROOT.length + 1);
+      if (PROCESS_ENV_ALLOWLIST.has(relative)) continue;
+      const source = codeOnly(readFileSync(file, "utf-8"));
+      if (/\bprocess\.env\b/.test(source)) {
+        offenders.push(relative);
+      }
+    }
+
+    expect(offenders).toEqual([]);
+  });
+
+  it("never uses the Node.js-only parts of the process API", () => {
+    const offenders: string[] = [];
+
+    for (const file of files) {
+      const source = codeOnly(readFileSync(file, "utf-8"));
+      // `process.argv` is `Bun.argv`; `process.exit()` truncates buffered
+      // output, so the scripts set `process.exitCode` instead.
+      if (/\bprocess\.argv\b/.test(source))
+        offenders.push(`${file}: process.argv`);
+      if (/\bprocess\.exit\s*\(/.test(source))
+        offenders.push(`${file}: process.exit()`);
+      if (
+        /\bprocess\.(cwd|platform|version|versions|uptime|memoryUsage|execPath|kill)\b/.test(
+          source,
+        )
+      ) {
+        offenders.push(`${file}: process.* runtime API`);
+      }
+    }
+
+    expect(offenders).toEqual([]);
+  });
+
+  it("never starts a script with a Node.js shebang", () => {
+    const offenders: string[] = [];
+
+    for (const file of files) {
+      const first = readFileSync(file, "utf-8").split("\n", 1)[0] ?? "";
+      if (first.startsWith("#!") && /node/.test(first)) {
+        offenders.push(`${file}: ${first}`);
+      }
+    }
+
+    expect(offenders).toEqual([]);
+  });
+});
+
+describe("bun-only toolchain: Bun is configured as the whole toolchain", () => {
+  const bunfig = () => readFileSync(join(ROOT, "bunfig.toml"), "utf-8");
+
+  it("aliases node to bun for every script", () => {
+    // Without this, Bun only aliases `node` when node is absent from $PATH.
+    // A developer machine or a CI runner that has Node.js installed would
+    // then run `#!/usr/bin/env node` binaries on Node.js.
+    expect(bunfig()).toMatch(/^\s*bun\s*=\s*true\s*$/m);
+  });
+
+  it("runs package.json scripts in Bun's own shell", () => {
+    // The toolchain must not depend on /bin/sh being present.
+    expect(bunfig()).toMatch(/^\s*shell\s*=\s*"bun"\s*$/m);
+  });
+
+  it("randomizes the test order", () => {
+    expect(bunfig()).toMatch(/^\s*randomize\s*=\s*true\s*$/m);
+  });
+
+  it("keeps the Deno and Playwright suites out of Bun's test discovery", () => {
+    // `supabase/functions/_shared/egress_test.ts` matches Bun's `*_test.ts`
+    // discovery pattern, but it is Deno code: it imports `jsr:@std/assert@1`,
+    // which only Deno can resolve. The e2e specs are Playwright's and need
+    // a browser and a running server.
+    expect(bunfig()).toMatch(/"supabase\/functions\/\*\*"/);
+    expect(bunfig()).toMatch(/"e2e\/\*\*"/);
+  });
+
+  it("does not format or lint with a Node.js tool", () => {
+    const pkg = JSON.parse(
+      readFileSync(join(ROOT, "package.json"), "utf-8"),
+    ) as {
+      scripts?: Record<string, string>;
+      dependencies?: Record<string, string>;
+      devDependencies?: Record<string, string>;
+    };
+
+    // Bun's own formatter and linter replaced both.
+    expect(pkg.devDependencies?.["prettier"]).toBeUndefined();
+    expect(pkg.dependencies?.["prettier"]).toBeUndefined();
+    expect(pkg.devDependencies?.["eslint"]).toBeUndefined();
+    expect(pkg.devDependencies?.["eslint-config-next"]).toBeUndefined();
+    expect(pkg.dependencies?.["eslint"]).toBeUndefined();
+    expect(pkg.dependencies?.["eslint-config-next"]).toBeUndefined();
+
+    expect(pkg.scripts?.format).toBe("bun fmt");
+    expect(pkg.scripts?.["format:check"]).toBe("bun fmt --check");
+    expect(pkg.scripts?.lint).toBe("bun lint");
+    expect(pkg.scripts?.["lint:fix"]).toBe("bun lint --fix");
+  });
+
+  it("has no ESLint configuration left behind", () => {
+    // The flat config only existed to configure `eslint-config-next`. With
+    // Bun's own linter the rules live in bunfig.toml's [lint] section.
+    expect(existsSync(join(ROOT, "eslint.config.mjs"))).toBe(false);
+    expect(existsSync(join(ROOT, "eslint.config.js"))).toBe(false);
+    expect(existsSync(join(ROOT, ".eslintrc.json"))).toBe(false);
+  });
+
+  it("configures the linter in bunfig.toml instead", () => {
+    const bunfig = readFileSync(join(ROOT, "bunfig.toml"), "utf-8");
+
+    // The `correctness` category is a superset of what the old ESLint
+    // configuration enabled, and a warning fails the run.
+    expect(bunfig).toMatch(/^\s*categories\s*=/m);
+    expect(bunfig).toMatch(/^\s*maxWarnings\s*=\s*0\s*$/m);
+  });
+
+  it("pins the runtime to Bun and never to Node.js", () => {
+    const pkg = JSON.parse(
+      readFileSync(join(ROOT, "package.json"), "utf-8"),
+    ) as { engines?: Record<string, string>; packageManager?: string };
+
+    expect(pkg.engines?.["bun"]).toBeDefined();
+    expect(pkg.engines?.["node"]).toBeUndefined();
+    expect(pkg.packageManager?.startsWith("bun@")).toBe(true);
+  });
+
+  it("does not name a Next.js runtime in a route segment config", () => {
+    // `export const runtime = "nodejs"` is the only literal "nodejs" left in
+    // first-party source. It was always the default, and Next.js 16 deprecates
+    // the other value ("edge") and forbids the export entirely under Cache
+    // Components. The app is served by Bun, so the segment config has no say
+    // in what runs it — and saying "nodejs" out loud only invites the
+    // question of what is running it.
+    const offenders: string[] = [];
+
+    for (const file of files) {
+      const source = readFileSync(file, "utf-8");
+      if (/export\s+const\s+runtime\s*=/.test(source)) {
+        offenders.push(file);
+      }
+    }
+
+    expect(offenders).toEqual([]);
+  });
+
+  it("type checks with tsrs, the Rust port of the TypeScript compiler", () => {
+    const pkg = JSON.parse(
+      readFileSync(join(ROOT, "package.json"), "utf-8"),
+    ) as {
+      scripts?: Record<string, string>;
+      devDependencies?: Record<string, string>;
+    };
+
+    // `tsc` from the TypeScript 7 beta is a Node.js program: its launcher
+    // is a `#!/usr/bin/env node` script. `tsrs` is a self-contained Rust
+    // binary, so it is the only TypeScript 7 checker this stack can run.
+    expect(pkg.scripts?.["typecheck"]).toBe(
+      "bun --bun tsrs --noEmit --checkerAssignment go",
+    );
+    expect(pkg.scripts?.["typecheck:tsc"]).toBeUndefined();
+    expect(pkg.devDependencies?.["tsrs"]).toBeDefined();
+  });
+});
+
+describe("bun-only toolchain: no Node.js in the delivery pipeline", () => {
+  it("installs and runs everything with Bun", () => {
+    const workflows = join(ROOT, ".github", "workflows");
+    const offenders: string[] = [];
+
+    for (const file of readdirSync(workflows)) {
+      if (!file.endsWith(".yml") && !file.endsWith(".yaml")) continue;
+      const source = readFileSync(join(workflows, file), "utf-8");
+      if (/actions\/setup-node/.test(source)) {
+        offenders.push(`${file}: actions/setup-node`);
+      }
+      if (/\b(npm|npx|yarn|pnpm)\s+(ci|install|run|exec)\b/.test(source)) {
+        offenders.push(`${file}: npm/yarn/pnpm invocation`);
+      }
+    }
+
+    expect(offenders).toEqual([]);
+  });
+
+  it("installs without running lifecycle scripts in CI", () => {
+    // The only lifecycle script in this repository builds the local Rust
+    // audit tool, which CI never uses. Running it would put a Rust
+    // toolchain in the critical path of every workflow.
+    const workflows = join(ROOT, ".github", "workflows");
+    const offenders: string[] = [];
+
+    for (const file of readdirSync(workflows)) {
+      if (!file.endsWith(".yml") && !file.endsWith(".yaml")) continue;
+      const source = readFileSync(join(workflows, file), "utf-8");
+      for (const match of source.matchAll(/bun install[^\n]*/g)) {
+        if (!match[0].includes("--ignore-scripts")) {
+          offenders.push(`${file}: ${match[0].trim()}`);
+        }
+      }
+    }
+
+    expect(offenders).toEqual([]);
+  });
+
+  it("builds the container from a Bun base image", () => {
+    const containerfile = readFileSync(join(ROOT, "Containerfile"), "utf-8");
+
+    expect(containerfile).toMatch(/^FROM oven\/bun:/m);
+    expect(containerfile).not.toMatch(/^FROM node:/m);
+  });
+
+  it("runs the container as an unprivileged user", () => {
+    const containerfile = readFileSync(join(ROOT, "Containerfile"), "utf-8");
+
+    expect(containerfile).toMatch(/^USER bun$/m);
+    // Everything the server writes at runtime has to belong to that user.
+    expect(containerfile).toMatch(/^COPY --chown=bun:bun/m);
+  });
+
+  it("never shells out to a Node.js package manager", () => {
+    const pkg = JSON.parse(
+      readFileSync(join(ROOT, "package.json"), "utf-8"),
+    ) as { scripts: Record<string, string> };
+
+    for (const [name, command] of Object.entries(pkg.scripts)) {
+      expect(`${name}: ${command}`).not.toMatch(
+        /\b(npm|npx|yarn|pnpm|node)\s+[-\w/]+/,
+      );
+    }
+  });
+});
+
+describe("bun-only toolchain: Bun's own APIs carry the load", () => {
+  const read = (path: string): string =>
+    readFileSync(join(ROOT, path), "utf-8");
+
+  it("reads bunfig.toml with Bun's own TOML parser", () => {
+    // A regular expression cannot tell `bun = true` from a line of prose
+    // that mentions it, and it cannot tell a setting that Bun will act on
+    // from one that has been moved under the wrong table. The doctor
+    // decides whether this repository runs on Bun, so it has to read the
+    // file the way Bun reads it.
+    const doctor = read("scripts/doctor.ts");
+
+    expect(doctor).toContain("Bun.TOML.parse");
+    expect(doctor).not.toMatch(/bunfig[\s\S]{0,200}?\.match\(/);
+  });
+
+  it("reads the coverage report Bun writes instead of scraping its output", () => {
+    // The console coverage table is a human-readable rendering, and its
+    // shape is not an interface. The lcov report is a data format.
+    const gate = read("scripts/coverage-check.ts");
+
+    expect(gate).toContain("--coverage-reporter=lcov");
+    expect(gate).toContain("parseLcov");
+    // The test output is only ever printed on failure, never parsed.
+    expect(gate).not.toMatch(/output\.match\(/);
+  });
+
+  it("finds files with Bun's own matcher", () => {
+    for (const script of [
+      "scripts/lint-migrations.ts",
+      "scripts/supabase-migrate.ts",
+      "scripts/bundle-size.ts",
+    ]) {
+      expect(`${script}: ${read(script)}`).toContain("new Bun.Glob(");
+    }
+  });
+
+  it("declares the dependency trust list explicitly", () => {
+    // Bun is default-secure: a dependency's install script does not run
+    // unless it is on this list. Naming the list makes the decision
+    // visible in the diff instead of leaving it to a built-in default that
+    // changes with the runtime.
+    const pkg = JSON.parse(read("package.json")) as {
+      trustedDependencies?: unknown;
+    };
+
+    expect(Array.isArray(pkg.trustedDependencies)).toBe(true);
+  });
+
+  it("never auto-installs a dependency at run time", () => {
+    // The lockfile is committed, so a missing dependency is a mistake in
+    // the working tree. Reaching for the network to paper over it is how
+    // an unvetted package gets into a build.
+    const bunfig = Bun.TOML.parse(read("bunfig.toml")) as {
+      install?: { auto?: string };
+    };
+
+    expect(bunfig.install?.auto).toBe("disable");
+  });
+
+  it("lets Bun's formatter do the sorting", () => {
+    const bunfig = Bun.TOML.parse(read("bunfig.toml")) as {
+      fmt?: { sortImports?: boolean; sortTailwindcss?: unknown };
+    };
+
+    expect(bunfig.fmt?.sortImports).toBe(true);
+    expect(bunfig.fmt?.sortTailwindcss).toBeDefined();
+  });
+
+  it("lints with the types in hand", () => {
+    // The type-aware rules are the ones that need the type checker: an
+    // `any` that came off the network, a promise nobody awaited, a type
+    // assertion that changes nothing. The compiler is silent about all
+    // three, and a linter without the types cannot see them either.
+    const bunfig = Bun.TOML.parse(read("bunfig.toml")) as {
+      lint?: { typeAware?: boolean; maxWarnings?: number };
+    };
+
+    expect(bunfig.lint?.typeAware).toBe(true);
+    expect(bunfig.lint?.maxWarnings).toBe(0);
+  });
+});

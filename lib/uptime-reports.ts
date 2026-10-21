@@ -123,7 +123,7 @@ export async function generateUptimeReport(
 
   if (monitorResult.error || !monitorResult.data) return null;
 
-  const monitor = monitorResult.data as { id: string; name: string };
+  const monitor = monitorResult.data;
 
   // Long windows span the retention boundary: raw rows cover the recent
   // slice, daily rollups cover full days before it. Short windows stay on

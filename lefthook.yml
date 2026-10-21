@@ -1,5 +1,5 @@
 # Lefthook Configuration - Enterprise Ready
-# Run `npx lefthook install` to set up hooks
+# Run `bun run hooks:install` to set up hooks
 #
 # Features:
 # - Parallel execution for speed
@@ -24,30 +24,48 @@ pre-commit:
 
   commands:
     # TypeScript type checking (staged files only)
+    #
+    # `bun check` is Bun's own checker, and it is the only one that can check
+    # a subset: `tsrs` is project-scoped the way `tsc` is, and refuses a file
+    # list outright. The whole-project check is `bun run typecheck`, which
+    # runs `tsrs` and is what CI gates on.
     typecheck:
       priority: 1
-      glob: "*.{ts,tsx}"
-      run: bunx tsc --noEmit --skipLibCheck
+      glob: "*.{ts,tsx,mts}"
+      run: bun check {staged_files}
       fail_text: "❌ TypeScript errors found. Fix type issues before committing."
 
-    # ESLint with auto-fix disabled (check only)
+    # Lint with auto-fix disabled (check only)
     lint:
       priority: 1
-      glob: "*.{js,jsx,ts,tsx}"
-      run: bunx eslint {staged_files} --max-warnings 0 --no-fix
-      fail_text: "❌ ESLint errors found. Run 'npm run lint -- --fix' to auto-fix."
+      glob: "*.{js,jsx,ts,tsx,mts}"
+      run: bun lint {staged_files}
+      fail_text: "❌ Lint errors found. Run 'bun run lint:fix' to auto-fix."
 
-    # Prettier format check
+    # Format check (Bun's own formatter)
     format:
       priority: 2
-      glob: "*.{js,jsx,ts,tsx,json,css,md,yml,yaml}"
-      run: bunx prettier --check {staged_files}
-      fail_text: "❌ Formatting issues found. Run 'npx prettier --write .' to fix."
+      glob: "*.{js,jsx,ts,tsx,mts,json,css,md,yml,yaml}"
+      run: bun fmt --check {staged_files}
+      fail_text: "❌ Formatting issues found. Run 'bun run format' to fix."
+
+    # Regenerate CLAUDE.md from AGENTS.md.
+    #
+    # Next.js manages its own blocks inside AGENTS.md and rewrites them on
+    # every `next dev` and `next build`, so the two agent documents drift
+    # whenever the framework touches the file. CLAUDE.md is the generated
+    # copy, minus those blocks. Running the sync before the commit is what
+    # keeps the pair in step; the unit test fails the build if they drift.
+    agent-docs:
+      priority: 2
+      glob: "AGENTS.md"
+      run: bun run agent-docs:sync
+      fail_text: "❌ CLAUDE.md could not be regenerated from AGENTS.md."
 
     # Check for debug statements (CI tooling in scripts/ intentionally logs)
     no-debug:
       priority: 3
-      glob: "*.{ts,tsx,js,jsx}"
+      glob: "*.{ts,tsx,mts,js,jsx}"
       exclude: "scripts/*"
       run: tools/audit/target/release/audit no-debug {staged_files}
       fail_text: "❌ Debug statements found. Remove console.log, debugger, etc."
@@ -55,7 +73,7 @@ pre-commit:
     # Check for secrets/credentials
     secrets-check:
       priority: 3
-      glob: "*.{ts,tsx,js,jsx,json,yml,yaml,toml,sql,env*}"
+      glob: "*.{ts,tsx,mts,js,jsx,json,yml,yaml,toml,sql,env*}"
       run: tools/audit/target/release/audit secrets-check {staged_files}
       fail_text: "❌ Potential secrets detected. Never commit credentials!"
 

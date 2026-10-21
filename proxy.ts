@@ -1,5 +1,6 @@
-import { updateSession } from "@/lib/supabase/middleware";
 import { NextRequest, NextResponse } from "next/server";
+
+import { updateSession } from "@/lib/supabase/middleware";
 
 export async function proxy(request: NextRequest) {
   // CVE-2025-29927 (React2Shell) protection

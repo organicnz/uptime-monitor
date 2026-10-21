@@ -90,5 +90,5 @@ export function mergeChannelConfig(
   config: Record<string, unknown>,
   secret: Record<string, unknown> | null,
 ): Record<string, unknown> {
-  return { ...config, ...(secret ?? {}) };
+  return { ...config, ...secret };
 }

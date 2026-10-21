@@ -1,7 +1,8 @@
+import { mkdtempSync, writeFileSync } from "bun:fs";
+import { tmpdir } from "bun:os";
+import { join } from "bun:path";
 import { describe, expect, it } from "bun:test";
-import { mkdtempSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+
 import { latencyTrendShader } from "@/components/shaders/latency-trend";
 import { statusBackdropShader } from "@/components/shaders/status-backdrop";
 
@@ -32,9 +33,18 @@ async function runVgpuCheck(name: string, source: string) {
   const file = join(dir, `${name}.wgsl`);
   writeFileSync(file, source);
 
-  const proc = Bun.spawn(["npx", "vgpu", "check", file]);
-  const stdout = await new Response(proc.stdout).text();
-  const stderr = await new Response(proc.stderr).text();
+  // Bun pipes `stdout` by default but *inherits* `stderr`, so
+  // `proc.stderr` is undefined unless it is asked for. A shader that fails
+  // validation explains itself on stderr, so it is piped: without this the
+  // failure detail is silently empty.
+  const proc = Bun.spawn(["bunx", "vgpu", "check", file], {
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+  // `Bun.readableStreamToText` reads the pipe directly; wrapping it in a
+  // `Response` builds a whole response object to do it.
+  const stdout = await Bun.readableStreamToText(proc.stdout);
+  const stderr = await Bun.readableStreamToText(proc.stderr);
   const exitCode = await proc.exited;
 
   let ok = exitCode === 0;

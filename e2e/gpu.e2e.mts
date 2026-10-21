@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, type Page, test } from "@playwright/test";
 
 /**
  * Browser-level coverage for the WebGPU visualisations.
@@ -20,6 +20,21 @@ import { expect, test, type Page } from "@playwright/test";
 
 /** Cold adapter acquisition on a software rasteriser is slow but bounded. */
 const GPU_TIMEOUT_MS = 90_000;
+
+/**
+ * Byte-wise comparison of two screenshots.
+ *
+ * `Buffer.compare` is a Node.js API. Comparing the two byte arrays directly
+ * is the same test without the dependency, and a screenshot is a `Uint8Array`
+ * underneath.
+ */
+function bytesEqual(a: Uint8Array, b: Uint8Array): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] !== b[i]) return false;
+  }
+  return true;
+}
 
 const ready = (page: Page) => page.getByText("WebGPU", { exact: true });
 const unavailable = (page: Page) =>
@@ -111,9 +126,9 @@ test("renders a single static frame when reduced motion is preferred", async ({
   // A continuous frame loop redraws every tick, which changes at least the
   // pulsing head marker between these two captures.
   expect(
-    Buffer.compare(first, second),
+    bytesEqual(first, second),
     "canvas changed between frames despite prefers-reduced-motion",
-  ).toBe(0);
+  ).toBe(true);
 });
 
 test("animates when reduced motion is not preferred", async ({ page }) => {
@@ -131,9 +146,9 @@ test("animates when reduced motion is not preferred", async ({ page }) => {
   // Guards the inverse of the test above: the static path must not have
   // silently become the only path.
   expect(
-    Buffer.compare(first, second),
+    bytesEqual(first, second),
     "canvas did not change between frames, so the frame loop is not running",
-  ).not.toBe(0);
+  ).toBe(false);
 });
 
 test("serves the fixture because the e2e env flag is set", async ({ page }) => {

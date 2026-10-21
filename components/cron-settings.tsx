@@ -1,6 +1,19 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import {
+  AlertCircle,
+  AlertTriangle,
+  Clock,
+  Globe,
+  Pause,
+  Play,
+  RefreshCw,
+  RotateCcw,
+} from "lucide-react";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
+
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -8,7 +21,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -17,18 +30,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Input } from "@/components/ui/input";
 import {
-  Clock,
-  Pause,
-  Play,
-  RefreshCw,
-  AlertCircle,
-  RotateCcw,
-  Globe,
-  AlertTriangle,
-} from "lucide-react";
-import { toast } from "sonner";
+  fetchJson,
+  type Schedule,
+  ScheduleResponseSchema,
+  ScheduleUpdateResponseSchema,
+} from "@/lib/api-client";
 
 const RETRY_OPTIONS = [
   { value: "0", label: "No retries" },
@@ -50,18 +57,6 @@ const TIMEZONE_OPTIONS = [
   { value: "America/New_York", label: "America/New_York (EST)" },
   { value: "America/Los_Angeles", label: "America/Los_Angeles (PST)" },
 ];
-
-type Schedule = {
-  id: string;
-  cron: string;
-  intervalMinutes: number;
-  destination: string;
-  isPaused: boolean;
-  createdAt: number;
-  retries: number;
-  failureCallback?: string;
-  timezone?: string;
-};
 
 const INTERVAL_OPTIONS = [
   { value: "1", label: "Every 1 minute", dailyMessages: 1440 },
@@ -88,12 +83,10 @@ export function CronSettings() {
     try {
       setLoading(true);
       setError(null);
-      const res = await fetch("/api/settings/schedule");
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error || "Failed to fetch schedule");
-      }
+      const data = await fetchJson(
+        "/api/settings/schedule",
+        ScheduleResponseSchema,
+      );
 
       if (data.schedule) {
         setSchedule(data.schedule);
@@ -111,7 +104,7 @@ export function CronSettings() {
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    fetchSchedule();
+    void fetchSchedule();
   }, []);
 
   const handleIntervalChange = async (value: string) => {
@@ -119,7 +112,7 @@ export function CronSettings() {
 
     setSaving(true);
     try {
-      const res = await fetch("/api/settings/schedule", {
+      await fetchJson("/api/settings/schedule", ScheduleUpdateResponseSchema, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -127,12 +120,6 @@ export function CronSettings() {
           intervalMinutes: parseInt(value, 10),
         }),
       });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error || "Failed to update schedule");
-      }
 
       setSelectedInterval(value);
       toast.success(
@@ -157,7 +144,7 @@ export function CronSettings() {
     const action = schedule.isPaused ? "resume" : "pause";
 
     try {
-      const res = await fetch("/api/settings/schedule", {
+      await fetchJson("/api/settings/schedule", ScheduleUpdateResponseSchema, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -165,12 +152,6 @@ export function CronSettings() {
           action,
         }),
       });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error || `Failed to ${action} schedule`);
-      }
 
       setSchedule({ ...schedule, isPaused: !schedule.isPaused });
       toast.success(`Schedule ${action}d`);
@@ -188,7 +169,7 @@ export function CronSettings() {
 
     setSaving(true);
     try {
-      const res = await fetch("/api/settings/schedule", {
+      await fetchJson("/api/settings/schedule", ScheduleUpdateResponseSchema, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -196,9 +177,6 @@ export function CronSettings() {
           retries: parseInt(value, 10),
         }),
       });
-
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to update retries");
 
       setSelectedRetries(value);
       toast.success(`Retries updated to ${value}`);
@@ -217,7 +195,7 @@ export function CronSettings() {
 
     setSaving(true);
     try {
-      const res = await fetch("/api/settings/schedule", {
+      await fetchJson("/api/settings/schedule", ScheduleUpdateResponseSchema, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -225,9 +203,6 @@ export function CronSettings() {
           timezone: value,
         }),
       });
-
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to update timezone");
 
       setSelectedTimezone(value);
       toast.success(`Timezone updated to ${value || "UTC"}`);
@@ -246,7 +221,7 @@ export function CronSettings() {
 
     setSaving(true);
     try {
-      const res = await fetch("/api/settings/schedule", {
+      await fetchJson("/api/settings/schedule", ScheduleUpdateResponseSchema, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -254,10 +229,6 @@ export function CronSettings() {
           failureCallback: failureCallback,
         }),
       });
-
-      const data = await res.json();
-      if (!res.ok)
-        throw new Error(data.error || "Failed to update failure callback");
 
       toast.success("Failure callback updated");
       await fetchSchedule();
@@ -279,7 +250,7 @@ export function CronSettings() {
 
   if (loading) {
     return (
-      <Card className="bg-neutral-900/50 border-neutral-800">
+      <Card className="border-neutral-800 bg-neutral-900/50">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Clock className="h-5 w-5" />
@@ -298,7 +269,7 @@ export function CronSettings() {
 
   if (error) {
     return (
-      <Card className="bg-neutral-900/50 border-neutral-800">
+      <Card className="border-neutral-800 bg-neutral-900/50">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Clock className="h-5 w-5" />
@@ -316,7 +287,7 @@ export function CronSettings() {
             className="mt-4"
             onClick={fetchSchedule}
           >
-            <RefreshCw className="h-4 w-4 mr-2" />
+            <RefreshCw className="mr-2 h-4 w-4" />
             Retry
           </Button>
         </CardContent>
@@ -326,7 +297,7 @@ export function CronSettings() {
 
   if (!schedule) {
     return (
-      <Card className="bg-neutral-900/50 border-neutral-800">
+      <Card className="border-neutral-800 bg-neutral-900/50">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Clock className="h-5 w-5" />
@@ -341,7 +312,7 @@ export function CronSettings() {
   }
 
   return (
-    <Card className="bg-neutral-900/50 border-neutral-800">
+    <Card className="border-neutral-800 bg-neutral-900/50">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Clock className="h-5 w-5" />
@@ -359,14 +330,14 @@ export function CronSettings() {
             onValueChange={handleIntervalChange}
             disabled={saving}
           >
-            <SelectTrigger className="w-full bg-neutral-800 border-neutral-700">
+            <SelectTrigger className="w-full border-neutral-700 bg-neutral-800">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
               {INTERVAL_OPTIONS.map((option) => (
                 <SelectItem key={option.value} value={option.value}>
                   {option.label}
-                  <span className="text-neutral-500 ml-2">
+                  <span className="ml-2 text-neutral-500">
                     ({option.dailyMessages}/day)
                   </span>
                 </SelectItem>
@@ -375,7 +346,7 @@ export function CronSettings() {
           </Select>
 
           {isOverFreeLimit && (
-            <p className="text-sm text-yellow-500 flex items-center gap-1">
+            <p className="flex items-center gap-1 text-sm text-yellow-500">
               <AlertCircle className="h-3 w-3" />
               Exceeds QStash free tier (1,000/day)
             </p>
@@ -393,7 +364,7 @@ export function CronSettings() {
             onValueChange={handleRetriesChange}
             disabled={saving}
           >
-            <SelectTrigger className="w-full bg-neutral-800 border-neutral-700">
+            <SelectTrigger className="w-full border-neutral-700 bg-neutral-800">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -420,7 +391,7 @@ export function CronSettings() {
             onValueChange={handleTimezoneChange}
             disabled={saving}
           >
-            <SelectTrigger className="w-full bg-neutral-800 border-neutral-700">
+            <SelectTrigger className="w-full border-neutral-700 bg-neutral-800">
               <SelectValue placeholder="UTC (default)" />
             </SelectTrigger>
             <SelectContent>
@@ -448,7 +419,7 @@ export function CronSettings() {
               placeholder="https://your-webhook.com/failure"
               value={failureCallback}
               onChange={(e) => setFailureCallback(e.target.value)}
-              className="bg-neutral-800 border-neutral-700"
+              className="border-neutral-700 bg-neutral-800"
               disabled={saving}
             />
             <Button
@@ -467,7 +438,7 @@ export function CronSettings() {
             URL to call when all retries are exhausted. Use your app&apos;s
             built-in endpoint:
           </p>
-          <code className="text-xs bg-neutral-800 px-2 py-1 rounded text-green-400 block overflow-x-auto">
+          <code className="block overflow-x-auto rounded bg-neutral-800 px-2 py-1 text-xs text-green-400">
             {typeof window !== "undefined"
               ? `${window.location.origin}/api/cron/failure-callback`
               : "/api/cron/failure-callback"}
@@ -475,7 +446,7 @@ export function CronSettings() {
         </div>
 
         {/* Status */}
-        <div className="flex items-center justify-between p-3 bg-neutral-800/50 rounded-lg">
+        <div className="flex items-center justify-between rounded-lg bg-neutral-800/50 p-3">
           <div>
             <p className="text-sm font-medium">
               Status:{" "}
@@ -495,12 +466,12 @@ export function CronSettings() {
           >
             {schedule.isPaused ? (
               <>
-                <Play className="h-4 w-4 mr-1" />
+                <Play className="mr-1 h-4 w-4" />
                 Resume
               </>
             ) : (
               <>
-                <Pause className="h-4 w-4 mr-1" />
+                <Pause className="mr-1 h-4 w-4" />
                 Pause
               </>
             )}

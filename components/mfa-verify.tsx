@@ -1,11 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { Loader2, Shield } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
+import { useState } from "react";
+
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Card,
   CardContent,
@@ -13,7 +12,9 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Shield, Loader2 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { createClient } from "@/lib/supabase/client";
 
 type Props = {
   onVerified?: () => void;
@@ -87,15 +88,15 @@ export function MFAVerify({ onVerified }: Props) {
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && verifyCode.length === 6) {
-      handleVerify();
+      void handleVerify();
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4">
+    <div className="flex min-h-screen items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <div className="mx-auto w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mb-4">
+          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
             <Shield className="h-6 w-6 text-primary" />
           </div>
           <CardTitle>Two-factor authentication</CardTitle>
@@ -105,7 +106,7 @@ export function MFAVerify({ onVerified }: Props) {
         </CardHeader>
         <CardContent className="space-y-6">
           {error && (
-            <div className="bg-destructive/10 border border-destructive/30 text-destructive px-4 py-3 rounded-lg text-sm">
+            <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
               {error}
             </div>
           )}
@@ -122,7 +123,7 @@ export function MFAVerify({ onVerified }: Props) {
               value={verifyCode}
               onChange={(e) => setVerifyCode(e.target.value.replace(/\D/g, ""))}
               onKeyDown={handleKeyDown}
-              className="text-center text-2xl tracking-widest font-mono h-14"
+              className="h-14 text-center font-mono text-2xl tracking-widest"
               autoFocus
             />
           </div>
@@ -130,7 +131,7 @@ export function MFAVerify({ onVerified }: Props) {
           <Button
             onClick={handleVerify}
             disabled={loading || verifyCode.length !== 6}
-            className="w-full h-11"
+            className="h-11 w-full"
           >
             {loading ? (
               <>
@@ -142,7 +143,7 @@ export function MFAVerify({ onVerified }: Props) {
             )}
           </Button>
 
-          <p className="text-xs text-center text-muted-foreground">
+          <p className="text-center text-xs text-muted-foreground">
             Open your authenticator app to view your verification code
           </p>
         </CardContent>

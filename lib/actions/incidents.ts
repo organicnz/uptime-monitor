@@ -1,10 +1,11 @@
 "use server";
 
-import { createClient } from "@/lib/supabase/server";
-import { getMfaVerificationError } from "@/lib/mfa";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+
 import { INCIDENT_STATUS } from "@/lib/constants";
+import { getMfaVerificationError } from "@/lib/mfa";
+import { createClient } from "@/lib/supabase/server";
 
 const incidentSchema = z.object({
   monitor_id: z.string().min(1, "Monitor is required"),
@@ -71,7 +72,7 @@ export async function createIncident(
       content: parsed.data.content || null,
       status: parsed.data.status,
       started_at: new Date().toISOString(),
-    } as unknown as never)
+    })
     .select()
     .single();
 
@@ -120,7 +121,13 @@ export async function updateIncidentStatus(
     return { success: false, error: "Unauthorized" };
   }
 
-  const updateData: Record<string, unknown> = { status };
+  // The row's own update type, so the payload is checked rather than
+  // asserted. `resolved_at` is only set on the way to RESOLVED, so it is
+  // built conditionally rather than defaulted.
+  const updateData: {
+    status: number;
+    resolved_at?: string;
+  } = { status };
 
   if (status === INCIDENT_STATUS.RESOLVED) {
     updateData.resolved_at = new Date().toISOString();
@@ -128,7 +135,7 @@ export async function updateIncidentStatus(
 
   const { error } = await supabase
     .from("incidents")
-    .update(updateData as unknown as never)
+    .update(updateData)
     .eq("id", id);
 
   if (error) {
@@ -192,7 +199,14 @@ export async function updateIncident(
     return { success: false, error: "Unauthorized" };
   }
 
-  const updateData: Record<string, unknown> = {
+  // The row's own update type, so the payload is checked rather than
+  // asserted.
+  const updateData: {
+    title: string;
+    content: string | null;
+    status: number;
+    resolved_at?: string;
+  } = {
     title,
     content: content || null,
     status,
@@ -204,7 +218,7 @@ export async function updateIncident(
 
   const { error } = await supabase
     .from("incidents")
-    .update(updateData as unknown as never)
+    .update(updateData)
     .eq("id", id);
 
   if (error) {

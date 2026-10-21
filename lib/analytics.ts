@@ -1,5 +1,5 @@
-import { createServiceClient } from "@/lib/supabase/service";
 import { HEARTBEAT_STATUS } from "@/lib/monitor-status";
+import { createServiceClient } from "@/lib/supabase/service";
 import type { Monitor } from "@/types/application";
 
 export type RollingStats = {
@@ -22,6 +22,62 @@ export type HeartbeatSample = {
 const MAX_ROWS = 500;
 
 const DEFAULT_WINDOW: RollingWindow = { hours: 24, minSamples: 5 };
+
+/**
+ * The rows this module reads and writes.
+ *
+ * A narrow port, for the same reason as the channel store: `mock.module` in
+ * Bun is process-wide, so a test that replaced one would silently change
+ * what every other test file sees.
+ */
+export type AnalyticsStore = {
+  /** The heartbeats in a window, newest first. */
+  recentHeartbeats(
+    monitorId: string,
+    since: string,
+  ): Promise<{ samples: HeartbeatSample[]; error: string | null }>;
+
+  /** Write the aggregate back onto the monitor. */
+  writeStats(
+    monitorId: string,
+    stats: RollingStats,
+  ): Promise<{ error: string | null }>;
+};
+
+function createSupabaseStore(): AnalyticsStore {
+  return {
+    async recentHeartbeats(monitorId, since) {
+      const supabase = createServiceClient();
+      const { data, error } = await supabase
+        .from("heartbeats")
+        .select("status, ping, duration")
+        .eq("monitor_id", monitorId)
+        .gte("time", since)
+        .order("time", { ascending: false })
+        .limit(MAX_ROWS);
+
+      if (error) {
+        return { samples: [], error: error.message };
+      }
+      return { samples: data ?? [], error: null };
+    },
+
+    async writeStats(monitorId, stats) {
+      const supabase = createServiceClient();
+      const { error } = await supabase
+        .from("monitors")
+        .update({
+          avg_response_time_ms: stats.avg_response_time_ms,
+          success_rate_percent: stats.success_rate_percent,
+        })
+        .eq("id", monitorId);
+
+      return { error: error?.message ?? null };
+    },
+  };
+}
+
+export const defaultAnalyticsStore: AnalyticsStore = createSupabaseStore();
 
 /**
  * Window sized so it holds ~100 checks, floored at 15 minutes and capped at a
@@ -126,51 +182,39 @@ export function resetAnalyticsThrottle(): void {
 export async function computeRollingStats(
   monitorId: string,
   window: RollingWindow = DEFAULT_WINDOW,
+  store: AnalyticsStore = defaultAnalyticsStore,
 ): Promise<RollingStats | null> {
-  const supabase = createServiceClient();
   const since = new Date(
     Date.now() - window.hours * 60 * 60 * 1000,
   ).toISOString();
 
-  const { data, error } = await supabase
-    .from("heartbeats")
-    .select("status, ping, duration")
-    .eq("monitor_id", monitorId)
-    .gte("time", since)
-    .order("time", { ascending: false })
-    .limit(MAX_ROWS);
+  const { samples, error } = await store.recentHeartbeats(monitorId, since);
 
   if (error) {
     console.error(
-      `[analytics] Failed to read heartbeats for ${monitorId}: ${error.message}`,
+      `[analytics] Failed to read heartbeats for ${monitorId}: ${error}`,
     );
     return null;
   }
 
-  return summarizeHeartbeats((data ?? []) as HeartbeatSample[], window);
+  return summarizeHeartbeats(samples, window);
 }
 
 export async function updateMonitorAnalytics(
   monitor: Pick<Monitor, "id" | "interval">,
+  store: AnalyticsStore = defaultAnalyticsStore,
 ): Promise<void> {
   if (!claimAnalyticsRefresh(monitor)) return;
 
   const window = getStatsWindowForMonitor(monitor);
-  const stats = await computeRollingStats(monitor.id, window);
+  const stats = await computeRollingStats(monitor.id, window, store);
   if (!stats) return;
 
-  const supabase = createServiceClient();
-  const { error } = await supabase
-    .from("monitors")
-    .update({
-      avg_response_time_ms: stats.avg_response_time_ms,
-      success_rate_percent: stats.success_rate_percent,
-    })
-    .eq("id", monitor.id);
+  const { error } = await store.writeStats(monitor.id, stats);
 
   if (error) {
     console.error(
-      `[analytics] Failed to update stats for ${monitor.id}: ${error.message}`,
+      `[analytics] Failed to update stats for ${monitor.id}: ${error}`,
     );
   }
 }

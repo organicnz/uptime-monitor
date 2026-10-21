@@ -150,16 +150,17 @@ export function calculateGroupStatus(monitors: MonitorWithStatus[]): number {
 "use client";
 
 import { ChevronDown, ChevronRight } from "lucide-react";
+
 import { MonitorCard } from "./monitor-card";
 
 export function MonitorGroup({ group, monitors, onToggle }: MonitorGroupProps) {
   const status = calculateGroupStatus(monitors);
 
   return (
-    <div className="border border-neutral-800 rounded-lg">
+    <div className="rounded-lg border border-neutral-800">
       <button
         onClick={onToggle}
-        className="w-full flex items-center justify-between p-4"
+        className="flex w-full items-center justify-between p-4"
       >
         <div className="flex items-center gap-3">
           {group.collapsed ? <ChevronRight /> : <ChevronDown />}
@@ -170,7 +171,7 @@ export function MonitorGroup({ group, monitors, onToggle }: MonitorGroupProps) {
       </button>
 
       {!group.collapsed && (
-        <div className="p-4 pt-0 space-y-2">
+        <div className="space-y-2 p-4 pt-0">
           {monitors.map((monitor) => (
             <MonitorCard key={monitor.id} monitor={monitor} compact />
           ))}
@@ -189,13 +190,13 @@ export function MonitorGroup({ group, monitors, onToggle }: MonitorGroupProps) {
 export function TagBadge({ tag, onRemove }: TagBadgeProps) {
   return (
     <span
-      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs"
+      className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs"
       style={{ backgroundColor: `${tag.color}20`, color: tag.color }}
     >
       {tag.name}
       {onRemove && (
         <button onClick={onRemove} className="hover:opacity-70">
-          <X className="w-3 h-3" />
+          <X className="h-3 w-3" />
         </button>
       )}
     </span>
@@ -217,7 +218,7 @@ export function TagFilter({ tags, selected, onChange }: TagFilterProps) {
           key={tag.id}
           onClick={() => toggleTag(tag.id)}
           className={cn(
-            "px-3 py-1 rounded-full text-sm transition-all",
+            "rounded-full px-3 py-1 text-sm transition-all",
             selected.includes(tag.id)
               ? "ring-2 ring-offset-2 ring-offset-neutral-900"
               : "opacity-60 hover:opacity-100",
@@ -268,7 +269,7 @@ Using `@dnd-kit/core` for reordering:
 
 ```tsx
 // components/sortable-monitor-list.tsx
-import { DndContext, closestCenter } from "@dnd-kit/core";
+import { closestCenter, DndContext } from "@dnd-kit/core";
 import {
   SortableContext,
   verticalListSortingStrategy,

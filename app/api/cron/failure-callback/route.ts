@@ -1,7 +1,8 @@
-import { NextRequest, NextResponse } from "next/server";
 import { Receiver } from "@upstash/qstash";
-import { createServiceClient } from "@/lib/supabase/service";
+import { NextRequest, NextResponse } from "next/server";
+
 import { getQstashConfig } from "@/lib/env";
+import { createServiceClient } from "@/lib/supabase/service";
 
 /**
  * QStash signature verification.
@@ -111,7 +112,7 @@ export async function POST(request: NextRequest) {
 }
 
 // GET for health check
-export async function GET() {
+export function GET() {
   return NextResponse.json({
     status: "healthy",
     endpoint: "failure-callback",

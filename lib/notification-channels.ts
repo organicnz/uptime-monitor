@@ -1,14 +1,15 @@
 import { z } from "zod";
-import type { Json } from "@/types/database";
-import { createClient } from "@/lib/supabase/server";
-import { createServiceClient } from "@/lib/supabase/service";
+
 import {
   mergeChannelConfig,
-  notificationTypes,
-  splitChannelConfig,
   type NotificationConfig,
   type NotificationType,
+  notificationTypes,
+  splitChannelConfig,
 } from "@/lib/notification-types";
+import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/service";
+import type { Json } from "@/types/database";
 
 /**
  * Server-side access to notification channels.
@@ -18,6 +19,12 @@ import {
  * credential there (see the CHECK constraint in
  * 20260927094500_add_vault_notification_secrets.sql). Nothing in this module
  * ever returns a secret to a client component or an API response.
+ *
+ * The database is reached through {@link ChannelStore}, a narrow port. The
+ * port is the module's contract with the database, written down: a test can
+ * supply a fake without mocking a module, and `mock.module` in Bun is
+ * process-wide, so a test that replaced one would silently change what every
+ * other test file sees.
  */
 
 type ChannelRow = {
@@ -33,10 +40,225 @@ type ChannelRow = {
   updated_at?: string;
 };
 
+/** The channel fields the module reads back. */
+type StoredChannel = {
+  id: string;
+  type: NotificationType;
+  config: Record<string, unknown>;
+  secret_id: string | null;
+};
+
 /** A channel as the UI is allowed to see it: no credential, only a flag. */
 export type ChannelView = Omit<ChannelRow, "secret_id"> & {
   hasSecret: boolean;
 };
+
+/** The channel fields a write may change. */
+export type ChannelPatch = {
+  name?: string;
+  active?: boolean;
+  is_default?: boolean;
+  config?: Record<string, unknown>;
+};
+
+/**
+ * The database operations this module needs.
+ *
+ * Every method resolves to a plain result: the row it read, or the message
+ * of the error it hit. Nothing about Supabase leaks past the port, so the
+ * module above it is ordinary code.
+ */
+export type ChannelStore = {
+  insert(input: {
+    userId: string;
+    name: string;
+    type: NotificationType;
+    config: Record<string, unknown>;
+  }): Promise<{ row: ChannelRow | null; error: string | null }>;
+
+  read(
+    id: string,
+    userId: string,
+  ): Promise<{ row: StoredChannel | null; error: string | null }>;
+
+  update(
+    id: string,
+    userId: string,
+    patch: ChannelPatch,
+  ): Promise<{ error: string | null }>;
+
+  remove(id: string, userId: string): Promise<{ error: string | null }>;
+
+  /** Store a credential in the vault, for one channel. */
+  setSecret(
+    channelId: string,
+    secret: Record<string, unknown>,
+  ): Promise<{ error: string | null }>;
+
+  /** Read one credential. Service-role only. */
+  readSecret(
+    channelId: string,
+  ): Promise<{ secret: Record<string, unknown> | null; error: string | null }>;
+
+  /** Read a batch of credentials, in one round trip. Service-role only. */
+  readSecrets(channelIds: string[]): Promise<{
+    secrets: Array<{ channelId: string; secret: Record<string, unknown> }>;
+    error: string | null;
+  }>;
+};
+
+/**
+ * The real store: Supabase, through the owner-checked vault functions.
+ *
+ * The user-scoped client is used for the channel row, and the service-role
+ * client for the credentials — a credential is only ever read by a process
+ * that is allowed to send the notification.
+ */
+function createSupabaseStore(): ChannelStore {
+  return {
+    async insert(input) {
+      const supabase = await createClient();
+      const { data, error } = await supabase
+        .from("notification_channels")
+        .insert({
+          user_id: input.userId,
+          name: input.name,
+          type: input.type,
+          // The column is JSON; the config is a record of settings that the
+          // schema has already checked.
+          config: input.config as Json,
+          active: true,
+        })
+        .select(
+          "id, user_id, name, type, config, secret_id, is_default, active",
+        )
+        .single();
+
+      return {
+        row: (data as unknown as ChannelRow) ?? null,
+        error: error?.message ?? null,
+      };
+    },
+
+    async read(id, userId) {
+      const supabase = await createClient();
+      const { data, error } = await supabase
+        .from("notification_channels")
+        .select("id, type, config, secret_id")
+        .eq("id", id)
+        .eq("user_id", userId)
+        .maybeSingle();
+
+      if (error) {
+        return { row: null, error: error.message };
+      }
+      return {
+        row: (data as unknown as StoredChannel) ?? null,
+        error: null,
+      };
+    },
+
+    async update(id, userId, patch) {
+      const supabase = await createClient();
+      // Built field by field rather than spread: the spread would widen
+      // `config` past the column's JSON type.
+      const update: {
+        name?: string;
+        active?: boolean;
+        is_default?: boolean;
+        config?: Json;
+      } = {};
+      if (patch.name !== undefined) update.name = patch.name;
+      if (patch.active !== undefined) update.active = patch.active;
+      if (patch.is_default !== undefined) update.is_default = patch.is_default;
+      if (patch.config !== undefined) update.config = patch.config as Json;
+
+      const { error } = await supabase
+        .from("notification_channels")
+        .update(update)
+        .eq("id", id)
+        .eq("user_id", userId);
+
+      return { error: error?.message ?? null };
+    },
+
+    async remove(id, userId) {
+      const supabase = await createClient();
+      const { error } = await supabase
+        .from("notification_channels")
+        .delete()
+        .eq("id", id)
+        .eq("user_id", userId);
+
+      return { error: error?.message ?? null };
+    },
+
+    async setSecret(channelId, secret) {
+      const supabase = await createClient();
+      const { error } = await supabase.rpc("notification_channel_set_secret", {
+        p_channel_id: channelId,
+        p_secret: secret as Json,
+      });
+
+      return { error: error?.message ?? null };
+    },
+
+    async readSecret(channelId) {
+      // The user-scoped client, because the RPC is `SECURITY DEFINER` with
+      // an owner check: it is the caller's own channel that is readable.
+      const supabase = await createClient();
+      const { data, error } = await supabase.rpc(
+        "notification_channel_secret",
+        {
+          p_channel_id: channelId,
+        },
+      );
+
+      if (error) {
+        return { secret: null, error: error.message };
+      }
+      return {
+        secret: (data as Record<string, unknown> | null) ?? null,
+        error: null,
+      };
+    },
+
+    async readSecrets(channelIds) {
+      // The service-role client is synchronous: it has no session to read.
+      const supabase = createServiceClient();
+      const { data, error } = await supabase.rpc(
+        "notification_channel_secrets",
+        {
+          p_channel_ids: channelIds,
+        },
+      );
+
+      if (error) {
+        return { secrets: [], error: error.message };
+      }
+      return {
+        secrets: (
+          (data ?? []) as {
+            out_channel_id: string;
+            out_secret: Record<string, unknown>;
+          }[]
+        ).map((row) => ({
+          channelId: row.out_channel_id,
+          secret: row.out_secret ?? {},
+        })),
+        error: null,
+      };
+    },
+  };
+}
+
+/**
+ * The store every call uses unless a test supplies its own.
+ *
+ * It is created once, not per call: the store's methods reach for a client
+ * when they are called, so there is no connection to open here.
+ */
+const DEFAULT_STORE: ChannelStore = createSupabaseStore();
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -55,37 +277,61 @@ const channelTypeSchema = z.enum(notificationTypes);
 
 const rawRecord = z.record(z.string(), z.unknown());
 
+// The `error` on each field is what a user sees when a field is *missing*.
+// Without it, Zod reports "expected string, received undefined", which says
+// nothing about which field was left out.
+
 const telegramConfigSchema = z.object({
-  bot_token: z.string().min(1, "Bot token is required"),
-  chat_id: z.string().min(1, "Chat ID is required"),
+  bot_token: z
+    .string({ error: "Bot token is required" })
+    .min(1, "Bot token is required"),
+  chat_id: z
+    .string({ error: "Chat ID is required" })
+    .min(1, "Chat ID is required"),
 });
 
 const webhookConfigSchema = z.object({
-  url: z.string().url("Invalid webhook URL"),
+  url: z
+    .string({ error: "Webhook URL is required" })
+    .url("Invalid webhook URL"),
   method: z.enum(["GET", "POST"]).optional().default("POST"),
   headers: z.record(z.string(), z.string()).optional(),
 });
 
 const webhookUrlOnlySchema = z.object({
-  webhook_url: z.string().url("Invalid webhook URL"),
+  webhook_url: z
+    .string({ error: "Webhook URL is required" })
+    .url("Invalid webhook URL"),
 });
 
 const pushoverConfigSchema = z.object({
-  user_key: z.string().min(1, "User key is required"),
-  token: z.string().min(1, "API token is required"),
+  user_key: z
+    .string({ error: "User key is required" })
+    .min(1, "User key is required"),
+  token: z
+    .string({ error: "API token is required" })
+    .min(1, "API token is required"),
   priority: z.number().min(-2).max(2).optional(),
   sound: z.string().optional(),
 });
 
 const emailConfigSchema = z.object({
-  smtp_host: z.string().min(1, "SMTP host is required"),
+  smtp_host: z
+    .string({ error: "SMTP host is required" })
+    .min(1, "SMTP host is required"),
   smtp_port: z
-    .number()
+    .number({ error: "SMTP port is required" })
     .min(1)
     .max(65535, "SMTP port must be between 1 and 65535"),
-  username: z.string().min(1, "Username is required"),
-  password: z.string().min(1, "Password is required"),
-  to: z.string().email("Invalid email address"),
+  username: z
+    .string({ error: "Username is required" })
+    .min(1, "Username is required"),
+  password: z
+    .string({ error: "Password is required" })
+    .min(1, "Password is required"),
+  to: z
+    .string({ error: "Email address is required" })
+    .email("Invalid email address"),
 });
 
 function configSchemaFor(type: NotificationType): z.ZodType {
@@ -155,13 +401,13 @@ function partition(
   existingSecret: Record<string, unknown> | null,
 ) {
   const split = splitChannelConfig(type, {
-    ...(config ?? {}),
-    ...(secret ?? {}),
+    ...config,
+    ...secret,
   });
 
   const merged = {
     ...split.config,
-    ...(existingSecret ?? {}),
+    ...existingSecret,
     ...split.secret,
   };
 
@@ -176,27 +422,22 @@ function partition(
 export async function createChannel(
   userId: string,
   input: CreateChannelInput,
+  store: ChannelStore = DEFAULT_STORE,
 ): Promise<ChannelWriteResult> {
-  const supabase = await createClient();
   const partitioned = partition(input.type, input.config, input.secret, null);
 
   if (!partitioned.ok) {
     return { ok: false, error: partitioned.error, status: 400 };
   }
 
-  const { data, error } = await supabase
-    .from("notification_channels")
-    .insert({
-      user_id: userId,
-      name: input.name,
-      type: input.type,
-      config: partitioned.config,
-      active: true,
-    } as never)
-    .select("id, user_id, name, type, config, secret_id, is_default, active")
-    .single();
+  const { row, error } = await store.insert({
+    userId,
+    name: input.name,
+    type: input.type,
+    config: partitioned.config,
+  });
 
-  if (error || !data) {
+  if (error || !row) {
     console.error("Error creating channel:", error);
     return {
       ok: false,
@@ -205,23 +446,18 @@ export async function createChannel(
     };
   }
 
-  const row = data as unknown as ChannelRow;
   let storedSecret = false;
 
   if (Object.keys(partitioned.secret).length > 0) {
-    const { error: secretError } = await supabase.rpc(
-      "notification_channel_set_secret",
-      { p_channel_id: row.id, p_secret: partitioned.secret as Json },
+    const { error: secretError } = await store.setSecret(
+      row.id,
+      partitioned.secret,
     );
 
     if (secretError) {
       // Do not leave a half-configured channel behind: a channel with no
       // credential is worse than no channel, because it fails silently.
-      await supabase
-        .from("notification_channels")
-        .delete()
-        .eq("id", row.id)
-        .eq("user_id", userId);
+      await store.remove(row.id, userId);
       console.error("Error storing channel secret:", secretError);
       return {
         ok: false,
@@ -239,15 +475,12 @@ export async function createChannel(
 export async function updateChannel(
   userId: string,
   input: UpdateChannelInput,
+  store: ChannelStore = DEFAULT_STORE,
 ): Promise<ChannelWriteResult> {
-  const supabase = await createClient();
-
-  const { data: existing, error: readError } = await supabase
-    .from("notification_channels")
-    .select("id, type, config, secret_id")
-    .eq("id", input.id)
-    .eq("user_id", userId)
-    .maybeSingle();
+  const { row: existing, error: readError } = await store.read(
+    input.id,
+    userId,
+  );
 
   if (readError) {
     console.error("Error reading channel:", readError);
@@ -258,15 +491,15 @@ export async function updateChannel(
     return { ok: false, error: "Channel not found", status: 404 };
   }
 
-  const type = (existing as { type: NotificationType }).type;
-  const currentConfig =
-    (existing as { config: Record<string, unknown> }).config ?? {};
-  const hasSecret =
-    (existing as { secret_id: string | null }).secret_id !== null;
+  const { type } = existing;
+  const currentConfig = existing.config ?? {};
+  const hasSecret = existing.secret_id !== null;
 
   // Only a stored secret can satisfy an omitted field. A channel that has
   // never had one must supply its credentials again.
-  const existingSecret = hasSecret ? await readChannelSecret(input.id) : null;
+  const existingSecret = hasSecret
+    ? (await store.readSecret(input.id)).secret
+    : null;
 
   const partitioned = partition(
     type,
@@ -279,18 +512,14 @@ export async function updateChannel(
     return { ok: false, error: partitioned.error, status: 400 };
   }
 
-  const patch: Record<string, unknown> = {};
+  const patch: ChannelPatch = {};
   if (input.name !== undefined) patch.name = input.name;
   if (input.active !== undefined) patch.active = input.active;
   if (input.is_default !== undefined) patch.is_default = input.is_default;
   if (input.config !== undefined) patch.config = partitioned.config;
 
   if (Object.keys(patch).length > 0) {
-    const { error: updateError } = await supabase
-      .from("notification_channels")
-      .update(patch as never)
-      .eq("id", input.id)
-      .eq("user_id", userId);
+    const { error: updateError } = await store.update(input.id, userId, patch);
 
     if (updateError) {
       console.error("Error updating channel:", updateError);
@@ -299,9 +528,9 @@ export async function updateChannel(
   }
 
   if (Object.keys(partitioned.secret).length > 0) {
-    const { error: secretError } = await supabase.rpc(
-      "notification_channel_set_secret",
-      { p_channel_id: input.id, p_secret: partitioned.secret as Json },
+    const { error: secretError } = await store.setSecret(
+      input.id,
+      partitioned.secret,
     );
 
     if (secretError) {
@@ -332,14 +561,10 @@ export async function updateChannel(
 export async function deleteChannel(
   userId: string,
   id: string,
+  store: ChannelStore = DEFAULT_STORE,
 ): Promise<{ ok: true } | { ok: false; error: string; status: number }> {
-  const supabase = await createClient();
   // The `delete_notification_channel_secret` trigger removes the vault row.
-  const { error } = await supabase
-    .from("notification_channels")
-    .delete()
-    .eq("id", id)
-    .eq("user_id", userId);
+  const { error } = await store.remove(id, userId);
 
   if (error) {
     console.error("Error deleting channel:", error);
@@ -349,48 +574,31 @@ export async function deleteChannel(
   return { ok: true };
 }
 
-async function readChannelSecret(
-  channelId: string,
-): Promise<Record<string, unknown> | null> {
-  const supabase = await createClient();
-  const { data, error } = await supabase.rpc("notification_channel_secret", {
-    p_channel_id: channelId,
-  });
-
-  if (error) {
-    console.error("Error reading channel secret:", error);
-    return null;
-  }
-
-  return (data as Record<string, unknown> | null) ?? null;
-}
-
 /**
  * Resolves the full config a sender needs for a set of channels, in one
  * round trip. Service-role only: delivery runs from cron.
  */
 export async function resolveChannelConfigs<
   T extends { id: string; type: NotificationType; config: unknown },
->(channels: T[]): Promise<Map<string, NotificationConfig>> {
+>(
+  channels: T[],
+  store: ChannelStore = DEFAULT_STORE,
+): Promise<Map<string, NotificationConfig>> {
   const resolved = new Map<string, NotificationConfig>();
   if (channels.length === 0) return resolved;
 
-  const supabase = createServiceClient();
-  const { data, error } = await supabase.rpc("notification_channel_secrets", {
-    p_channel_ids: channels.map((channel) => channel.id),
-  });
+  const { secrets, error } = await store.readSecrets(
+    channels.map((channel) => channel.id),
+  );
 
   if (error) {
     console.error("Error resolving channel secrets:", error);
     return resolved;
   }
 
-  const secrets = new Map<string, Record<string, unknown>>();
-  for (const row of (data ?? []) as {
-    out_channel_id: string;
-    out_secret: Record<string, unknown>;
-  }[]) {
-    secrets.set(row.out_channel_id, row.out_secret ?? {});
+  const byChannel = new Map<string, Record<string, unknown>>();
+  for (const row of secrets) {
+    byChannel.set(row.channelId, row.secret ?? {});
   }
 
   for (const channel of channels) {
@@ -398,7 +606,7 @@ export async function resolveChannelConfigs<
       channel.id,
       mergeChannelConfig(
         (channel.config ?? {}) as Record<string, unknown>,
-        secrets.get(channel.id) ?? null,
+        byChannel.get(channel.id) ?? null,
       ) as unknown as NotificationConfig,
     );
   }

@@ -1,0 +1,33 @@
+# Quadlet unit for the uptime-monitor Bun container.
+#
+# Install into the podman machine's user unit directory:
+#   podman machine ssh podman-machine -- mkdir -p ~/.config/containers/systemd
+#   podman machine scp uptime-monitor.container podman-machine:~/.config/containers/systemd/
+#   podman machine ssh podman-machine -- systemctl --user daemon-reload
+#   podman machine ssh podman-machine -- systemctl --user start uptime-monitor.service
+#
+# The service name is the file name with `.container` replaced by `.service`.
+
+[Unit]
+Description=Uptime Monitor (Next.js on Bun)
+After=network-online.target
+Wants=network-online.target
+
+[Container]
+Image=localhost/uptime-monitor:latest
+AutoUpdate=registry
+ContainerName=uptime-monitor
+# Secrets never live in the unit file: they are read from an env file that is
+# not in the repository.
+EnvironmentFile=%h/.config/uptime-monitor/env
+PublishPort=3000:3000
+Pull=missing
+
+[Service]
+Restart=always
+RestartSec=5
+# The container is the only thing that needs to be up; the unit just proxies.
+TimeoutStartSec=90
+
+[Install]
+WantedBy=default.target

@@ -1,21 +1,10 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Switch } from "@/components/ui/switch";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Loader2, ArrowLeft, Check, Trash2, AlertTriangle } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Check, Loader2, Trash2 } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+
 import {
   AlertDialog,
   AlertDialogAction,
@@ -27,13 +16,24 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
 // Import Server Actions
 import {
   createStatusPage,
-  updateStatusPage,
   deleteStatusPage,
+  updateStatusPage,
 } from "@/lib/actions/status-pages";
-
 // Import Global Types
 import { Monitor } from "@/types/application";
 
@@ -141,7 +141,7 @@ export function StatusPageForm({ monitors, initialData }: StatusPageFormProps) {
         <div className="flex items-center gap-4">
           <Link href="/dashboard/status-pages">
             <Button variant="outline" size="sm" type="button">
-              <ArrowLeft className="h-4 w-4 mr-2" />
+              <ArrowLeft className="mr-2 h-4 w-4" />
               Back
             </Button>
           </Link>
@@ -149,7 +149,7 @@ export function StatusPageForm({ monitors, initialData }: StatusPageFormProps) {
             <h1 className="text-3xl font-bold">
               {initialData ? "Edit Status Page" : "New Status Page"}
             </h1>
-            <p className="text-neutral-400 mt-1">
+            <p className="mt-1 text-neutral-400">
               Configure your public status page details
             </p>
           </div>
@@ -162,7 +162,7 @@ export function StatusPageForm({ monitors, initialData }: StatusPageFormProps) {
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
                   <>
-                    <Trash2 className="h-4 w-4 mr-2" />
+                    <Trash2 className="mr-2 h-4 w-4" />
                     Delete Page
                   </>
                 )}
@@ -191,7 +191,7 @@ export function StatusPageForm({ monitors, initialData }: StatusPageFormProps) {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
-        <div className="lg:col-span-2 space-y-6">
+        <div className="space-y-6 lg:col-span-2">
           <Card>
             <CardHeader>
               <CardTitle>Page Details</CardTitle>
@@ -212,15 +212,15 @@ export function StatusPageForm({ monitors, initialData }: StatusPageFormProps) {
 
               <div className="space-y-2">
                 <Label htmlFor="slug">URL Slug</Label>
-                <div className="flex rounded-md shadow-sm ring-1 ring-inset ring-neutral-700 bg-neutral-800">
-                  <span className="flex select-none items-center pl-3 text-neutral-400 sm:text-sm">
+                <div className="flex rounded-md bg-neutral-800 shadow-sm ring-1 ring-neutral-700 ring-inset">
+                  <span className="flex items-center pl-3 text-neutral-400 select-none sm:text-sm">
                     /status/
                   </span>
                   <input
                     type="text"
                     name="slug"
                     id="slug"
-                    className="flex-1 block bg-transparent border-0 py-1.5 pl-1 text-white placeholder:text-neutral-500 focus:ring-0 sm:text-sm sm:leading-6"
+                    className="block flex-1 border-0 bg-transparent py-1.5 pl-1 text-white placeholder:text-neutral-500 focus:ring-0 sm:text-sm sm:leading-6"
                     placeholder="acme-status"
                     value={displaySlug}
                     onChange={(e) => {
@@ -270,20 +270,23 @@ export function StatusPageForm({ monitors, initialData }: StatusPageFormProps) {
                   {monitors.map((monitor) => {
                     const isSelected = formData.monitor_ids.has(monitor.id);
                     return (
-                      <div
+                      <button
                         key={monitor.id}
-                        className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-all ${
+                        type="button"
+                        aria-pressed={isSelected}
+                        aria-label={monitor.name}
+                        className={`flex w-full cursor-pointer items-center justify-between rounded-lg border p-3 transition-all ${
                           isSelected
-                            ? "bg-green-500/10 border-green-500/50"
-                            : "bg-neutral-900/50 border-neutral-800 hover:bg-neutral-800/50"
+                            ? "border-green-500/50 bg-green-500/10"
+                            : "border-neutral-800 bg-neutral-900/50 hover:bg-neutral-800/50"
                         }`}
                         onClick={() => toggleMonitor(monitor.id)}
                       >
                         <div className="flex items-center gap-3">
                           <div
-                            className={`w-4 h-4 rounded border flex items-center justify-center ${
+                            className={`flex h-4 w-4 items-center justify-center rounded border ${
                               isSelected
-                                ? "bg-green-500 border-green-500"
+                                ? "border-green-500 bg-green-500"
                                 : "border-neutral-600"
                             }`}
                           >
@@ -300,12 +303,12 @@ export function StatusPageForm({ monitors, initialData }: StatusPageFormProps) {
                             </div>
                           </div>
                         </div>
-                      </div>
+                      </button>
                     );
                   })}
                 </div>
               ) : (
-                <div className="text-center py-8 text-neutral-500">
+                <div className="py-8 text-center text-neutral-500">
                   No monitors available. Create some monitors first.
                 </div>
               )}
@@ -319,15 +322,15 @@ export function StatusPageForm({ monitors, initialData }: StatusPageFormProps) {
               <CardTitle>Preview</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="p-4 rounded-lg bg-neutral-950 border border-neutral-800 space-y-4">
-                <div className="text-center pb-4 border-b border-neutral-800">
-                  <h3 className="font-bold text-lg">
+              <div className="space-y-4 rounded-lg border border-neutral-800 bg-neutral-950 p-4">
+                <div className="border-b border-neutral-800 pb-4 text-center">
+                  <h3 className="text-lg font-bold">
                     {formData.title || "Page Title"}
                   </h3>
                 </div>
-                <div className="flex items-center gap-2 text-green-400 bg-green-900/20 p-2 rounded justify-center">
+                <div className="flex items-center justify-center gap-2 rounded bg-green-900/20 p-2 text-green-400">
                   <Check className="h-4 w-4" />
-                  <span className="font-medium text-sm">
+                  <span className="text-sm font-medium">
                     All Systems Operational
                   </span>
                 </div>
@@ -339,7 +342,7 @@ export function StatusPageForm({ monitors, initialData }: StatusPageFormProps) {
                       return m ? (
                         <div
                           key={id}
-                          className="h-8 bg-neutral-900 rounded flex items-center px-3 justify-between"
+                          className="flex h-8 items-center justify-between rounded bg-neutral-900 px-3"
                         >
                           <span className="text-xs text-neutral-400">
                             {m.name}
@@ -359,8 +362,8 @@ export function StatusPageForm({ monitors, initialData }: StatusPageFormProps) {
           </Card>
 
           {error && (
-            <div className="p-3 rounded-lg bg-red-50 dark:bg-red-950 text-red-700 dark:text-red-300 text-sm">
-              <AlertTriangle className="h-4 w-4 inline mr-2" />
+            <div className="rounded-lg bg-red-50 p-3 text-sm text-red-700 dark:bg-red-950 dark:text-red-300">
+              <AlertTriangle className="mr-2 inline h-4 w-4" />
               {error}
             </div>
           )}
@@ -379,7 +382,7 @@ export function StatusPageForm({ monitors, initialData }: StatusPageFormProps) {
             <Button className="w-full" type="submit" disabled={isLoading}>
               {isLoading ? (
                 <>
-                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Saving...
                 </>
               ) : (

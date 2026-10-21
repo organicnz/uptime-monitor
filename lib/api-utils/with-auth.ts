@@ -1,7 +1,8 @@
-import { createClient } from "@/lib/supabase/server";
-import { NextResponse } from "next/server";
 import type { User } from "@supabase/supabase-js";
+import { NextResponse } from "next/server";
+
 import { isMfaVerificationRequired } from "@/lib/mfa";
+import { createClient } from "@/lib/supabase/server";
 
 type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>;
 

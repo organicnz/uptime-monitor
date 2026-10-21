@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, mock } from "bun:test";
+
 import { cleanup, render, screen } from "@testing-library/react";
 
 // The backdrop is a WebGPU canvas with its own no-adapter fallback; it has

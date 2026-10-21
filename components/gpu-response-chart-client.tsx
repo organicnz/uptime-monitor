@@ -7,7 +7,7 @@ export const GPUResponseChart = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="flex items-center justify-center rounded-xl border border-border bg-muted/30 h-[400px]">
+      <div className="flex h-[400px] items-center justify-center rounded-xl border border-border bg-muted/30">
         <p className="text-sm text-muted-foreground">
           Initializing GPU renderer...
         </p>

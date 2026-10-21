@@ -1,6 +1,7 @@
 import { describe, expect, it, mock } from "bun:test";
-import { NextResponse } from "next/server";
+
 import type { User } from "@supabase/supabase-js";
+import { NextResponse } from "next/server";
 
 const user = { id: "user-id" } as User;
 

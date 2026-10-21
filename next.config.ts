@@ -1,14 +1,17 @@
-import type { NextConfig } from "next";
 import { withSentryConfig } from "@sentry/nextjs";
+import type { NextConfig } from "next";
 
+// The build and the server both run on Bun, so `Bun.env` is the accessor
+// for build-time configuration. It is the same live object as `process.env`.
+//
 // A local Supabase origin has to be in the CSP `connect-src` allowlist. When
 // the variable is missing the block is silently dropped, which turns into
 // "why is my local realtime connection blocked?" hours later.
 const configuredSupabaseOrigin = (() => {
-  const configured = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const configured = Bun.env.NEXT_PUBLIC_SUPABASE_URL;
 
   if (!configured) {
-    if (process.env.NODE_ENV !== "test") {
+    if (Bun.env.NODE_ENV !== "test") {
       console.warn(
         "[next.config] NEXT_PUBLIC_SUPABASE_URL is unset; the CSP " +
           "connect-src allowlist cannot include it.",
@@ -87,14 +90,43 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   reactCompiler: true,
-  turbopack: {
-    root: process.cwd(),
+  // The build does not type check. Type checking is a separate, faster
+  // gate: `bun check` is Bun's own checker, and `tsrs` is the Rust port of
+  // the TypeScript compiler that checks the same project against real
+  // TypeScript semantics. Both run in the typecheck workflow, and the
+  // build would otherwise repeat the work with the slowest of the three.
+  typescript: {
+    ignoreBuildErrors: true,
   },
-  async headers() {
+  // No `turbopack.root`: Next.js detects the project root from the lockfile
+  // (bun.lock), which is more accurate than a path derived from the current
+  // working directory.
+  headers() {
     return [
       {
         source: "/:path*",
         headers: securityHeaders,
+      },
+      // Cache policy for the two route families that need one. These used to
+      // live in vercel.json, which only works on Vercel; the app is served
+      // from its own Bun container, so the policy belongs to the framework.
+      {
+        source: "/api/:path*",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "no-store, no-cache, must-revalidate",
+          },
+        ],
+      },
+      {
+        source: "/status/:path*",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, s-maxage=30, stale-while-revalidate=60",
+          },
+        ],
       },
     ];
   },
@@ -106,15 +138,15 @@ export default withSentryConfig(nextConfig, {
   // For all available options, see:
   // https://github.com/getsentry/sentry-webpack-plugin#options
 
-  org: process.env.SENTRY_ORG,
-  project: process.env.SENTRY_PROJECT,
+  org: Bun.env.SENTRY_ORG,
+  project: Bun.env.SENTRY_PROJECT,
 
   // Auth token for source-map upload during `next build` in CI.
   // Keep secret: provide via SENTRY_AUTH_TOKEN env (GitHub Actions secret).
-  authToken: process.env.SENTRY_AUTH_TOKEN,
+  authToken: Bun.env.SENTRY_AUTH_TOKEN,
 
   // Only print logs for uploading source maps in CI
-  silent: !process.env.CI,
+  silent: !Bun.env.CI,
 
   // For all available options, see:
   // https://docs.sentry.io/platforms/javascript/guides/nextjs/manual-setup/
@@ -129,6 +161,6 @@ export default withSentryConfig(nextConfig, {
   tunnelRoute: "/monitoring",
 
   sourcemaps: {
-    disable: process.env.NODE_ENV === "development",
+    disable: Bun.env.NODE_ENV === "development",
   },
 });

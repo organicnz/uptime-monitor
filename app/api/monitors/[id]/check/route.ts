@@ -1,11 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServiceClient } from "@/lib/supabase/service";
-import { createClient } from "@/lib/supabase/server";
-import { processMonitorCheck } from "@/lib/monitor-checker";
 import { z } from "zod";
-import type { Monitor } from "@/types/application";
 
-export const runtime = "nodejs";
+import { runMonitorCheck } from "@/lib/monitor-checker-runner";
+import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/service";
 
 const CheckRequestSchema = z.object({
   force: z.boolean().optional().default(false),
@@ -54,7 +52,7 @@ export async function POST(
     return NextResponse.json({ error: "Monitor not found" }, { status: 404 });
   }
 
-  const monitor = monitorData as Monitor;
+  const monitor = monitorData;
 
   if (!monitor.active && !parsed.data.force) {
     return NextResponse.json(
@@ -64,7 +62,7 @@ export async function POST(
   }
 
   try {
-    await processMonitorCheck(monitor, undefined, {
+    await runMonitorCheck(monitor, undefined, {
       triggeredBy: user.id,
     });
 

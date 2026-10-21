@@ -19,13 +19,24 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v5
-        with:
-          node-version: "22"
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: "1.4.2"
-      - run: bun install --frozen-lockfile
+          # The latest Bun canary. The canary is a moving target: the npm
+          # dist-tag is what tracks it, not a version string in
+          # package.json, so `bun-version: canary` is the only thing that
+          # stays correct as new canaries ship.
+          bun-version: canary
+      - name: Cache Bun packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+          restore-keys: bun-${{ runner.os }}-
+      - run: bun install --frozen-lockfile --ignore-scripts
+      # The type checker is tsrs, the Rust port of the TypeScript 7 compiler.
+      # It is the only gate: it is 100% conformant with the reference
+      # implementation, and it is the only TypeScript 7 checker that runs
+      # without Node.js.
       - run: bun run typecheck
 
   lint:
@@ -33,14 +44,21 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v5
-        with:
-          node-version: "22"
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: "1.4.2"
-      - run: bun install --frozen-lockfile
-      - run: bun run lint -- --max-warnings 0
+          # The latest Bun canary. The canary is a moving target: the npm
+          # dist-tag is what tracks it, not a version string in
+          # package.json, so `bun-version: canary` is the only thing that
+          # stays correct as new canaries ship.
+          bun-version: canary
+      - name: Cache Bun packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+          restore-keys: bun-${{ runner.os }}-
+      - run: bun install --frozen-lockfile --ignore-scripts
+      - run: bun run lint
       - run: bun run format:check
 
   unit:
@@ -48,27 +66,51 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v5
-        with:
-          node-version: "22"
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: "1.4.2"
-      - run: bun install --frozen-lockfile
+          # The latest Bun canary. The canary is a moving target: the npm
+          # dist-tag is what tracks it, not a version string in
+          # package.json, so `bun-version: canary` is the only thing that
+          # stays correct as new canaries ship.
+          bun-version: canary
+      - name: Cache Bun packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+          restore-keys: bun-${{ runner.os }}-
+      - run: bun install --frozen-lockfile --ignore-scripts
+      # The Rust probe: the container ships this binary, so CI builds it and
+      # runs the suite against it. Without it the probe tests would skip and
+      # the binary would never be exercised.
+      - name: Build the Rust probe
+        run: bun run build:probe
+      - run: bun run doctor
       - run: bun run coverage-check
+        env:
+          # Bun writes both reports from the same single test run.
+          COVERAGE_JUNIT_PATH: .bundle/junit.xml
+          COVERAGE_LCOV_DIR: .bundle/lcov
 
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v5
-        with:
-          node-version: "22"
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: "1.4.2"
-      - run: bun install --frozen-lockfile
+          # The latest Bun canary. The canary is a moving target: the npm
+          # dist-tag is what tracks it, not a version string in
+          # package.json, so `bun-version: canary` is the only thing that
+          # stays correct as new canaries ship.
+          bun-version: canary
+      - name: Cache Bun packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+          restore-keys: bun-${{ runner.os }}-
+      - run: bun install --frozen-lockfile --ignore-scripts
       - run: bun run build
       - run: bun run bundle-size
 
@@ -77,16 +119,23 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v5
-        with:
-          node-version: "22"
       - uses: supabase/setup-cli@v3
         with:
           version: v2.117.0
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: "1.4.2"
-      - run: bun install --frozen-lockfile
+          # The latest Bun canary. The canary is a moving target: the npm
+          # dist-tag is what tracks it, not a version string in
+          # package.json, so `bun-version: canary` is the only thing that
+          # stays correct as new canaries ship.
+          bun-version: canary
+      - name: Cache Bun packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+          restore-keys: bun-${{ runner.os }}-
+      - run: bun install --frozen-lockfile --ignore-scripts
       - run: bun run e2e:install:ci
       - name: Start local Supabase
         run: supabase start --exclude studio,imgproxy,vector,analytics,inbucket

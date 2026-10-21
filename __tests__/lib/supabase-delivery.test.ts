@@ -1,5 +1,9 @@
-import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, readdirSync, readFileSync } from "bun:fs";
+import { join } from "bun:path";
+import { describe, expect, it } from "bun:test";
+
+import { lintMigrationSql } from "@/scripts/migration-lint";
+import { EXPECTED_COLUMNS } from "@/scripts/supabase-expected-schema";
 
 const ROOT = join(import.meta.dir, "..", "..");
 const MIGRATIONS_DIR = join(ROOT, "supabase", "migrations");
@@ -17,7 +21,7 @@ const QUALITY_WORKFLOW_PATH = join(
   "workflows",
   "quality-gate.yml",
 );
-const VERIFY_SCRIPT_PATH = join(ROOT, "scripts", "supabase-verify-schema.py");
+const SCRIPTS_DIR = join(ROOT, "scripts");
 
 function migrationFiles(): string[] {
   return readdirSync(MIGRATIONS_DIR)
@@ -36,52 +40,21 @@ describe("supabase delivery: migrations", () => {
   });
 
   it("keeps every migration non-empty and idempotent (safe to re-apply)", () => {
+    // The same linter the CI gate runs (`bun run migrations:lint`), so a
+    // migration that passes here cannot fail there.
     const violations: string[] = [];
     for (const file of migrationFiles()) {
       const sql = readFileSync(join(MIGRATIONS_DIR, file), "utf-8");
-      if (!sql.trim()) {
-        violations.push(`${file}: empty file`);
-        continue;
+      for (const violation of lintMigrationSql(file, sql)) {
+        const where = violation.line ? `${file}:${violation.line}` : file;
+        violations.push(`${where}: ${violation.message}`);
       }
-
-      const drops = (sql.match(/DROP\s+POLICY\s+IF\s+EXISTS/gi) ?? []).length;
-      const creates = (
-        sql.match(/(?<!OR\sREPLACE\s)CREATE\s+POLICY\s+/gi) ?? []
-      ).length;
-      if (creates > drops) {
-        violations.push(
-          `${file}: ${creates} CREATE POLICY but only ${drops} DROP POLICY IF EXISTS`,
-        );
-      }
-
-      sql.split("\n").forEach((line, i) => {
-        const s = line.trim().toUpperCase();
-        const where = `${file}:${i + 1}`;
-        if (/^CREATE\s+TABLE\s+(?!IF\s+NOT\s+EXISTS)/.test(s)) {
-          violations.push(`${where}: bare CREATE TABLE`);
-        }
-        if (
-          /^CREATE\s+(UNIQUE\s+)?INDEX\s+/.test(s) &&
-          !/IF\s+NOT\s+EXISTS/.test(s)
-        ) {
-          violations.push(`${where}: bare CREATE INDEX`);
-        }
-        if (/(^|\s)ADD\s+COLUMN\s+/.test(s) && !/IF\s+NOT\s+EXISTS/.test(s)) {
-          violations.push(`${where}: bare ADD COLUMN`);
-        }
-      });
     }
     expect(violations).toEqual([]);
   });
 
-  it("covers every verify-script EXPECTED column in schema or migrations", () => {
-    const verify = readFileSync(VERIFY_SCRIPT_PATH, "utf-8");
-    const expected = [...verify.matchAll(/"(\w+)":\s*\[([^\]]*)\]/g)].map(
-      (m) => ({
-        table: m[1],
-        cols: [...m[2].matchAll(/"(\w+)"/g)].map((c) => c[1]),
-      }),
-    );
+  it("covers every expected column in schema or migrations", () => {
+    const expected = Object.entries(EXPECTED_COLUMNS);
     expect(expected.length).toBeGreaterThan(0);
 
     const corpus =
@@ -90,7 +63,7 @@ describe("supabase delivery: migrations", () => {
         .map((f) => readFileSync(join(MIGRATIONS_DIR, f), "utf-8"))
         .join("\n");
 
-    const missing = expected.flatMap(({ table, cols }) =>
+    const missing = expected.flatMap(([table, cols]) =>
       cols
         .filter((col) => !corpus.includes(col))
         .map((col) => `${table}.${col}`),
@@ -140,11 +113,15 @@ describe("delivery gate", () => {
           version: v2.117.0
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: "1.4.2"`,
+          # The latest Bun canary. The canary is a moving target: the npm
+          # dist-tag is what tracks it, not a version string in
+          # package.json, so \`bun-version: canary\` is the only thing that
+          # stays correct as new canaries ship.
+          bun-version: canary`,
     );
   });
 
-  it("pins the supported Bun version in every dependency-install workflow", () => {
+  it("takes the latest Bun canary in every workflow", () => {
     const workflowDir = join(ROOT, ".github", "workflows");
     const workflowFiles = readdirSync(workflowDir).filter((file) =>
       file.endsWith(".yml"),
@@ -157,16 +134,152 @@ describe("delivery gate", () => {
         continue;
       }
       checked += 1;
-      expect(workflow).toContain('bun-version: "1.4.2"');
+      // The canary is a moving target, so the version is never pinned
+      // twice: the workflows ask for the canary dist-tag, and the runtime
+      // and CI can never drift apart.
+      expect(workflow).toContain("bun-version: canary");
+      expect(workflow).not.toContain("bun-version-file:");
     }
 
     expect(checked).toBeGreaterThan(0);
+
+    const pkg = JSON.parse(
+      readFileSync(join(ROOT, "package.json"), "utf-8"),
+    ) as { packageManager: string; engines: { bun: string } };
+
+    // The pinned runtime is the canary. A canary version carries the date it
+    // was built: `1.4.3-canary.20261019.1`.
+    expect(pkg.packageManager).toMatch(
+      /^bun@\d+\.\d+\.\d+(-canary\.\d{8}\.\d+)?$/,
+    );
+
+    // The engine floor is the version the runtime *reports*, not the
+    // canary's own number. The `1.4.3-canary.*` build reports itself as
+    // `1.4.4`, because it is the canary for that release — so the floor is
+    // written against the reported version, and the running Bun has to
+    // satisfy it. The doctor makes the same check against package.json.
+    expect(pkg.engines.bun).toMatch(/^>=\d+\.\d+\.\d+$/);
+    expect(Bun.semver.satisfies(Bun.version, pkg.engines.bun)).toBe(true);
   });
 
   it("keeps the canonical delivery command in Lefthook", () => {
     const lefthook = readFileSync(join(ROOT, "lefthook.yml"), "utf-8");
     expect(lefthook).toContain("run: bun run verify:delivery");
     expect(lefthook).not.toContain("skip_output:");
+  });
+});
+
+describe("bun-only toolchain", () => {
+  it("never provisions a Node.js or Python toolchain in CI", () => {
+    const workflowDir = join(ROOT, ".github", "workflows");
+    const offenders: string[] = [];
+
+    for (const file of readdirSync(workflowDir).filter((f) =>
+      f.endsWith(".yml"),
+    )) {
+      const workflow = readFileSync(join(workflowDir, file), "utf-8");
+      for (const forbidden of [
+        "actions/setup-node",
+        "actions/setup-python",
+        "node-version:",
+        "python-version:",
+      ]) {
+        if (workflow.includes(forbidden)) {
+          offenders.push(`${file}: ${forbidden}`);
+        }
+      }
+    }
+
+    expect(offenders).toEqual([]);
+  });
+
+  it("ships the delivery scripts as Bun/TypeScript, with no Python left", () => {
+    expect(existsSync(join(SCRIPTS_DIR, "supabase-migrate.ts"))).toBe(true);
+    expect(existsSync(join(SCRIPTS_DIR, "supabase-verify-schema.ts"))).toBe(
+      true,
+    );
+    expect(existsSync(join(SCRIPTS_DIR, "lint-migrations.ts"))).toBe(true);
+
+    const python = readdirSync(SCRIPTS_DIR).filter((f) => f.endsWith(".py"));
+    expect(python).toEqual([]);
+  });
+
+  it("runs every package script through the Bun runtime", () => {
+    const pkg = JSON.parse(
+      readFileSync(join(ROOT, "package.json"), "utf-8"),
+    ) as { scripts: Record<string, string>; packageManager: string };
+
+    expect(pkg.packageManager.startsWith("bun@")).toBe(true);
+
+    // Every script that shells out to a third-party binary has to say
+    // `bun --bun`, otherwise Bun's shell runs it through the binary's
+    // `#!/usr/bin/env node` shebang and Node.js comes back.
+    const needsBun = [
+      "dev",
+      "build",
+      "start",
+      "e2e",
+      "e2e:install",
+      "e2e:install:ci",
+      "verify:gpu",
+    ];
+    for (const name of needsBun) {
+      expect(pkg.scripts[name]).toStartWith("bun --bun ");
+    }
+
+    // Bun's own formatter replaced Prettier.
+    expect(pkg.scripts.format).toBe("bun fmt");
+    expect(pkg.scripts["format:check"]).toBe("bun fmt --check");
+    // Bun's own linter replaced ESLint and `eslint-config-next`.
+    expect(pkg.scripts.lint).toBe("bun lint");
+    expect(pkg.scripts["lint:fix"]).toBe("bun lint --fix");
+    // The type checker is `tsrs`, the Rust port of the TypeScript 7
+    // compiler, and it is the only gate. The `tsc` that ships with the
+    // TypeScript 7 beta is a Node.js program, so it cannot run here at all.
+    //
+    // `--checkerAssignment go` puts tsrs on the TypeScript 7 reference
+    // compiler's own file assignment and checker history, so the diagnostics
+    // match the Go implementation exactly rather than merely approximating
+    // it. It costs nothing measurable.
+    expect(pkg.scripts.typecheck).toBe(
+      "bun --bun tsrs --noEmit --checkerAssignment go",
+    );
+    expect(pkg.scripts["typecheck:tsc"]).toBeUndefined();
+    // Bun's own checker stays for the pre-commit hook, which checks only the
+    // staged files. `tsrs` is project-scoped, the way `tsc` is, and refuses a
+    // file list outright.
+    expect(pkg.scripts["typecheck:fast"]).toBe("bun check");
+
+    // The general rule, so a new script cannot opt out by accident: a
+    // third-party binary may only ever appear behind `bun --bun`. Strip
+    // every such invocation and assert that nothing is left over.
+    const thirdPartyBinaries = [
+      "next",
+      "eslint",
+      "tsc",
+      "tsrs",
+      "playwright",
+      "lefthook",
+      "prettier",
+    ];
+    for (const command of Object.values(pkg.scripts)) {
+      let remainder = command;
+      for (const binary of thirdPartyBinaries) {
+        remainder = remainder.replaceAll(`bun --bun ${binary}`, "");
+      }
+      for (const binary of thirdPartyBinaries) {
+        // The command body only, and only in command position: a script
+        // *named* `typecheck:watch` is fine, a script that *invokes* tsrs
+        // without `bun --bun` is not.
+        const inCommandPosition = new RegExp(`(^|[\\s|;&(])${binary}(\\s|$)`);
+        expect(remainder).not.toMatch(inCommandPosition);
+      }
+    }
+
+    // Nothing may reach for npm/npx/node.
+    for (const [name, command] of Object.entries(pkg.scripts)) {
+      expect(`${name}: ${command}`).not.toMatch(/\b(npm|npx|yarn|pnpm)\b/);
+    }
   });
 });
 
@@ -208,12 +321,13 @@ describe("supabase delivery: CI/CD workflow", () => {
     );
   });
 
-  it("pins setup-node before setup-cli and serializes delivery", () => {
+  it("provisions Bun and the Supabase CLI, and serializes delivery", () => {
     const yml = workflow();
-    expect(yml).toContain("actions/setup-node@v5");
+    expect(yml).toContain("oven-sh/setup-bun@v2");
+    expect(yml).toContain("bun-version: canary");
     expect(yml).toContain("supabase/setup-cli@v3");
     expect(yml).toContain("version: v2.117.0");
-    expect(yml.indexOf("actions/setup-node@v5")).toBeLessThan(
+    expect(yml.indexOf("oven-sh/setup-bun@v2")).toBeLessThan(
       yml.indexOf("supabase/setup-cli@v3"),
     );
     expect(yml).toContain("cancel-in-progress: false");

@@ -1,0 +1,42 @@
+[package]
+name = "probe"
+version = "0.1.0"
+edition = "2021"
+
+# The probe is a one-shot batch runner: it reads a JSON job list on stdin and
+# writes a JSON result list on stdout. It is deliberately *not* a library the
+# app links against — the Bun runtime spawns it, so a probe crash can never
+# take the server down with it.
+[[bin]]
+name = "probe"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1.0"
+futures-util = { version = "0.3", default-features = false, features = ["std"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tokio = { version = "1", features = [
+  "rt-multi-thread",
+  "macros",
+  "net",
+  "time",
+  "io-util",
+] }
+# rustls with the OS trust store, so a self-hosted instance that trusts a
+# private CA keeps trusting it. `rustls-tls-native-roots` rather than
+# `rustls-tls` (which uses webpki-roots) for the same reason.
+reqwest = { version = "0.12", default-features = false, features = [
+  "charset",
+  "http2",
+  "json",
+  "rustls-tls-native-roots",
+  "stream",
+] }
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+# The probe ships in a container image; a smaller binary is a smaller image.
+strip = true

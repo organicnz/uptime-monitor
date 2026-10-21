@@ -25,8 +25,8 @@ Located in `components/`. Domain-specific components:
 // Client component with realtime
 "use client";
 
-import { useRealtimeMonitors } from "@/hooks/use-realtime-monitors";
 import { Card, CardContent } from "@/components/ui/card";
+import { useRealtimeMonitors } from "@/hooks/use-realtime-monitors";
 
 export function MyComponent({ data }: Props) {
   const { statuses, isConnected } = useRealtimeMonitors(ids);

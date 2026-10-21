@@ -1,12 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+
 import { withAuth } from "@/lib/api-utils/with-auth";
 import {
   generateBulkUptimeReport,
   generateUptimeReport,
 } from "@/lib/uptime-reports";
-
-export const runtime = "nodejs";
 
 const bulkSchema = z.object({
   monitorIds: z.array(z.string().uuid()).min(1).max(50),

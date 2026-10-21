@@ -12,11 +12,11 @@
     "allowJs": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "baseUrl": ".",
     "paths": {
       "@/*": ["./*"]
     },
     "lib": ["dom", "dom.iterable", "esnext"],
+    "types": ["react", "react-dom", "bun-types"],
     "plugins": [
       {
         "name": "next"

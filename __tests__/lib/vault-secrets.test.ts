@@ -1,8 +1,9 @@
-import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, readFileSync } from "bun:fs";
+import { join } from "bun:path";
 import { describe, expect, it } from "bun:test";
-import { ALL_SENSITIVE_CONFIG_KEYS } from "@/lib/notification-types";
+
 import { DOCUMENTED_ENV_VARS } from "@/lib/env";
+import { ALL_SENSITIVE_CONFIG_KEYS } from "@/lib/notification-types";
 
 const ROOT = join(import.meta.dir, "..", "..");
 const MIGRATION = join(

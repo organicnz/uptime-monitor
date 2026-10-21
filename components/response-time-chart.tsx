@@ -1,20 +1,22 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { format, subDays, subHours } from "date-fns";
+import { Activity } from "lucide-react";
+import { useCallback, useMemo, useState } from "react";
 import {
-  AreaChart,
   Area,
+  AreaChart,
+  CartesianGrid,
+  ResponsiveContainer,
+  Tooltip,
+  type TooltipContentProps,
   XAxis,
   YAxis,
-  Tooltip,
-  ResponsiveContainer,
-  CartesianGrid,
 } from "recharts";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+
 import { Button } from "@/components/ui/button";
-import { Activity } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import { format, subDays, subHours } from "date-fns";
 
 type Heartbeat = {
   id: string;
@@ -22,6 +24,28 @@ type Heartbeat = {
   ping: number | null;
   time: string;
 };
+
+/** The point this chart plots, which is what the tooltip reads back. */
+type ResponsePoint = {
+  time: string;
+  ping: number;
+  status: number;
+};
+
+/**
+ * Narrow a recharts payload entry to the point this chart plots.
+ *
+ * Recharts types the `payload` of a tooltip entry as `any`, because it
+ * holds whatever the series was given. That is the right call on their
+ * side and the wrong one to inherit: the point is this component's own
+ * shape, and a type guard says so in one place instead of an `any`
+ * spreading through the render.
+ */
+function isResponsePoint(value: unknown): value is ResponsePoint {
+  if (typeof value !== "object" || value === null) return false;
+  const point = value as Partial<ResponsePoint>;
+  return typeof point.time === "string" && typeof point.status === "number";
+}
 
 type ResponseTimeChartProps = {
   heartbeats: Heartbeat[];
@@ -139,29 +163,34 @@ export function ResponseTimeChart({
     [timeRange],
   );
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const renderTooltip = useCallback((props: any) => {
+  const renderTooltip = useCallback((props: TooltipContentProps) => {
     const { active, payload } = props;
-    if (active && payload && payload.length) {
-      const data = payload[0];
-      return (
-        <div className="bg-popover border border-border rounded-lg shadow-lg p-3 text-sm">
-          <p className="text-muted-foreground mb-1">
-            {format(new Date(data.payload.time), "MMM d, HH:mm")}
-          </p>
-          <p className="font-semibold">
-            <span
-              className={cn(
-                data.payload.status === 0 ? "text-red-500" : "text-emerald-500",
-              )}
-            >
-              {data.value}ms
-            </span>
-          </p>
-        </div>
-      );
+    // `payload` is `any` in recharts' own types, so it is taken as
+    // `unknown` and narrowed by the guard below.
+    const point: unknown = payload?.[0]?.payload;
+
+    if (!active || !point || !isResponsePoint(point)) {
+      return null;
     }
-    return null;
+
+    const value = payload?.[0]?.value;
+
+    return (
+      <div className="rounded-lg border border-border bg-popover p-3 text-sm shadow-lg">
+        <p className="mb-1 text-muted-foreground">
+          {format(new Date(point.time), "MMM d, HH:mm")}
+        </p>
+        <p className="font-semibold">
+          <span
+            className={cn(
+              point.status === 0 ? "text-red-500" : "text-emerald-500",
+            )}
+          >
+            {value}ms
+          </span>
+        </p>
+      </div>
+    );
   }, []);
 
   return (
@@ -186,7 +215,7 @@ export function ResponseTimeChart({
             ))}
           </div>
         </div>
-        <div className="flex items-center gap-4 text-xs text-muted-foreground mt-2">
+        <div className="mt-2 flex items-center gap-4 text-xs text-muted-foreground">
           <span>
             Avg:{" "}
             <span className="font-medium text-foreground">{stats.avg}ms</span>
@@ -266,7 +295,7 @@ export function ResponseTimeChart({
             </ResponsiveContainer>
           </div>
         ) : (
-          <div className="h-64 flex items-center justify-center text-muted-foreground">
+          <div className="flex h-64 items-center justify-center text-muted-foreground">
             No data available for this time range
           </div>
         )}

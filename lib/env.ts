@@ -5,6 +5,18 @@
  * type error and turns a missing variable into a runtime throw from inside the
  * SDK. These helpers fail at the call site with a message naming the variable
  * and where to set it.
+ *
+ * Where the environment comes from depends on the runtime:
+ *
+ * - **Server.** The app runs on Bun. `Bun.env` is the canonical accessor and
+ *   is the very same live object as `process.env`, so a value is read from
+ *   the running process rather than frozen at build time.
+ * - **Browser.** A browser bundle has no `Bun` global. Next.js inlines a
+ *   `process.env.NEXT_PUBLIC_*` *member access* into the client bundle at
+ *   build time, and those are the only variables a browser can ever see.
+ *
+ * Both branches expose the same shape, so the accessors below are isomorphic:
+ * one module serves server components, route handlers and the browser bundle.
  */
 
 const SUPABASE_URL_HINT =
@@ -17,8 +29,38 @@ class MissingEnvError extends Error {
   }
 }
 
+/**
+ * The environment for this runtime, resolved once at module load.
+ *
+ * `Bun.env` and `process.env` are the same object on Bun, so the server
+ * branch is a live view of the running process, not a snapshot.
+ *
+ * The browser branch cannot work the same way. Next.js inlines a
+ * `process.env.NEXT_PUBLIC_*` *member access* into the client bundle at
+ * build time; it does not populate `process.env` as a whole object — the
+ * browser's `process` polyfill has an empty `env`. A dynamic `ENV[name]`
+ * lookup therefore finds nothing in a browser, which is how the browser
+ * Supabase client ended up unable to find its own URL.
+ *
+ * So every public variable is read here with that exact member-access form,
+ * and the list is the complete public surface. An accessor added later for a
+ * new `NEXT_PUBLIC_*` variable has to be added here too, or it will find
+ * nothing in a browser and everything on the server.
+ */
+const ENV: Record<string, string | undefined> =
+  typeof Bun === "undefined"
+    ? {
+        NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
+        NEXT_PUBLIC_SUPABASE_ANON_KEY:
+          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+        NEXT_PUBLIC_SITE_URL: process.env.NEXT_PUBLIC_SITE_URL,
+        NEXT_PUBLIC_VERCEL_ENV: process.env.NEXT_PUBLIC_VERCEL_ENV,
+        NEXT_PUBLIC_SENTRY_DSN: process.env.NEXT_PUBLIC_SENTRY_DSN,
+      }
+    : Bun.env;
+
 function read(name: string): string | undefined {
-  const value = process.env[name];
+  const value = ENV[name];
   if (value === undefined) return undefined;
   const trimmed = value.trim();
   return trimmed === "" ? undefined : trimmed;
@@ -109,20 +151,21 @@ export function getAdminUserIds(): string[] {
     .filter(Boolean);
 }
 
-/**
- * Sentry environment for the browser bundle. `VERCEL_ENV` is not inlined into
- * client code (only `NEXT_PUBLIC_*` is), so the client needs its own
- * explicitly configured copy. Optional; falls back to NODE_ENV.
- */
-export function getClientSentryEnvironment(): string {
-  return (
-    optional("NEXT_PUBLIC_VERCEL_ENV") ?? optional("NODE_ENV") ?? "unknown"
-  );
-}
-
 export function isEnvError(error: unknown): error is MissingEnvError {
   return error instanceof MissingEnvError;
 }
+
+/**
+ * The environment variables the app cannot start without.
+ *
+ * Single source of truth: the accessors above read these, and
+ * `scripts/doctor.ts` reports on them.
+ */
+export const REQUIRED_ENV_VARS = [
+  "NEXT_PUBLIC_SUPABASE_URL",
+  "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+  "SUPABASE_SERVICE_ROLE_KEY",
+] as const;
 
 /**
  * Every variable the app reads at runtime, for the drift test that keeps

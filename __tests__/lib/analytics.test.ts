@@ -1,10 +1,11 @@
 import { describe, expect, it } from "bun:test";
+
 import {
-  getStatsWindowForMonitor,
-  resetAnalyticsThrottle,
   claimAnalyticsRefresh,
-  summarizeHeartbeats,
+  getStatsWindowForMonitor,
   type HeartbeatSample,
+  resetAnalyticsThrottle,
+  summarizeHeartbeats,
 } from "@/lib/analytics";
 import { HEARTBEAT_STATUS } from "@/lib/monitor-status";
 

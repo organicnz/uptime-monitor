@@ -2,16 +2,17 @@
 
 import { useEffect, useRef, useState } from "react";
 import {
+  clock,
   effect,
   frame,
   frameLoop,
-  clock,
   storage,
-  uniforms,
   surface,
+  uniforms,
 } from "vgpu";
-import { latencyTrendShader } from "./shaders/latency-trend";
+
 import { acquireGpu, onDeviceLost, prefersReducedMotion } from "./gpu-runtime";
+import { latencyTrendShader } from "./shaders/latency-trend";
 
 export type GPUChartPoint = {
   ping: number | null;
@@ -57,7 +58,7 @@ export function GPUResponseChart({
     let cancelled = false;
     let renderer: Renderer | undefined;
 
-    (async () => {
+    void (async () => {
       try {
         const gpu = await acquireGpu();
         if (cancelled) return;
@@ -182,7 +183,7 @@ export function GPUResponseChart({
         </p>
       )}
       {status === "ready" && (
-        <span className="absolute right-2 top-2 rounded-full bg-black/60 px-2 py-0.5 text-[10px] font-medium text-emerald-400">
+        <span className="absolute top-2 right-2 rounded-full bg-black/60 px-2 py-0.5 text-[10px] font-medium text-emerald-400">
           WebGPU
         </span>
       )}

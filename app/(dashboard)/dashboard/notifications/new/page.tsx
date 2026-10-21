@@ -1,7 +1,16 @@
 "use client";
 
-import React, { useState } from "react";
+import { ArrowLeft, Loader2, Mail, Webhook } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
+import React, { useState } from "react";
+
+import {
+  DiscordIcon,
+  SlackIcon,
+  TeamsIcon,
+  TelegramIcon,
+} from "@/components/icons";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -12,18 +21,15 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, Mail, Webhook, Loader2 } from "lucide-react";
-import Link from "next/link";
 import {
-  splitChannelConfig,
+  ChannelResponseSchema,
+  fetchJson,
+  NotificationTestResponseSchema,
+} from "@/lib/api-client";
+import {
   type NotificationType,
+  splitChannelConfig,
 } from "@/lib/notification-types";
-import {
-  TelegramIcon,
-  DiscordIcon,
-  SlackIcon,
-  TeamsIcon,
-} from "@/components/icons";
 
 type ChannelType = NotificationType;
 
@@ -141,7 +147,7 @@ export default function NewNotificationPage() {
         collectedConfig(),
       );
 
-      const response = await fetch("/api/notifications/channels", {
+      await fetchJson("/api/notifications/channels", ChannelResponseSchema, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -151,11 +157,6 @@ export default function NewNotificationPage() {
           secret,
         }),
       });
-
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || "Failed to create channel");
-      }
 
       router.push("/dashboard/notifications");
       router.refresh();
@@ -174,16 +175,18 @@ export default function NewNotificationPage() {
     try {
       if (!selectedType) throw new Error("Select a channel type first");
 
-      const response = await fetch("/api/notifications/test", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          type: selectedType,
-          config: collectedConfig(),
-        }),
-      });
-
-      const data = await response.json();
+      const data = await fetchJson(
+        "/api/notifications/test",
+        NotificationTestResponseSchema,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            type: selectedType,
+            config: collectedConfig(),
+          }),
+        },
+      );
 
       if (data.success) {
         setTestResult({
@@ -205,17 +208,17 @@ export default function NewNotificationPage() {
 
   return (
     <div className="p-4 sm:p-6 lg:p-8">
-      <div className="max-w-3xl mx-auto space-y-8">
+      <div className="mx-auto max-w-3xl space-y-8">
         <div className="flex items-center gap-4">
           <Link href="/dashboard/notifications">
             <Button variant="outline" size="sm">
-              <ArrowLeft className="h-4 w-4 mr-2" />
+              <ArrowLeft className="mr-2 h-4 w-4" />
               Back
             </Button>
           </Link>
           <div>
             <h1 className="text-3xl font-bold">Add Notification Channel</h1>
-            <p className="text-neutral-600 dark:text-neutral-400 mt-1">
+            <p className="mt-1 text-neutral-600 dark:text-neutral-400">
               Configure a new way to receive alerts
             </p>
           </div>
@@ -228,17 +231,17 @@ export default function NewNotificationPage() {
               ({ type, name, icon: Icon, description, color, bg }) => (
                 <Card
                   key={type}
-                  className={`cursor-pointer transition-all hover:shadow-lg group ${
+                  className={`group cursor-pointer transition-all hover:shadow-lg ${
                     type === "email"
-                      ? "opacity-60 cursor-not-allowed grayscale"
+                      ? "cursor-not-allowed opacity-60 grayscale"
                       : "hover:border-primary/50"
-                  } ${selectedType === type ? "ring-2 ring-primary border-primary bg-primary/5" : "glass-card"}`}
+                  } ${selectedType === type ? "border-primary bg-primary/5 ring-2 ring-primary" : "glass-card"}`}
                   onClick={() => type !== "email" && setSelectedType(type)}
                 >
                   <CardHeader>
                     <CardTitle className="flex items-center gap-3">
                       <div
-                        className={`p-2.5 rounded-lg ${bg} transition-transform group-hover:scale-110`}
+                        className={`rounded-lg p-2.5 ${bg} transition-transform group-hover:scale-110`}
                       >
                         <Icon className={`h-6 w-6 ${color}`} />
                       </div>
@@ -341,17 +344,17 @@ export default function NewNotificationPage() {
                 )}
 
                 {error && (
-                  <div className="p-3 rounded-lg bg-red-50 dark:bg-red-950 text-red-700 dark:text-red-300 text-sm">
+                  <div className="rounded-lg bg-red-50 p-3 text-sm text-red-700 dark:bg-red-950 dark:text-red-300">
                     {error}
                   </div>
                 )}
 
                 {testResult && (
                   <div
-                    className={`p-3 rounded-lg text-sm ${
+                    className={`rounded-lg p-3 text-sm ${
                       testResult.success
-                        ? "bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300"
-                        : "bg-red-50 dark:bg-red-950 text-red-700 dark:text-red-300"
+                        ? "bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-300"
+                        : "bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-300"
                     }`}
                   >
                     {testResult.message}
@@ -373,13 +376,13 @@ export default function NewNotificationPage() {
                     disabled={isLoading || !formData.name}
                   >
                     {isLoading ? (
-                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     ) : null}
                     Test
                   </Button>
                   <Button type="submit" disabled={isLoading}>
                     {isLoading ? (
-                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     ) : null}
                     Create Channel
                   </Button>

@@ -1,5 +1,17 @@
 "use client";
 
+import {
+  ChevronDown,
+  ChevronUp,
+  FolderX,
+  MoreHorizontal,
+  Pencil,
+  Trash2,
+} from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useTransition } from "react";
+import { toast } from "sonner";
+
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -9,20 +21,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
-  ChevronUp,
-  ChevronDown,
-  MoreHorizontal,
-  Pencil,
-  Trash2,
-  FolderX,
-} from "lucide-react";
-import { useTransition } from "react";
-import { useRouter } from "next/navigation";
-import { toast } from "sonner";
-import {
+  assignMonitorToGroup,
   deleteGroup,
   toggleGroupCollapsed,
-  assignMonitorToGroup,
 } from "@/lib/actions/groups";
 
 type Group = {
@@ -96,12 +97,12 @@ export function GroupCardActions({ group, onEdit }: GroupCardActionsProps) {
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
           <DropdownMenuItem onClick={onEdit}>
-            <Pencil className="h-4 w-4 mr-2" />
+            <Pencil className="mr-2 h-4 w-4" />
             Edit Group
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={handleDelete} className="text-destructive">
-            <Trash2 className="h-4 w-4 mr-2" />
+            <Trash2 className="mr-2 h-4 w-4" />
             Delete Group
           </DropdownMenuItem>
         </DropdownMenuContent>
@@ -157,7 +158,7 @@ export function MonitorGroupActions({
             onClick={() => handleMoveToGroup(group.id)}
           >
             <div
-              className="h-3 w-3 rounded-full mr-2"
+              className="mr-2 h-3 w-3 rounded-full"
               style={{ backgroundColor: group.color }}
             />
             Move to {group.name}
@@ -167,7 +168,7 @@ export function MonitorGroupActions({
           <>
             {otherGroups.length > 0 && <DropdownMenuSeparator />}
             <DropdownMenuItem onClick={() => handleMoveToGroup(null)}>
-              <FolderX className="h-4 w-4 mr-2" />
+              <FolderX className="mr-2 h-4 w-4" />
               Remove from Group
             </DropdownMenuItem>
           </>

@@ -1,6 +1,10 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
+import { Trash2 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useTransition } from "react";
+import { toast } from "sonner";
+
 import {
   AlertDialog,
   AlertDialogAction,
@@ -12,10 +16,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Trash2 } from "lucide-react";
-import { useRouter } from "next/navigation";
-import { useTransition } from "react";
-import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
 
 type DeleteMaintenanceButtonProps = {
   id: string;
@@ -60,7 +61,7 @@ export function DeleteMaintenanceButton({
           <AlertDialogCancel>Cancel</AlertDialogCancel>
           <AlertDialogAction
             onClick={handleDelete}
-            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            className="text-destructive-foreground bg-destructive hover:bg-destructive/90"
           >
             Delete
           </AlertDialogAction>

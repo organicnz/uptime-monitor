@@ -1,10 +1,11 @@
-import { createClient } from "@/lib/supabase/server";
-import { redirect, notFound } from "next/navigation";
-import { IncidentForm } from "@/components/incident-form";
-import { updateIncident, deleteIncident } from "@/lib/actions/incidents";
-import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
+import Link from "next/link";
+import { notFound, redirect } from "next/navigation";
+
 import { DeleteIncidentButton } from "@/components/delete-incident-button";
+import { IncidentForm } from "@/components/incident-form";
+import { deleteIncident, updateIncident } from "@/lib/actions/incidents";
+import { createClient } from "@/lib/supabase/server";
 
 type Monitor = {
   id: string;
@@ -70,18 +71,18 @@ export default async function EditIncidentPage({
 
   return (
     <div className="p-4 sm:p-6 lg:p-8">
-      <div className="max-w-2xl mx-auto space-y-6">
+      <div className="mx-auto max-w-2xl space-y-6">
         <div className="flex items-start justify-between">
           <div>
             <Link
               href="/dashboard/incidents"
-              className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground transition-colors mb-4"
+              className="mb-4 inline-flex items-center text-sm text-muted-foreground transition-colors hover:text-foreground"
             >
-              <ArrowLeft className="h-4 w-4 mr-1" />
+              <ArrowLeft className="mr-1 h-4 w-4" />
               Back to Incidents
             </Link>
-            <h1 className="text-3xl font-bold gradient-text">Edit Incident</h1>
-            <p className="text-muted-foreground mt-1">
+            <h1 className="gradient-text text-3xl font-bold">Edit Incident</h1>
+            <p className="mt-1 text-muted-foreground">
               Update incident details and status
             </p>
           </div>

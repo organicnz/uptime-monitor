@@ -1,8 +1,12 @@
 "use client";
 
-import { useEffect, useState, useCallback, useId } from "react";
+import {
+  REALTIME_SUBSCRIBE_STATES,
+  type RealtimeChannel,
+} from "@supabase/supabase-js";
+import { useCallback, useEffect, useId, useState } from "react";
+
 import { createClient } from "@/lib/supabase/client";
-import type { RealtimeChannel } from "@supabase/supabase-js";
 
 export type Heartbeat = {
   id: string;
@@ -100,7 +104,7 @@ export function useRealtimeMonitors(monitorIds: string[]) {
       if (cancelled) return;
 
       for (const { data } of latestResults) {
-        if (data) updateStatus(data as Heartbeat);
+        if (data) updateStatus(data);
       }
 
       if (cancelled) return;
@@ -126,14 +130,14 @@ export function useRealtimeMonitors(monitorIds: string[]) {
         )
         .subscribe((status) => {
           if (!cancelled) {
-            setIsConnected(status === "SUBSCRIBED");
+            setIsConnected(status === REALTIME_SUBSCRIBE_STATES.SUBSCRIBED);
           }
         });
 
       if (cancelled && channel) {
         const stale = channel;
         channel = null;
-        supabase.removeChannel(stale);
+        void supabase.removeChannel(stale);
       }
     };
 
@@ -143,12 +147,12 @@ export function useRealtimeMonitors(monitorIds: string[]) {
       cancelled = true;
       setIsConnected(false);
       if (channel) {
-        supabase.removeChannel(channel);
+        void supabase.removeChannel(channel);
       } else {
         // Subscription setup may still be in flight; remove by name once it
         // resolves. Best-effort cleanup to avoid leaked channels.
         const pending = supabase.channel(channelName);
-        supabase.removeChannel(pending);
+        void supabase.removeChannel(pending);
       }
     };
   }, [idsKey, instanceId, updateStatus]);
@@ -229,14 +233,14 @@ export function useRealtimeMonitor(monitorId: string) {
         )
         .subscribe((status) => {
           if (!cancelled) {
-            setIsConnected(status === "SUBSCRIBED");
+            setIsConnected(status === REALTIME_SUBSCRIBE_STATES.SUBSCRIBED);
           }
         });
 
       if (cancelled && channel) {
         const stale = channel;
         channel = null;
-        supabase.removeChannel(stale);
+        void supabase.removeChannel(stale);
       }
     };
 
@@ -246,10 +250,10 @@ export function useRealtimeMonitor(monitorId: string) {
       cancelled = true;
       setIsConnected(false);
       if (channel) {
-        supabase.removeChannel(channel);
+        void supabase.removeChannel(channel);
       } else {
         const pending = supabase.channel(channelName);
-        supabase.removeChannel(pending);
+        void supabase.removeChannel(pending);
       }
     };
   }, [monitorId, instanceId]);

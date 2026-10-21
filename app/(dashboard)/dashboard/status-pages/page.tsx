@@ -1,6 +1,7 @@
-import { createClient } from "@/lib/supabase/server";
-import { redirect } from "next/navigation";
+import { ExternalLink, Eye, Globe, LayoutTemplate, Plus } from "lucide-react";
 import Link from "next/link";
+import { redirect } from "next/navigation";
+
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -9,7 +10,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Plus, LayoutTemplate, ExternalLink, Globe, Eye } from "lucide-react";
+import { createClient } from "@/lib/supabase/server";
 import { StatusPage } from "@/types/application";
 
 export default async function StatusPagesPage() {
@@ -32,12 +33,12 @@ export default async function StatusPagesPage() {
 
   return (
     <div className="p-4 sm:p-6 lg:p-8">
-      <div className="max-w-5xl mx-auto space-y-8">
+      <div className="mx-auto max-w-5xl space-y-8">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
           <div>
-            <h1 className="text-3xl font-bold gradient-text">Status Pages</h1>
-            <p className="text-muted-foreground mt-1">
+            <h1 className="gradient-text text-3xl font-bold">Status Pages</h1>
+            <p className="mt-1 text-muted-foreground">
               Create public status pages to showcase your monitor uptime
             </p>
           </div>
@@ -54,19 +55,19 @@ export default async function StatusPagesPage() {
           {statusPages?.map((page) => (
             <Card
               key={page.id}
-              className="glass-card group hover:border-primary/30 transition-all"
+              className="glass-card group transition-all hover:border-primary/30"
             >
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="p-2.5 rounded-xl bg-primary/10">
+                    <div className="rounded-xl bg-primary/10 p-2.5">
                       <Globe className="h-5 w-5 text-primary" />
                     </div>
                     <div>
-                      <CardTitle className="text-lg group-hover:text-primary transition-colors">
+                      <CardTitle className="text-lg transition-colors group-hover:text-primary">
                         {page.title}
                       </CardTitle>
-                      <CardDescription className="truncate max-w-[180px]">
+                      <CardDescription className="max-w-[180px] truncate">
                         {page.description || "No description"}
                       </CardDescription>
                     </div>
@@ -74,7 +75,7 @@ export default async function StatusPagesPage() {
                   <Link
                     href={`/status/${page.slug}`}
                     target="_blank"
-                    className="p-2 rounded-lg hover:bg-muted transition-colors"
+                    className="rounded-lg p-2 transition-colors hover:bg-muted"
                   >
                     <ExternalLink className="h-4 w-4 text-muted-foreground hover:text-primary" />
                   </Link>
@@ -82,9 +83,9 @@ export default async function StatusPagesPage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 {/* URL Preview */}
-                <div className="flex items-center gap-2 p-3 rounded-xl bg-muted/50">
+                <div className="flex items-center gap-2 rounded-xl bg-muted/50 p-3">
                   <Eye className="h-4 w-4 text-muted-foreground" />
-                  <code className="text-sm text-muted-foreground font-mono">
+                  <code className="font-mono text-sm text-muted-foreground">
                     /status/{page.slug}
                   </code>
                 </div>
@@ -92,7 +93,7 @@ export default async function StatusPagesPage() {
                 {/* Status Badge */}
                 <div className="flex items-center justify-between">
                   <span
-                    className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium ${
+                    className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${
                       page.is_public
                         ? "bg-emerald-500/10 text-emerald-500"
                         : "bg-muted text-muted-foreground"
@@ -116,15 +117,15 @@ export default async function StatusPagesPage() {
 
           {/* Empty State */}
           {(!statusPages || statusPages.length === 0) && (
-            <Card className="col-span-full glass-card border-dashed">
+            <Card className="glass-card col-span-full border-dashed">
               <CardContent className="flex flex-col items-center justify-center py-16">
-                <div className="p-4 bg-primary/10 rounded-2xl mb-4">
+                <div className="mb-4 rounded-2xl bg-primary/10 p-4">
                   <LayoutTemplate className="h-12 w-12 text-primary" />
                 </div>
-                <h3 className="text-xl font-semibold mb-2">
+                <h3 className="mb-2 text-xl font-semibold">
                   No status pages yet
                 </h3>
-                <p className="text-muted-foreground mb-6 text-center max-w-md">
+                <p className="mb-6 max-w-md text-center text-muted-foreground">
                   Create a public status page to share your uptime status with
                   your users.
                 </p>

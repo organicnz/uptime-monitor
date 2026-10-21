@@ -44,7 +44,7 @@ mock.module("@/lib/supabase/service", () => ({
           get filters() {
             return state.filters;
           },
-        } as never);
+        });
         return chain;
       },
     };
@@ -53,11 +53,15 @@ mock.module("@/lib/supabase/service", () => ({
 
 const checker = {
   calls: [] as unknown[],
-  error: null as unknown,
+  error: null as Error | null,
 };
 
-mock.module("@/lib/monitor-checker", () => ({
-  processMonitorCheck: async (
+// The mock replaces the module for the whole test run, so it replaces only
+// the *route's* dependency: stubbing `@/lib/monitor-checker` itself would
+// hand the stub to every other test file that imports the real one, and a
+// test of the state machine would silently be testing a recorder.
+mock.module("@/lib/monitor-checker-runner", () => ({
+  runMonitorCheck: async (
     monitor: unknown,
     deadline: unknown,
     options: unknown,

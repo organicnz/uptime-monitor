@@ -1,4 +1,5 @@
 import { Client } from "@upstash/qstash";
+
 import { getQstashConfig, getVercelAutomationBypassSecret } from "@/lib/env";
 
 // QStash client singleton

@@ -1,10 +1,23 @@
 "use client";
 
-import { useRealtimeMonitors } from "@/hooks/use-realtime-monitors";
 import { formatDistanceToNow } from "date-fns";
-import { duplicateMonitor } from "@/lib/actions/monitors";
+import {
+  AlertCircle,
+  CheckCircle2,
+  Copy,
+  ExternalLink,
+  MoreVertical,
+  Settings,
+  Wifi,
+  WifiOff,
+  XCircle,
+} from "lucide-react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useMemo, useTransition } from "react";
 import { toast } from "sonner";
-import { MonitorCard } from "@/components/ui/monitor-card";
+
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,19 +25,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Button } from "@/components/ui/button";
-import { CheckCircle2, XCircle, AlertCircle } from "lucide-react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useMemo, useTransition } from "react";
-import {
-  Wifi,
-  WifiOff,
-  MoreVertical,
-  Copy,
-  Settings,
-  ExternalLink,
-} from "lucide-react";
+import { MonitorCard } from "@/components/ui/monitor-card";
+import { useRealtimeMonitors } from "@/hooks/use-realtime-monitors";
+import { duplicateMonitor } from "@/lib/actions/monitors";
 
 type Monitor = {
   id: string;
@@ -138,9 +141,9 @@ export function LiveMonitorsList({ monitors }: LiveMonitorsListProps) {
             <>
               <div className="relative">
                 <Wifi className="h-4 w-4 text-emerald-500" />
-                <span className="absolute -top-0.5 -right-0.5 h-2 w-2 bg-emerald-500 rounded-full animate-pulse" />
+                <span className="absolute -top-0.5 -right-0.5 h-2 w-2 animate-pulse rounded-full bg-emerald-500" />
               </div>
-              <span className="text-emerald-500 font-medium">
+              <span className="font-medium text-emerald-500">
                 Live updates active
               </span>
             </>
@@ -152,7 +155,7 @@ export function LiveMonitorsList({ monitors }: LiveMonitorsListProps) {
           )}
         </div>
         {lastUpdate && (
-          <span className="text-muted-foreground text-xs">
+          <span className="text-xs text-muted-foreground">
             Updated {formatDistanceToNow(lastUpdate, { addSuffix: true })}
           </span>
         )}
@@ -164,7 +167,7 @@ export function LiveMonitorsList({ monitors }: LiveMonitorsListProps) {
           const statusDisplay = getStatusDisplay(monitor.id);
 
           return (
-            <div key={monitor.id} className="relative group">
+            <div key={monitor.id} className="group relative">
               <Link
                 href={`/dashboard/monitors/${monitor.id}`}
                 className="block"
@@ -190,7 +193,7 @@ export function LiveMonitorsList({ monitors }: LiveMonitorsListProps) {
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="absolute top-2 right-2 h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity bg-neutral-900/80 hover:bg-neutral-800"
+                    className="absolute top-2 right-2 h-8 w-8 bg-neutral-900/80 opacity-0 transition-opacity group-hover:opacity-100 hover:bg-neutral-800"
                     onClick={(e) => e.preventDefault()}
                   >
                     <MoreVertical className="h-4 w-4" />
@@ -211,12 +214,7 @@ export function LiveMonitorsList({ monitors }: LiveMonitorsListProps) {
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
-                    onClick={(e) =>
-                      handleDuplicate(
-                        monitor.id,
-                        e as unknown as React.MouseEvent,
-                      )
-                    }
+                    onClick={(e) => handleDuplicate(monitor.id, e)}
                     disabled={isDuplicating}
                   >
                     <Copy className="mr-2 h-4 w-4" />

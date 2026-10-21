@@ -1,19 +1,20 @@
-import { createClient } from "@/lib/supabase/server";
-import { notFound } from "next/navigation";
 import {
-  CheckCircle2,
-  XCircle,
-  AlertTriangle,
-  Clock,
   Activity,
+  AlertTriangle,
+  CheckCircle2,
+  Clock,
   Globe,
   Server,
-  Zap,
   Shield,
+  XCircle,
+  Zap,
 } from "lucide-react";
+import Link from "next/link";
+import { notFound } from "next/navigation";
 
-import { Monitor, StatusPage } from "@/types/application";
 import { GPUStatusBackground } from "@/components/gpu-status-background-client";
+import { createClient } from "@/lib/supabase/server";
+import { Monitor, StatusPage } from "@/types/application";
 
 // Reusing types from dashboard
 const typeIcons: Record<string, typeof Globe> = {
@@ -57,7 +58,7 @@ export default async function PublicStatusPage({
 
   if (monitors.length === 0) {
     return (
-      <div className="min-h-screen bg-slate-50 dark:bg-neutral-950 flex items-center justify-center">
+      <div className="flex min-h-screen items-center justify-center bg-slate-50 dark:bg-neutral-950">
         <div className="text-center">
           <h1 className="text-2xl font-bold">{typedStatusPage.title}</h1>
           <p className="text-neutral-500">No monitors configured.</p>
@@ -93,9 +94,9 @@ export default async function PublicStatusPage({
   const systemHealth = anyDown ? "down" : allUp ? "up" : "degraded";
 
   return (
-    <div className="relative min-h-screen bg-slate-50 dark:bg-neutral-950 text-neutral-900 dark:text-neutral-100 font-sans">
+    <div className="relative min-h-screen bg-slate-50 font-sans text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100">
       <GPUStatusBackground status={systemHealth} />
-      <div className="relative max-w-4xl mx-auto px-4 py-12">
+      <div className="relative mx-auto max-w-4xl px-4 py-12">
         {/* Header */}
         <div className="mb-8 flex items-center justify-between">
           <div>
@@ -103,7 +104,7 @@ export default async function PublicStatusPage({
               {typedStatusPage.title}
             </h1>
             {typedStatusPage.description && (
-              <p className="text-neutral-500 mt-2">
+              <p className="mt-2 text-neutral-500">
                 {typedStatusPage.description}
               </p>
             )}
@@ -120,7 +121,7 @@ export default async function PublicStatusPage({
 
         {/* System Status Banner */}
         <div
-          className={`rounded-lg p-6 mb-8 text-white flex items-center gap-4 shadow-sm ${
+          className={`mb-8 flex items-center gap-4 rounded-lg p-6 text-white shadow-sm ${
             anyDown ? "bg-red-500" : allUp ? "bg-green-500" : "bg-yellow-500"
           }`}
         >
@@ -144,9 +145,9 @@ export default async function PublicStatusPage({
         </div>
 
         {/* Monitors List */}
-        <div className="bg-white dark:bg-neutral-900 rounded-xl shadow-sm border border-neutral-200 dark:border-neutral-800 overflow-hidden">
-          <div className="p-4 border-b border-neutral-200 dark:border-neutral-800 bg-neutral-50/50 dark:bg-neutral-900/50">
-            <h3 className="font-semibold text-neutral-500 uppercase text-xs tracking-wider">
+        <div className="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+          <div className="border-b border-neutral-200 bg-neutral-50/50 p-4 dark:border-neutral-800 dark:bg-neutral-900/50">
+            <h3 className="text-xs font-semibold tracking-wider text-neutral-500 uppercase">
               Service Status
             </h3>
           </div>
@@ -163,18 +164,18 @@ export default async function PublicStatusPage({
               return (
                 <div
                   key={monitor.id}
-                  className="flex items-center justify-between p-4 hover:bg-neutral-50 dark:hover:bg-neutral-800/50 transition-colors"
+                  className="flex items-center justify-between p-4 transition-colors hover:bg-neutral-50 dark:hover:bg-neutral-800/50"
                 >
                   <div className="flex items-center gap-4">
                     <div
-                      className={`p-2 rounded-lg ${
+                      className={`rounded-lg p-2 ${
                         isUp
-                          ? "bg-green-100 dark:bg-green-900/20 text-green-600 dark:text-green-400"
+                          ? "bg-green-100 text-green-600 dark:bg-green-900/20 dark:text-green-400"
                           : isDown
-                            ? "bg-red-100 dark:bg-red-900/20 text-red-600 dark:text-red-400"
+                            ? "bg-red-100 text-red-600 dark:bg-red-900/20 dark:text-red-400"
                             : isDegraded
-                              ? "bg-amber-100 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400"
-                              : "bg-neutral-100 dark:bg-neutral-800 text-neutral-500"
+                              ? "bg-amber-100 text-amber-600 dark:bg-amber-900/20 dark:text-amber-400"
+                              : "bg-neutral-100 text-neutral-500 dark:bg-neutral-800"
                       }`}
                     >
                       {isUp ? (
@@ -188,16 +189,16 @@ export default async function PublicStatusPage({
                       )}
                     </div>
                     <div>
-                      <h4 className="font-medium text-lg">{monitor.name}</h4>
+                      <h4 className="text-lg font-medium">{monitor.name}</h4>
                       <div className="flex items-center gap-3 text-sm text-neutral-500">
                         <span className="flex items-center gap-1">
                           <Icon className="h-3 w-3" />
-                          <span className="uppercase text-xs">
+                          <span className="text-xs uppercase">
                             {monitor.type}
                           </span>
                         </span>
                         {ping && (
-                          <span className="text-xs font-mono">{ping}ms</span>
+                          <span className="font-mono text-xs">{ping}ms</span>
                         )}
                       </div>
                     </div>
@@ -205,7 +206,7 @@ export default async function PublicStatusPage({
 
                   <div className="flex flex-col items-end gap-1">
                     <span
-                      className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide ${
+                      className={`rounded-full px-3 py-1 text-xs font-bold tracking-wide uppercase ${
                         isUp
                           ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
                           : isDown
@@ -232,12 +233,12 @@ export default async function PublicStatusPage({
 
         <div className="mt-12 text-center text-sm text-neutral-400">
           Powered by{" "}
-          <a
-            href="#"
+          <Link
+            href="/"
             className="underline decoration-neutral-700 hover:text-neutral-200"
           >
             Uptime Monitor
-          </a>
+          </Link>
         </div>
       </div>
     </div>

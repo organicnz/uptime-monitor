@@ -1,17 +1,22 @@
 import { defineConfig, devices } from "@playwright/test";
 
-const isCI = Boolean(process.env.CI);
-const port = Number(process.env.E2E_PORT ?? 3101);
-const baseURL = process.env.E2E_BASE_URL ?? `http://localhost:${port}`;
+// The Playwright CLI runs on Bun (`bun --bun playwright test`), so `Bun.env`
+// is the accessor for the environment that drives the suite.
+const isCI = Boolean(Bun.env.CI);
+const port = Number(Bun.env.E2E_PORT ?? 3101);
+const baseURL = Bun.env.E2E_BASE_URL ?? `http://localhost:${port}`;
 const serverCommand =
-  process.env.E2E_SERVER_COMMAND ??
-  (process.env.E2E_PRODUCTION === "1"
-    ? `bunx next start -p ${port}`
-    : `bunx next dev -p ${port}`);
+  Bun.env.E2E_SERVER_COMMAND ??
+  (Bun.env.E2E_PRODUCTION === "1"
+    ? `bun --bun next start -p ${port}`
+    : `bun --bun next dev -p ${port}`);
 
 export default defineConfig({
   testDir: "./e2e",
-  testMatch: "**/*.e2e.ts",
+  // `.mts` on purpose: Playwright's TypeScript transform for CommonJS files
+  // hooks `require.extensions`, which Bun does not implement. The ESM loader
+  // path works on Bun, so the specs are ESM modules.
+  testMatch: "**/*.e2e.mts",
   outputDir: "./test-results",
   timeout: 30_000,
   expect: { timeout: 5_000 },
@@ -38,16 +43,16 @@ export default defineConfig({
     // E2E_BASE_URL (e.g. against a deployed preview). Relying on an ambient
     // dev server made local runs non-deterministic and silently reuse stale
     // builds.
-    reuseExistingServer: Boolean(process.env.E2E_BASE_URL),
+    reuseExistingServer: Boolean(Bun.env.E2E_BASE_URL),
     timeout: 120_000,
     stdout: "pipe",
     stderr: "pipe",
     env: {
       NEXT_PUBLIC_SUPABASE_URL:
-        process.env.NEXT_PUBLIC_SUPABASE_URL ?? "http://127.0.0.1:54321",
+        Bun.env.NEXT_PUBLIC_SUPABASE_URL ?? "http://127.0.0.1:54321",
       NEXT_PUBLIC_SUPABASE_ANON_KEY:
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "local-anon-key",
-      CRON_SECRET: process.env.CRON_SECRET ?? "e2e-cron-secret",
+        Bun.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "local-anon-key",
+      CRON_SECRET: Bun.env.CRON_SECRET ?? "e2e-cron-secret",
       // Unlocks the self-contained WebGPU fixture route (app/gpu-fixture).
       // Left unset everywhere else, so the route 404s in a real deployment.
       E2E_GPU_FIXTURE: "1",
@@ -56,7 +61,7 @@ export default defineConfig({
   projects: [
     {
       name: "chromium",
-      testIgnore: /gpu\.e2e\.ts$/,
+      testIgnore: /gpu\.e2e\.mts$/,
       use: { ...devices["Desktop Chrome"] },
     },
     {
@@ -65,7 +70,7 @@ export default defineConfig({
       // some machines. Keeping them here means the main suite keeps its short
       // timeout and its launch flags, instead of inheriting both.
       name: "chromium-gpu",
-      testMatch: /gpu\.e2e\.ts$/,
+      testMatch: /gpu\.e2e\.mts$/,
       timeout: 180_000,
       use: {
         ...devices["Desktop Chrome"],

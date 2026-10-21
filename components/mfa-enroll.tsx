@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { Check, CheckCircle2, Copy, Loader2, Shield } from "lucide-react";
 import Image from "next/image";
-import { createClient } from "@/lib/supabase/client";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
+
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Card,
   CardContent,
@@ -13,8 +13,9 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Shield, Loader2, CheckCircle2, Copy, Check } from "lucide-react";
-import { toast } from "sonner";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { createClient } from "@/lib/supabase/client";
 
 type Props = {
   onEnrolled: () => void;
@@ -51,7 +52,7 @@ export function MFAEnroll({ onEnrolled, onCancelled }: Props) {
       setLoading(false);
     };
 
-    enroll();
+    void enroll();
   }, []);
 
   const handleCopySecret = async () => {
@@ -120,25 +121,25 @@ export function MFAEnroll({ onEnrolled, onCancelled }: Props) {
       </CardHeader>
       <CardContent className="space-y-6">
         {error && (
-          <div className="bg-destructive/10 border border-destructive/30 text-destructive px-4 py-3 rounded-lg text-sm">
+          <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
             {error}
           </div>
         )}
 
         {/* QR Code */}
         <div className="flex justify-center">
-          <div className="p-4 bg-white rounded-xl">
+          <div className="rounded-xl bg-white p-4">
             <Image src={qr} alt="QR Code" width={192} height={192} />
           </div>
         </div>
 
         {/* Manual entry */}
         <div className="space-y-2">
-          <p className="text-sm text-muted-foreground text-center">
+          <p className="text-center text-sm text-muted-foreground">
             Can&apos;t scan? Enter this code manually:
           </p>
           <div className="flex items-center gap-2">
-            <code className="flex-1 px-3 py-2 bg-muted rounded-lg text-sm font-mono break-all">
+            <code className="flex-1 rounded-lg bg-muted px-3 py-2 font-mono text-sm break-all">
               {secret}
             </code>
             <Button
@@ -170,7 +171,7 @@ export function MFAEnroll({ onEnrolled, onCancelled }: Props) {
             placeholder="000000"
             value={verifyCode}
             onChange={(e) => setVerifyCode(e.target.value.replace(/\D/g, ""))}
-            className="text-center text-2xl tracking-widest font-mono"
+            className="text-center font-mono text-2xl tracking-widest"
           />
         </div>
 

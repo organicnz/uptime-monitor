@@ -8,6 +8,7 @@ API routes live in `app/api/*/route.ts`
 
 ```typescript
 import { NextRequest, NextResponse } from "next/server";
+
 import { createClient } from "@/lib/supabase/server";
 
 export async function GET(request: NextRequest) {

@@ -8,26 +8,31 @@ This file provides context for AI assistants (Claude Code, Kiro, etc.) working w
 
 ## Tech Stack
 
-- **Framework**: Next.js 16 (App Router, React 19, Turbopack)
+- **Runtime**: Bun 1.4+ (install, scripts, tests, dev server, production server)
+- **Framework**: Next.js 16.5 canary (App Router, React 19.3, Turbopack) — served by Bun
 - **Database**: Supabase (PostgreSQL + Auth + Realtime)
 - **Styling**: Tailwind CSS v4
 - **Language**: TypeScript (strict mode)
-- **Deployment**: Vercel
+- **Deployment**: Bun container (podman Quadlet)
 
 ## Quick Reference
 
 ```bash
 # Development
-npm run dev      # Start dev server on port 3001 (Turbopack)
-npm run build    # Production build
-npm run lint     # Run ESLint
+bun run dev      # Start dev server on port 3001 (Turbopack), on Bun
+bun run build    # Production build, on Bun
+bun run lint     # Run ESLint, on Bun
+bun run format   # Format with Bun's own formatter (bun fmt)
+bun run test     # Unit tests, on Bun's test runner
+bun run typecheck  # Type check with tsrs (the Rust port of the TypeScript compiler)
+bun run doctor   # Preflight: is this machine set up to run this on Bun?
 
 # Database
 # Schema: supabase/schema.sql
 # Types: types/database.ts
 
 # Rust Tools
-npm run build:audit      # Build the audit binary
+bun run build:audit      # Build the audit binary
 tools/audit/target/release/audit --help  # Show help
 ```
 
@@ -44,6 +49,7 @@ lib/                   # Utilities and services
 ├── supabase/          # Supabase clients (server, client, service, middleware)
 ├── actions/           # Server actions
 ├── env.ts             # Required-env accessors; fail closed
+├── client-env.ts      # Browser-side env (Next.js inlines it at build time)
 ├── security.ts        # Security utilities (SSRF protection, secure compare)
 ├── notification-types.ts    # Which config fields are credentials
 ├── notification-channels.ts # Vault-backed channel CRUD (server only)
@@ -51,13 +57,20 @@ lib/                   # Utilities and services
 ├── monitor-checker.ts # Monitor check logic
 components/            # Reusable UI components
 ├── ui/                # shadcn/ui components
-types/                 # TypeScript type definitions
+tools/                 # Rust binaries built for this repository
+├── audit/             # The audit tool: code quality, secrets, favicons
+└── probe/             # The monitor probe: connect, TLS, request, timing
+types/                 # TypeScript type definitions (incl. bun-modules.d.ts)
+scripts/               # Bun scripts (delivery, coverage, bundle size, doctor)
 supabase/              # Database schema
 ├── schema.sql         # Reference schema
 ├── migrations/        # Applied in order, all idempotent
-└── functions/         # Edge Functions
+└── functions/         # Edge Functions (Deno runtime)
     ├── _shared/senders.ts  # Shared by the app and the edge runtime
     └── notification-dispatch/
+bunfig.toml            # The Bun policy: node→bun alias, Bun Shell, install pins
+Containerfile          # Bun-only production image
+deploy/                # podman Quadlet unit + env template
 ```
 
 ## Key Features
@@ -71,15 +84,17 @@ supabase/              # Database schema
 ## Development Commands
 
 ```bash
-npm run dev      # Start dev server on port 3001 (Turbopack)
-npm run build    # Production build
-npm run lint     # Run ESLint
+bun run dev      # Start dev server on port 3001 (Turbopack), on Bun
+bun run build    # Production build, on Bun
+bun run lint     # Run ESLint, on Bun
+bun run format   # Format with Bun's own formatter (bun fmt)
+bun run test     # Unit tests, on Bun's test runner
+bun run doctor   # Preflight: is this machine set up to run this on Bun?
 
 # Rust Tools
-npm run build:audit                        # Build audit tool
+bun run build:audit                        # Build audit tool
 ./tools/audit/target/release/audit generate-favicons  # Generate favicons
 ./tools/audit/target/release/audit local-cron         # Run local monitor check
-./tools/audit/target/release/audit vercel-cleanup     # Cleanup deployments
 ```
 
 ## Environment Variables
@@ -88,6 +103,8 @@ npm run build:audit                        # Build audit tool
 `process.env.X!` — the assertion suppresses the type error and turns a missing
 value into a throw from inside the SDK. `.env.local.example` is the documented
 list, and `__tests__/lib/vault-secrets.test.ts` fails if the two drift.
+`lib/client-env.ts` holds the browser-only accessors, which read the values
+Next.js inlines into the bundle.
 
 - `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` - required
 - `SUPABASE_SERVICE_ROLE_KEY` - required, server-side only
@@ -95,7 +112,8 @@ list, and `__tests__/lib/vault-secrets.test.ts` fails if the two drift.
   workflow reads it as a repository secret, so rotating it means updating both
 - `SITE_URL` (GitHub **Variable**, not a Secret: the app's public URL) -
   where the retention-cleanup workflow posts the daily rollup job
-- `VERCEL_AUTOMATION_BYPASS_SECRET` - Vercel Deployment Protection
+- `VERCEL_AUTOMATION_BYPASS_SECRET` - Vercel Deployment Protection;
+  only meaningful on Vercel, unset on the self-hosted Bun deployment
 - `NOTIFICATION_DISPATCH_SECRET` - shared with the dispatch Edge Function;
   CI provisions the function's copy via `supabase secrets set`
 
@@ -114,11 +132,317 @@ list, and `__tests__/lib/vault-secrets.test.ts` fails if the two drift.
   of `notification_channels.config`
 - `CREATE` on the `public` schema revoked from every role
 - SSRF protection for monitor URLs and outbound webhooks, in both runtimes
+- DNS pinning in the app runtime: requests go to the validated IP, with the
+  hostname kept in the `Host` header and the TLS server name
 - Rate limiting on auth endpoints
 - Constant-time token comparison
 - Strong password requirements (8+ chars, mixed case, numbers)
 - Security headers (HSTS, CSP, X-Frame-Options)
 - Input validation with Zod
+
+## Runtime
+
+There is no Node.js in this stack. Bun runs everything: the package manager,
+the task runner, the formatter, the linter, the unit tests, the scripts, the
+Next.js dev server, the type checker, and the production server.
+
+`bunfig.toml` is where that is configured, so "no Node.js" is a _setting_
+rather than a convention somebody has to remember.
+
+- **The runtime is the latest Bun canary** (`1.4.3-canary.20261019.1`, which
+  reports itself as `1.4.4`). The canary is a moving target, so it is never
+  pinned to an exact version in a workflow: CI asks for `bun-version: canary`,
+  the npm dist-tag is what tracks it, and `package.json`'s `engines.bun`
+  records the floor. The reason for the canary is specific: Bun's own linter,
+  formatter and test runner are where the newest work lands first, and this
+  repository is built on all three.
+  A canary's own number is not the version it reports: `1.4.3-canary.*` is
+  the canary _for_ `1.4.4`, so `engines.bun` is `>=1.4.4` and the floor is
+  checked against what `Bun.version` says.
+- **Never add a `node:*` import.** Use Bun's own APIs: `bun:fs`, `bun:path`,
+  `bun:os`, `Bun.dns`, `Bun.connect`, `Bun.file`. The global `crypto`
+  exposes `timingSafeEqual` and `getRandomValues`. `bun:fs`, `bun:path` and
+  `bun:os` are declared in `types/bun-modules.d.ts` against Bun's own API —
+  not re-exported from `@types/node` — so adding a call site means adding a
+  signature there.
+- **Never invoke `node`, `npm`, `npx`, `yarn` or `pnpm`.** Use `bun`,
+  `bunx`, and `bun --bun <binary>`.
+- **`bunfig.toml` sets `[run] bun = true`.** Bun then puts a `node` symlink —
+  pointing at Bun — at the front of `$PATH` for every command `bun run`
+  starts, so a third-party binary with a `#!/usr/bin/env node` shebang still
+  runs on Bun. Bun applies this by default only when `node` is _absent_ from
+  `$PATH`, so it is stated explicitly: on a machine or a CI runner that has
+  Node.js installed, it is the difference between Bun and Node.js. The
+  `bun run doctor` preflight fails if the setting is removed.
+- **`bunfig.toml` sets `[run] shell = "bun"`.** `package.json` scripts run in
+  Bun's own shell, so the toolchain does not depend on `/bin/sh`. Bun Shell
+  is a strict subset of POSIX: `if`/`elif`/`fi`, `&&`, `||`, `;`, subshells
+  and `>` redirection all work, but fd duplication (`>/dev/null 2>&1`) does
+  not. Keep scripts to the subset.
+- `bun run <script>` executes a binary through its
+  `#!/usr/bin/env node` shebang, which starts Node.js again. Prefix the
+  binary with `bun --bun` to keep it on Bun. Every tool invocation in
+  `package.json` and `lefthook.yml` does this, and a unit test enforces it.
+  Native Bun subcommands (`bun check`, `bun test`, `bun audit`, `bun fmt`)
+  are Bun by definition and need no `--bun`.
+- **Prettier is gone; `bun fmt` is the formatter.** Bun's formatter is
+  Prettier-compatible by default and additionally covers TOML and YAML, so
+  the old `.prettierignore` became `[fmt] ignorePatterns` in `bunfig.toml`.
+  `bun run format` writes, `bun run format:check` verifies, and
+  `bun fmt --doctor` reports any formatter package that is still needed.
+- **Bun's formatter also sorts.** `[fmt] sortImports` puts the imports into
+  groups — built-ins, external, first-party, relative — and
+  `[fmt.sortTailwindcss]` sorts the Tailwind classes using the project's
+  own Tailwind v4, which is configured by its stylesheet because v4 has no
+  config file. The payoff is not the order: it is that the order stops
+  being a matter of taste. A class list that is always written the same way
+  produces a diff when it changes and no diff when it does not.
+- **ESLint is gone; `bun lint` is the linter.** `bunfig.toml`'s `[lint]`
+  section replaced `eslint.config.mjs` and `eslint-config-next`. The
+  `correctness` category is a strict **superset** of what
+  `eslint-config-next/core-web-vitals` plus `eslint-config-next/typescript`
+  enabled — 260 rules instead of 85 — with the same rule families (react,
+  react-hooks, jsx-a11y, @next/next, @typescript-eslint) plus oxc, unicorn,
+  promise, jest, vitest and bun:test. `maxWarnings = 0` makes a warning a
+  failure, so the local run and the CI gate are the same gate.
+- **The linter sees the types.** `bunfig.toml` sets `[lint] typeAware = true`,
+  which turns on the rules that need the type checker: an `any`
+  that came off the network, a promise nobody awaited, a type assertion
+  that changes nothing, a comparison against an enum member written as a
+  string literal. The compiler is silent about all of them. Enabling it
+  meant fixing 244 findings, and most of them were real:
+  - **`response.json()` is `any`, and it was the root of most of them.**
+    `lib/api-client.ts` is now the way the browser talks to the app's own
+    API: `fetchJson` validates the body against a Zod schema, so the
+    shape of a response is written down in one place and a change on the
+    server fails loudly instead of reading `undefined` off a different
+    object. The response schemas live next to it.
+  - **A type assertion that does not change the type is dead weight.**
+    The generated database types already say what a column holds, so
+    `data as Monitor[]` and friends were removed rather than kept. The
+    `as unknown as never` that the writes used to carry are gone too: a
+    Supabase insert or update is now checked against the row type instead
+    of waving itself through.
+  - **`bun-types` already declares Bun's `tls` fetch option** on
+    `RequestInit`, so `lib/security.ts` no longer needs a local type for
+    it. The DNS-pinning request keeps the same shape it always had.
+  - **The `Deno` global is typed by Deno, not by anything in this
+    repository's dependency tree**, so every `Deno.serve` is an `any` to
+    Bun's linter and everything through it is an `any` too. The
+    `no-unsafe-*` rules are off for `supabase/functions/**`, and the gate
+    that matters for those files is `deno task check`, which runs in CI
+    against the real `deno.ns` types with `strict` on.
+  - **`require-await` is off for the test suite.** A mock has to keep the
+    async signature of the thing it replaces, but it has nothing to wait
+    for, so the rule would ask it to await a promise it just created.
+- **Bun's own rules are enabled too.** `bun/no-cwd-dependent-path`,
+  `bun/no-literal-temp-dir`, `bun/no-unportable-commands`,
+  `bun/prefer-builtin-sleep`, `bun/prefer-timeout-signal` and friends are
+  off by default and only a Bun-aware linter can check them.
+- **Every rule that is off has a reason next to it.** The `[lint]` section
+  documents each one: `jsx-a11y/prefer-tag-over-role` would mean a component
+  refactor rather than a bug fix, `bun/no-env-at-module-scope` is wrong for a
+  Next.js app (the build substitutes `process.env.NEXT_PUBLIC_*` at build
+  time, so the read has to happen where the text is), and the Deno edge
+  functions cannot take a Bun-only API.
+- The old ESLint `eslint-disable` comments still work — Bun's linter honours
+  them — and it reports the ones that have gone stale.
+- **Read the environment through `Bun.env`, not `process.env`.** On the
+  server `Bun.env` and `process.env` are the same live object, so the
+  value is read from the running process rather than frozen at build time.
+  `process.env` survives in exactly four files, and each is deliberate:
+  `lib/client-env.ts` and `instrumentation-client.ts` (Next.js substitutes
+  `process.env.NEXT_PUBLIC_*` into the browser bundle at build time by
+  matching that exact text, and it has no `Bun` global to offer),
+  `sentry.edge.config.ts` and `instrumentation.ts` (the edge runtime is a
+  V8 isolate with Next's own `process.env`, not Bun). The allowlist is
+  asserted in `__tests__/lib/bun-only.test.ts`.
+- `lib/env.ts` is isomorphic: it reads `Bun.env` on the server and the
+  Next.js-inlined `process.env` in the browser, through one branch.
+- **`Bun.argv`, not `process.argv`.** Same object, but it is Bun's own API
+  rather than a Node.js compatibility shim.
+- **`process.exitCode`, not `process.exit()`.** `process.exit()` truncates
+  buffered output when it is piped; setting `process.exitCode` lets Bun
+  flush first, so a CI log never loses its last lines.
+- **Spawn a process with `Bun.$`, not `child_process`.** Bun's shell API
+  escapes interpolated values, runs the command directly with no
+  intermediate shell, and returns `{ stdout, stderr, exitCode }` through
+  `.nothrow()`. `scripts/coverage-check.ts` uses it to run the test suite.
+- **Find files with `Bun.Glob`, not a hand-rolled walk.** It is the
+  runtime's own matcher: one traversal, and the paths that match come back
+  already filtered. `scripts/lint-migrations.ts`,
+  `scripts/supabase-migrate.ts` and `scripts/bundle-size.ts` use it.
+  `scanSync` takes a single options object — `{ cwd, onlyFiles }` — not a
+  root and an options argument, and `followSymlinks: true` is what makes
+  the build-output scan see the traced packages that `.next/node_modules`
+  links to.
+- **Write files with `Bun.write`, not `writeFile`.** It creates the parent
+  directory if it is missing, so a write does not need a `mkdir` beside it
+  to keep the two in step.
+- **Read `bunfig.toml` with `Bun.TOML.parse`, not a regular expression.**
+  A regex cannot tell `bun = true` from a line of prose that mentions it,
+  and it cannot tell a setting Bun will act on from one that has been moved
+  under the wrong table. `bunfig.toml` is where "this repository has no
+  Node.js" is decided, so `scripts/doctor.ts` parses it the way Bun parses
+  it. A file Bun cannot read is ignored by Bun in full, so an unparseable
+  `bunfig.toml` is a doctor failure, not a warning.
+- **The coverage gate reads Bun's lcov report.** `bun test --coverage`
+  writes `lcov.info`; the gate parses the `FNF`/`FNH`/`LF`/`LH` records
+  and averages the per-file percentages, which is exactly what Bun's own
+  "All files" row reports. It used to scrape that row out of the console
+  output with a regular expression, and a human-readable rendering is not
+  an interface. `COVERAGE_MIN_FILE_FUNCS` and `COVERAGE_MIN_FILE_LINES`
+  add an opt-in per-file floor on top of the aggregate one.
+- **The coverage measurement is deliberately stable.** Two things decide
+  which files the report covers, and both are pinned. The scripts are
+  excluded, because each one is a command-line tool whose entry point is a
+  process and whose `main()` a unit suite cannot cover; what the scripts
+  decide lives in exported functions the suite does cover. And the
+  Supabase server client is replaced in `__tests__/setup.ts`, in the
+  preload, before any test file loads — because `mock.module` is
+  process-wide, so the test _order_ used to decide whether the real module
+  was ever evaluated, and the same commit could pass the coverage gate or
+  fail it. The number the gate compares does not move with the order.
+- **Every file has a floor, not just the aggregate.** The aggregate can
+  hide a file that nothing imports any more: it drops out of the report
+  and the average barely moves. `scripts/coverage-check.ts` therefore
+  holds each file to 60% of its functions and 40% of its lines, on top of
+  the 70% / 80% aggregate. `COVERAGE_MIN_FILE_FUNCS` and
+  `COVERAGE_MIN_FILE_LINES` raise or lower it; zero turns it off. The
+  floor is what would have caught the two files that hold the
+  notification credentials and had no test at all: the aggregate read 86%
+  while `lib/notifications.ts` sat at 0% of its functions.
+- **The audit gate reads `bun audit --json`.** The advisories come back as
+  data — a package key and a record per advisory — so the gate can decide
+  per advisory instead of testing the tool's output for a sentence. The
+  suppressions live in `scripts/audit.ts`, each with a reason, because a
+  suppression in a workflow file is invisible in a code review and one in
+  code is a line somebody has to argue with when the reason stops being
+  true.
+- **`install.auto = "disable"`.** Bun's default is to fetch a missing
+  dependency on the fly, resolving to `latest` when the lockfile does not
+  say otherwise — which is exactly what a compromised registry wants. The
+  lockfile is committed, so a missing dependency is a mistake in the
+  working tree, not a reason to reach for the network.
+- **`package.json` declares `trustedDependencies: []`.** Bun is
+  default-secure: a dependency's install script does not run unless it is
+  on an allow list. The list being empty is the strongest form of that,
+  and the only install scripts in this tree are Node.js ones that have no
+  business running. Naming the list makes the decision visible in a diff
+  instead of leaving it to a built-in default that moves with the runtime.
+- **`Bun.escapeHTML` escapes HTML.** `lib/security.ts` uses it instead of
+  a hand-rolled chain of replacements, which produced the same entities
+  but had two places to get the order wrong.
+- **`tsrs` is the type checker, and it is the only gate**
+  (`bun run typecheck`). It is the Rust port of the TypeScript compiler, from
+  the Oxc project, tracking TypeScript 7.1 — and it is the only TypeScript 7
+  checker that runs in a stack without Node.js: the `tsc` that ships with the
+  TypeScript 7 beta is a `#!/usr/bin/env node` program. It is roughly ten
+  times faster than `tsc`, and it checks the same project against real
+  TypeScript semantics.
+  The script runs it with `--checkerAssignment go`, which puts tsrs on the
+  reference compiler's own file assignment and checker history, so the
+  diagnostics match the Go implementation exactly rather than merely
+  approximating it. It costs nothing measurable.
+- **`bun check` is the scoped checker** (`bun run typecheck:fast`). It is the
+  only one that can check a subset: `tsrs` is project-scoped the way `tsc` is,
+  and refuses a file list outright. The pre-commit hook uses it, on the
+  staged files only. It is not a gate — on a whole project it is slower than
+  `tsrs` and less conformant with TypeScript.
+- **The build does not type check.** `next.config.ts` sets
+  `typescript.ignoreBuildErrors`, so `next build` does not repeat the work
+  with the slowest of the checkers. The dedicated typecheck workflow is the
+  gate, and it is a required job.
+- **The `typescript` package is the TypeScript 7 beta**, pinned exactly
+  (`7.1.0-beta`). Next.js still needs the package to parse `tsconfig.json`
+  for the path aliases; it is not used to type check anything.
+- **The Rust probe does the syscall-bound half of a monitor check.**
+  `tools/probe` is a standalone binary with no runtime of its own: the cron
+  route sends it a batch of jobs and it connects, handshakes, requests and
+  times them. The SSRF policy stays in `lib/security.ts` — the probe is
+  given an address that has already been resolved and validated, and it
+  never resolves a name itself — so there is still exactly one
+  implementation of the policy. `lib/probe.ts` is the bridge, and it falls
+  back to the in-process implementation whenever the binary is missing, so
+  a deployment without Rust is slower rather than broken.
+- **Inject dependencies; do not mock modules.** `checkMonitor` takes its
+  transport and its policy through `CheckDependencies`, and
+  `planMonitorChecks` takes its probe through `ProbeRunner`. A
+  `mock.module` in Bun is process-wide: a test that replaced
+  `lib/security` would silently change what every other test file sees,
+  which is a flaky suite rather than a test.
+- **The same rule applies to the database, through a port.**
+  `lib/notification-channels.ts` reaches the database through
+  `ChannelStore`, `lib/notifications.ts` through `NotificationStore`,
+  `lib/analytics.ts` through `AnalyticsStore`, and the monitor state
+  machine through `CheckStore`. Each is a list of plain operations that
+  resolve to a row or to a message, so nothing about Supabase leaks past
+  the port and a test can supply a fake as a plain object. The port is also
+  the module's contract with the database, written down: which client
+  reads the channel row (the user's) and which reads the credential (the
+  service role) is now visible in one place rather than spread through the
+  calls.
+- **A stub for one caller belongs in its own module.**
+  `lib/monitor-checker-runner.ts` exists so the manual-check route can
+  have its checker stubbed without `@/lib/monitor-checker` being replaced.
+  A `mock.module` is process-wide, so a test that stubbed the whole
+  module would hand its stub to every other test file that imports the
+  real one — and the state machine's test would silently have been
+  testing a recorder. That is not hypothetical: it was exactly what
+  happened, and it showed up as a test that passed on its own and failed
+  in the suite.
+- **A process-wide mock belongs in the preload.** The Supabase server
+  client reads cookies from `next/headers`, which needs a request context
+  a unit test does not have, so the suite replaces it. Doing that in
+  `__tests__/setup.ts` — which `bunfig.toml` preloads — means the
+  replacement happens before any test file loads. A test that needs a
+  different fake registers its own, which replaces the default. Doing it
+  inside a test file instead leaves the order of the test files deciding
+  whether the real module is ever evaluated.
+- `bunfig.toml` also sets `[test] randomize = true`, so the suite runs in a
+  random order and an inter-test dependency cannot hide. Bun prints the
+  seed, so any failure is reproducible with `bun test --seed <n>`.
+- `bun run doctor` is the environment preflight: it checks the Bun version,
+  that `bunfig.toml` parses, the `node` → Bun alias, the shell, the
+  no-orphans setting, the randomized test order, the lockfile against
+  `package.json`, the absence of Node.js-only tooling, the formatter, the
+  linter and its warning threshold, the type checker, the coverage gate,
+  the supply-chain settings, the dependency trust list, the probe binary,
+  and the required environment variables. It runs in CI as a gate.
+- CI installs with `bun install --frozen-lockfile --ignore-scripts`. The
+  only lifecycle script in the repository builds the local Rust audit tool,
+  which CI never uses; skipping it keeps a Rust toolchain out of the
+  critical path of every workflow.
+- The container image runs as the unprivileged `bun` user, and everything it
+  copies is owned by that user so the server can write its Next.js cache.
+- `Bun.dns.lookup` is the DNS resolver (it returns an array of addresses, and
+  reports a family with no records as `DNS_ENOTFOUND`).
+- The e2e specs are `*.e2e.mts`, not `*.e2e.ts`. Playwright transforms
+  TypeScript for CommonJS files by hooking `require.extensions`, which Bun
+  does not implement; its ESM loader path works on Bun. A `.ts` spec fails to
+  build with `Unexpected !`.
+- `@types/node` is not a direct dependency. It is still present in
+  `node_modules` because `bun-types` depends on it (Bun implements the
+  Node.js API surface, so its type definitions are built on those
+  declarations) and Next.js's own types reference them. `tsconfig.json` does
+  not list `"node"` in `types`, so the Node.js globals are not opted into.
+- The app cannot run on Vercel: Vercel serves Next.js on Node.js. It runs
+  from the Bun container in `Containerfile`.
+- The Supabase Edge Functions in `supabase/functions/` run on **Deno**, not
+  Bun: that is the only runtime Supabase Edge Functions supports. Deno is
+  not Node.js, and those functions are deliberately runtime-agnostic — no
+  `node:*`, no `Deno.*`, no `process.env` in the shared code.
+- `__tests__/lib/bun-only.test.ts` enforces the rules above: no `node:`
+  imports, no CommonJS globals, no bare core specifiers, no Node.js type
+  surface, no Node.js process API outside the allowlist, no Node.js
+  shebangs, no Node.js in CI or in the container image, no ESLint or
+  Prettier configuration left behind, and the `bunfig.toml` settings that
+  make Bun the whole toolchain. It also enforces the parts that are Bun's
+  own APIs rather than Node.js's: that `bunfig.toml` is read with
+  `Bun.TOML.parse`, that the coverage gate reads Bun's lcov report instead
+  of scraping the console output, that file discovery goes through
+  `Bun.Glob`, that the dependency trust list is declared, and that
+  auto-install is off.
 
 ## Patterns
 
@@ -138,6 +462,25 @@ list, and `__tests__/lib/vault-secrets.test.ts` fails if the two drift.
   subdomain of `https://<ref>.supabase.co` and is already public
 - `migrate` and `edge-functions` declare `environment: production`; add
   required reviewers under Settings -> Environments
+- **`AGENTS.md` is managed by Next.js; `CLAUDE.md` is generated from it.**
+  Next.js writes its own blocks into `AGENTS.md` — the `nextjs-agent-rules`
+  block, and since 16.5 the `nextjs-agent-upgrade` block — and rewrites them
+  on every `next dev` and every `next build`. `CLAUDE.md` is the same
+  document under the other name, minus those blocks, and it is generated
+  rather than maintained by hand: `bun run agent-docs:sync` regenerates it,
+  the pre-commit hook runs that, and a unit test fails the build if the two
+  drift. Do not edit `CLAUDE.md` directly, and do not remove the managed
+  blocks from `AGENTS.md` — the framework puts them back, and removing them
+  from a diff only re-creates the uncommitted change.
+- **The Next.js canary is bumped with a script, not by hand.** The
+  three-day `minimumReleaseAge` cooldown rejects a canary published minutes
+  earlier, so adopting one needs a version-scoped exemption for that build
+  and for the ten `@next/*` packages that publish alongside it. Two lists
+  kept in step by hand is a chore with a silent failure mode, so
+  `bun run bump:next-canary` derives the list from the published manifest
+  and moves the version in `package.json` with it. The exemptions stay
+  version-scoped on purpose: a blanket package exemption would let any future
+  build past the cooldown, which is the whole thing the cooldown is for.
 
 ---
 
@@ -145,25 +488,27 @@ list, and `__tests__/lib/vault-secrets.test.ts` fails if the two drift.
 
 ### Supabase Query Pattern
 
-Always use explicit type assertions for Supabase queries (types may return `never`):
+The generated database types already say what a column holds, so a query
+needs no assertion to be typed. An assertion that does not change the type
+is one the type-aware linter rejects.
 
 ```typescript
 // Server component
 import { createClient } from "@/lib/supabase/server";
-
-type Monitor = { id: string; name: string /* ... */ };
 
 const supabase = await createClient(); // async on server!
 const { data } = await supabase
   .from("monitors")
   .select("*")
   .eq("user_id", user.id);
-const monitors = (data || []) as Monitor[];
+// `data` is already `Monitor[]`.
+const monitors = data ?? [];
 
-// For inserts, cast to never
+// For inserts, the row type is derived from the table, so the payload is
+// checked rather than asserted.
 const { data, error } = await supabase
   .from("monitors")
-  .insert([monitorData] as unknown as never)
+  .insert([monitorData])
   .select()
   .single();
 ```
@@ -257,16 +602,15 @@ export async function createMonitor(formData: FormData) {
 
 ```typescript
 // Icons
-import { CheckCircle2, XCircle, AlertCircle, Plus, Trash2 } from "lucide-react";
+import { AlertCircle, CheckCircle2, Plus, Trash2, XCircle } from "lucide-react";
+// Toast notifications
+import { toast } from "sonner";
 
 // UI Components
 import { Button } from "@/components/ui/button";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-
-// Toast notifications
-import { toast } from "sonner";
 ```
 
 ### Monitor Types

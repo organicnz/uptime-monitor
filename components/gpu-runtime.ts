@@ -1,6 +1,6 @@
 "use client";
 
-import { init, type Gpu } from "vgpu";
+import { type Gpu, init } from "vgpu";
 
 /**
  * One GPU context per page, shared by every consumer.

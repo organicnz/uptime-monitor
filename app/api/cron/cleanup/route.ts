@@ -1,11 +1,10 @@
-import { NextRequest, NextResponse } from "next/server";
 import { Receiver } from "@upstash/qstash";
-import { createServiceClient } from "@/lib/supabase/service";
-import { secureCompare } from "@/lib/security";
-import { getCronSecret, getQstashConfig } from "@/lib/env";
-import { HEARTBEAT_RAW_RETENTION_DAYS } from "@/lib/uptime-reports";
+import { NextRequest, NextResponse } from "next/server";
 
-export const runtime = "nodejs";
+import { getCronSecret, getQstashConfig } from "@/lib/env";
+import { secureCompare } from "@/lib/security";
+import { createServiceClient } from "@/lib/supabase/service";
+import { HEARTBEAT_RAW_RETENTION_DAYS } from "@/lib/uptime-reports";
 
 // The uptime report reads raw rows for exactly the last
 // HEARTBEAT_RAW_RETENTION_DAYS days and heartbeat_daily for full days before

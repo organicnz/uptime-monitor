@@ -1,11 +1,11 @@
 "use server";
-import { getSiteUrl } from "@/lib/env";
-
-import { createClient } from "@/lib/supabase/server";
-import { getMfaVerificationError } from "@/lib/mfa";
-import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { z } from "zod";
+
+import { getSiteUrl } from "@/lib/env";
+import { getMfaVerificationError } from "@/lib/mfa";
+import { createClient } from "@/lib/supabase/server";
 
 // Validation schemas
 const emailSchema = z.string().email("Invalid email address").max(255);
@@ -88,7 +88,6 @@ export async function signInWithEmail(formData: FormData) {
   redirect("/dashboard");
 }
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export async function signUpWithEmail(_formData: FormData) {
   // Signups are disabled for this private instance
   return { error: "Signups are currently disabled" };

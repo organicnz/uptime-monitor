@@ -1,14 +1,15 @@
 "use client";
 
-import { useRealtimeMonitor } from "@/hooks/use-realtime-monitors";
 import { formatDistanceToNow } from "date-fns";
 import {
-  CheckCircle2,
-  XCircle,
   AlertCircle,
+  CheckCircle2,
   Wifi,
   WifiOff,
+  XCircle,
 } from "lucide-react";
+
+import { useRealtimeMonitor } from "@/hooks/use-realtime-monitors";
 
 interface RealtimeStatusProps {
   monitorId: string;
@@ -68,10 +69,10 @@ export function RealtimeStatus({
 
   return (
     <div className="flex items-center gap-3">
-      <div className={`relative p-2 rounded-lg ${config.bg}`}>
+      <div className={`relative rounded-lg p-2 ${config.bg}`}>
         <Icon className={`h-5 w-5 ${config.color}`} />
         {currentStatus.status === "up" && (
-          <span className="absolute -top-0.5 -right-0.5 h-2 w-2 bg-green-400 rounded-full animate-pulse" />
+          <span className="absolute -top-0.5 -right-0.5 h-2 w-2 animate-pulse rounded-full bg-green-400" />
         )}
       </div>
       <div>
@@ -127,7 +128,7 @@ export function RealtimeHeartbeatChart({
         <div className="flex items-center gap-1">
           {isConnected ? (
             <>
-              <span className="h-1.5 w-1.5 bg-green-400 rounded-full animate-pulse" />
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-green-400" />
               <span>Live</span>
             </>
           ) : (
@@ -135,7 +136,7 @@ export function RealtimeHeartbeatChart({
           )}
         </div>
       </div>
-      <div className="flex items-end gap-0.5 h-12">
+      <div className="flex h-12 items-end gap-0.5">
         {displayHeartbeats.length > 0
           ? displayHeartbeats.map((hb, i) => {
               const height =
@@ -167,7 +168,7 @@ export function RealtimeHeartbeatChart({
             Array.from({ length: maxBars }).map((_, i) => (
               <div
                 key={i}
-                className="w-2 h-1/3 bg-neutral-700 rounded-sm animate-pulse"
+                className="h-1/3 w-2 animate-pulse rounded-sm bg-neutral-700"
                 style={{ animationDelay: `${i * 50}ms` }}
               />
             ))}

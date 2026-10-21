@@ -7,6 +7,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+
 import { createClient } from "@/lib/supabase/client";
 
 type Heartbeat = {
@@ -61,8 +62,9 @@ export function useRealtimeMonitors(monitorIds: string[]) {
 ```tsx
 "use client";
 
-import { useRealtimeMonitors } from "@/hooks/use-realtime-monitors";
 import { Wifi, WifiOff } from "lucide-react";
+
+import { useRealtimeMonitors } from "@/hooks/use-realtime-monitors";
 
 export function LiveMonitorsList({ monitors }: Props) {
   const ids = monitors.map((m) => m.id);

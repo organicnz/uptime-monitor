@@ -1,13 +1,14 @@
-import { createClient } from "@/lib/supabase/server";
-import { redirect } from "next/navigation";
+import { formatDistanceToNow } from "date-fns";
+import { AlertTriangle, CheckCircle2, Clock, Plus, Search } from "lucide-react";
 import Link from "next/link";
+import { redirect } from "next/navigation";
+
+import { IncidentQuickActions } from "@/components/incident-quick-actions";
+import { IncidentStatusBadge } from "@/components/incident-status-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { AlertTriangle, Plus, CheckCircle2, Search, Clock } from "lucide-react";
-import { formatDistanceToNow } from "date-fns";
+import { createClient } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
-import { IncidentStatusBadge } from "@/components/incident-status-badge";
-import { IncidentQuickActions } from "@/components/incident-quick-actions";
 
 type Incident = {
   id: string;
@@ -54,12 +55,12 @@ export default async function IncidentsPage() {
 
   return (
     <div className="p-4 sm:p-6 lg:p-8">
-      <div className="max-w-4xl mx-auto space-y-8">
+      <div className="mx-auto max-w-4xl space-y-8">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
           <div>
-            <h1 className="text-3xl font-bold gradient-text">Incidents</h1>
-            <p className="text-muted-foreground mt-1">
+            <h1 className="gradient-text text-3xl font-bold">Incidents</h1>
+            <p className="mt-1 text-muted-foreground">
               Track and manage service incidents
             </p>
           </div>
@@ -76,7 +77,7 @@ export default async function IncidentsPage() {
           <Card className="glass-card">
             <CardContent className="pt-6">
               <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-red-500/10">
+                <div className="rounded-lg bg-red-500/10 p-2">
                   <AlertTriangle className="h-5 w-5 text-red-500" />
                 </div>
                 <div>
@@ -89,7 +90,7 @@ export default async function IncidentsPage() {
           <Card className="glass-card">
             <CardContent className="pt-6">
               <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-amber-500/10">
+                <div className="rounded-lg bg-amber-500/10 p-2">
                   <Search className="h-5 w-5 text-amber-500" />
                 </div>
                 <div>
@@ -104,7 +105,7 @@ export default async function IncidentsPage() {
           <Card className="glass-card">
             <CardContent className="pt-6">
               <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-emerald-500/10">
+                <div className="rounded-lg bg-emerald-500/10 p-2">
                   <CheckCircle2 className="h-5 w-5 text-emerald-500" />
                 </div>
                 <div>
@@ -121,7 +122,7 @@ export default async function IncidentsPage() {
         {/* Active Incidents */}
         {(openIncidents.length > 0 || investigatingIncidents.length > 0) && (
           <div className="space-y-4">
-            <h2 className="text-lg font-semibold flex items-center gap-2">
+            <h2 className="flex items-center gap-2 text-lg font-semibold">
               <AlertTriangle className="h-5 w-5 text-red-500" />
               Active Incidents
             </h2>
@@ -135,16 +136,16 @@ export default async function IncidentsPage() {
                 )}
               >
                 <CardContent className="p-5">
-                  <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+                  <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
                     <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        <h3 className="font-semibold text-lg">
+                      <div className="mb-2 flex items-center gap-2">
+                        <h3 className="text-lg font-semibold">
                           {incident.title}
                         </h3>
                         <IncidentStatusBadge status={incident.status} />
                       </div>
                       {incident.content && (
-                        <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
+                        <p className="mb-3 line-clamp-2 text-sm text-muted-foreground">
                           {incident.content}
                         </p>
                       )}
@@ -157,7 +158,7 @@ export default async function IncidentsPage() {
                           })}
                         </span>
                         {incident.monitors && (
-                          <span className="px-2 py-0.5 rounded-md bg-muted text-xs">
+                          <span className="rounded-md bg-muted px-2 py-0.5 text-xs">
                             {incident.monitors.name}
                           </span>
                         )}
@@ -174,16 +175,16 @@ export default async function IncidentsPage() {
         {/* Resolved Incidents */}
         {resolvedIncidents.length > 0 && (
           <div className="space-y-4">
-            <h2 className="text-lg font-semibold flex items-center gap-2 text-muted-foreground">
+            <h2 className="flex items-center gap-2 text-lg font-semibold text-muted-foreground">
               <CheckCircle2 className="h-5 w-5 text-emerald-500" />
               Recently Resolved
             </h2>
             {resolvedIncidents.slice(0, 10).map((incident) => (
               <Card key={incident.id} className="glass-card">
                 <CardContent className="p-5">
-                  <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+                  <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
                     <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
+                      <div className="mb-1 flex items-center gap-2">
                         <h3 className="font-medium">{incident.title}</h3>
                         <IncidentStatusBadge status={incident.status} />
                       </div>
@@ -198,7 +199,7 @@ export default async function IncidentsPage() {
                           )}
                         </span>
                         {incident.monitors && (
-                          <span className="px-2 py-0.5 rounded-md bg-muted text-xs">
+                          <span className="rounded-md bg-muted px-2 py-0.5 text-xs">
                             {incident.monitors.name}
                           </span>
                         )}
@@ -220,13 +221,13 @@ export default async function IncidentsPage() {
         {incidents.length === 0 && (
           <Card className="glass-card border-dashed">
             <CardContent className="flex flex-col items-center justify-center py-16">
-              <div className="p-4 bg-emerald-500/10 rounded-2xl mb-4">
+              <div className="mb-4 rounded-2xl bg-emerald-500/10 p-4">
                 <CheckCircle2 className="h-12 w-12 text-emerald-500" />
               </div>
-              <h3 className="text-xl font-semibold mb-2">
+              <h3 className="mb-2 text-xl font-semibold">
                 No incidents recorded
               </h3>
-              <p className="text-muted-foreground mb-6 text-center max-w-md">
+              <p className="mb-6 max-w-md text-center text-muted-foreground">
                 Incidents are automatically created when monitors go down. You
                 can also manually report incidents.
               </p>

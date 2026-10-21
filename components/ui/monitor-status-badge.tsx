@@ -1,11 +1,12 @@
-import { cn } from "@/lib/utils";
 import {
   AlertCircle,
+  AlertTriangle,
   CheckCircle2,
   Search,
-  AlertTriangle,
   Wrench,
 } from "lucide-react";
+
+import { cn } from "@/lib/utils";
 
 const statusConfig = {
   0: {
@@ -57,14 +58,13 @@ export function MonitorStatusBadge({ status }: { status: number }) {
   const config =
     statusConfig[status as keyof typeof statusConfig] || statusConfig[0];
   const Icon = config.icon;
-  const label =
-    statusLabels[status as keyof typeof statusLabels] || config.label;
+  const label = statusLabels[status] || config.label;
 
   return (
     <span
       role="status"
       className={cn(
-        "inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium border",
+        "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium",
         config.bg,
         config.color,
         config.border,

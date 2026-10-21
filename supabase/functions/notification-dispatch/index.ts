@@ -15,14 +15,15 @@
  */
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
+
+import { createSsrfProtectedTransport } from "../_shared/egress.ts";
 import {
-  sendNotification,
-  withRetry,
   type NotificationPayload,
   type NotificationType,
+  sendNotification,
   type SendResult,
+  withRetry,
 } from "../_shared/senders.ts";
-import { createSsrfProtectedTransport } from "../_shared/egress.ts";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -170,7 +171,7 @@ Deno.serve(async (request) => {
     );
   }
 
-  const config = { ...(channel.config ?? {}), ...secret };
+  const config = { ...channel.config, ...secret };
 
   const result: SendResult = await sendNotification(
     channel.type,

@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
 import { Github } from "lucide-react";
+import { useState } from "react";
+
+import { Button } from "@/components/ui/button";
 import { signInWithOAuth } from "@/lib/actions/auth";
 
 export function OAuthButtons() {
@@ -19,7 +20,7 @@ export function OAuthButtons() {
       <Button
         type="button"
         variant="outline"
-        className="w-full h-11"
+        className="h-11 w-full"
         onClick={() => handleOAuth("github")}
         disabled={loading !== null}
       >
@@ -36,7 +37,7 @@ export function OAuthButtons() {
       <Button
         type="button"
         variant="outline"
-        className="w-full h-11"
+        className="h-11 w-full"
         onClick={() => handleOAuth("google")}
         disabled={loading !== null}
       >

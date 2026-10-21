@@ -1,3 +1,293 @@
+# Bun configuration for the whole repository.
+#
+# Bun is the package manager, the task runner, the bundler, the formatter, the
+# linter, the test runner and the production runtime. This file is the single
+# place where that is configured, so "this repository has no Node.js" is a
+# setting rather than a convention somebody has to remember.
+
+# No anonymous crash reports. This is a self-hosted instance; nothing leaves
+# the machine unless the operator asks for it.
+telemetry = false
+
+[install]
+# Pin the exact version when a dependency is added. A drifting or compromised
+# registry must never be able to change what the lockfile resolves to.
+exact = true
+# Peer dependencies are part of a package's contract, not an optional extra.
+peer = true
+# Never auto-install a missing dependency at run time.
+#
+# Bun's default is to fetch whatever is missing, on the fly, resolving to
+# `latest` when the lockfile does not say otherwise. That is convenient and
+# it is exactly what a compromised registry wants: a package that is not
+# installed becomes a package that is fetched, unvetted, outside the
+# lockfile, and outside the release-age cooldown below.
+#
+# The lockfile is committed, so a missing dependency is a mistake in the
+# working tree, not a reason to reach for the network. With this set, the
+# import fails and says to run `bun install`.
+auto = "disable"
+# Supply-chain hardening: never resolve a release published less than three
+# days ago. Most compromised-package attacks are detected and yanked within
+# that window, so a fresh version is the most dangerous one to install.
+# The committed lockfile is unaffected — this only filters new resolutions.
+minimumReleaseAge = 259200
+# Exemptions from the age rule. `tsrs` is the canary build of the TypeScript
+# compiler: it ships continuously, and holding the repository to a three-day
+# old compiler would pin it to a stale one. The age rule exists to protect
+# against a compromised *release*; a canary that is opted into explicitly is
+# a different risk, taken on purpose. Its per-platform binaries are exempt
+# for the same reason.
+minimumReleaseAgeExcludes = [
+  "tsrs",
+  "@tsrs/darwin-arm64",
+  "@tsrs/linux-arm64-gnu",
+  "@tsrs/linux-arm64-musl",
+  "@tsrs/linux-x64-gnu",
+  "@tsrs/linux-x64-musl",
+  # The TypeScript beta, which the team tracks deliberately. The repository
+  # is checked against the beta's semantics by `tsrs`, so a beta that is a
+  # few days old would be a beta the code has not been checked against.
+  "typescript",
+  # The Next.js canary, and the platform packages that publish alongside it.
+  #
+  # These are exempt one build at a time rather than one package at a time.
+  # The exemption covers this exact version and nothing else, so the next
+  # canary has to be opted into deliberately instead of sliding in on the
+  # back of the previous one. That is the point of the three-day cooldown: a
+  # compromised release is caught and yanked inside that window, and a
+  # blanket package exemption would walk straight past it.
+  #
+  # The `@next/*` packages are here because they publish at the same moment
+  # as `next` itself and would otherwise be caught by the cooldown: the
+  # native binary for the platform, the build-time environment, and the
+  # optional platform binaries.
+  "@next/env@16.5.0-canary.20",
+  "@next/swc-darwin-arm64@16.5.0-canary.20",
+  "@next/swc-darwin-x64@16.5.0-canary.20",
+  "@next/swc-linux-arm64-gnu@16.5.0-canary.20",
+  "@next/swc-linux-arm64-musl@16.5.0-canary.20",
+  "@next/swc-linux-x64-gnu@16.5.0-canary.20",
+  "@next/swc-linux-x64-musl@16.5.0-canary.20",
+  "@next/swc-win32-arm64-msvc@16.5.0-canary.20",
+  "@next/swc-win32-x64-msvc@16.5.0-canary.20",
+  "next@16.5.0-canary.20",
+  # The Bun type definitions for the canary runtime, for the same reason:
+  # the runtime and its types have to be the same build.
+  "bun-types@1.4.4-canary.20261019T141446",
+]
+
+[run]
+# Bun's own shell. The toolchain must not depend on /bin/sh being present,
+# and Bun Shell behaves identically on every platform.
+#
+# Bun Shell is a strict subset of POSIX: `if`/`elif`/`fi`, `&&`, `||`, `;`,
+# subshells and `>` redirection all work, but fd duplication (`2>&1` after a
+# redirect) does not. Keep scripts to the subset.
+shell = "bun"
+# Alias `node` to `bun` for every script and executable `bun run` starts.
+#
+# This is what makes "no Node.js" a guarantee rather than a convention: a
+# third-party binary with a `#!/usr/bin/env node` shebang still runs on Bun.
+# Bun enables this by default only when `node` is absent from $PATH, so it
+# is stated explicitly here rather than left to chance.
+bun = true
+# When a `bun run` process exits, take its children with it. Without this, a
+# dev server that outlives its terminal keeps the port bound.
+noOrphans = true
+
 [test]
 preload = ["./__tests__/setup.ts"]
-testPathIgnorePatterns = ["e2e/**"]
+pathIgnorePatterns = [
+  # The e2e specs are Playwright's, not Bun's: they need a browser and a
+  # running server. Bun does not pick them up by name, but the pattern keeps
+  # that from ever changing.
+  "e2e/**",
+  # The Supabase Edge Functions are Deno code. `egress_test.ts` matches Bun's
+  # `*_test.ts` discovery pattern, and it imports `jsr:@std/assert@1`, which
+  # only Deno can resolve. It is run by `deno task test` in CI instead.
+  "supabase/functions/**",
+]
+# Run the suite in a random order so an inter-test dependency cannot hide.
+# Bun prints the seed, so any failure is reproducible with `bun test --seed`.
+randomize = true
+# The coverage report measures the application, not the scaffolding that
+# exercises it, and not the command-line tools.
+#
+# `coverageSkipTestFiles` already drops the `*.test.ts` files themselves;
+# this drops the rest of the test tree, so the preload in
+# `__tests__/setup.ts` does not count as uncovered application code.
+#
+# The scripts are dropped for a structural reason rather than a cosmetic
+# one: each one is a command-line tool whose entry point is a process, so
+# its `main()` cannot be covered by a unit suite at all. What the scripts
+# contain — the decisions — lives in exported functions that the suite does
+# cover. Measuring the processes as well would measure the harness.
+coveragePathIgnorePatterns = ["__tests__/**", "scripts/**"]
+
+[fmt]
+# Bun's formatter replaces Prettier. It covers strictly more file types
+# (TOML among them), so this list mirrors the old .prettierignore.
+ignorePatterns = [
+  ".next/**",
+  "playwright-report/**",
+  "test-results/**",
+  "supabase/.temp/**",
+  # The Rust build directories. They are in .gitignore, but the formatter
+  # is told about them explicitly as well, so a build in a working tree
+  # never reformats its own artefacts.
+  "tools/audit/target/**",
+  "tools/probe/target/**",
+]
+# Sort the imports into groups: built-ins, external packages, the project's
+# own modules, and then everything relative. The order is stable, so a
+# merged import block is a conflict rather than a coin toss, and a reader
+# can tell at a glance which imports are first-party.
+sortImports = true
+
+# Sort the Tailwind classes, using the project's own Tailwind to resolve
+# them. Tailwind v4 ships no config file, so the stylesheet is what says
+# which utilities exist; without it Bun leaves the classes alone.
+#
+# The payoff is not the sort order itself — it is that the order stops
+# being a matter of taste. A class list that is always written the same way
+# produces a diff when it changes and no diff when it does not, and it stops
+# hiding a specificity change behind a reordering.
+[fmt.sortTailwindcss]
+stylesheet = "./app/globals.css"
+
+[lint]
+# Bun's own linter replaces ESLint and `eslint-config-next`. The `correctness`
+# category is a strict superset of what `eslint-config-next/core-web-vitals`
+# plus `eslint-config-next/typescript` enabled: 260 rules instead of 85, with
+# the same rule families (react, react-hooks, jsx-a11y, @next/next,
+# @typescript-eslint) plus oxc, unicorn, promise, jest, vitest and bun:test.
+categories = { correctness = "error" }
+# A warning is a problem. The old CI gate ran `eslint --max-warnings 0`;
+# this makes every run, local or CI, the same gate.
+maxWarnings = 0
+# Type-aware linting: the rules that need the type checker to know what a
+# value actually is.
+#
+# These are the rules that catch the mistakes a type checker cannot. An
+# `any` that came off the network, a promise nobody awaited, a type
+# assertion that does not change anything — the compiler is silent about
+# all three, and a linter with the types in hand is not.
+#
+# It costs about a second on this repository, and it runs in CI as part of
+# the same `bun lint` the local run uses.
+typeAware = true
+
+[lint.rules]
+# Bun's own rules, off by default, that only a Bun-aware linter can check.
+# Each one is a portability or correctness rule that a Node.js linter has no
+# way to express.
+"bun/no-cwd-dependent-path" = "error"
+"bun/no-literal-temp-dir" = "error"
+"bun/no-unportable-commands" = "error"
+"bun/prefer-builtin-sleep" = "error"
+"bun/prefer-timeout-signal" = "error"
+"bun/no-useless-spread-fallback" = "error"
+"bun/jsx-no-forbidden-nesting" = "error"
+"bun/no-array-just-to-count" = "error"
+
+# Turned off, with a reason. Everything the previous ESLint gate caught is
+# still caught; these are the rules it never had, and each one would demand a
+# change to working code rather than to a mistake.
+#
+# `prefer-tag-over-role` asks for a <div role="button"> to become a <button>.
+# That is a component refactor across eight files, not a lint finding, and
+# the React Compiler already handles the perf half of it.
+"jsx-a11y/prefer-tag-over-role" = "off"
+# The MFA code input autofocusing on mount is deliberate: the user is
+# confirming a code they just copied, and moving the cursor to it is the
+# point.
+"jsx-a11y/no-autofocus" = "off"
+# Reading the environment at module scope is how Next.js works: it
+# substitutes `process.env.NEXT_PUBLIC_*` into the browser bundle at build
+# time by matching that literal text, so the read has to happen where the
+# text is. It is also how a config file (`next.config.ts`,
+# `playwright.config.ts`) and a one-shot script read their settings. The
+# rule is right for a library and wrong for an application.
+"bun/no-env-at-module-scope" = "off"
+# A side effect at import time is the point of a preload file, of a script
+# (which is an entry point, not a library), and of the shadcn/ui `displayName`
+# assignments that Radix's own components ship with.
+"bun/no-side-effects-on-import" = "off"
+
+[[lint.overrides]]
+# The test suite. `expect(...).resolves` returns a thenable that no type
+# checker can see through, and a top-level `expect(...)` is an assertion, not
+# a floating promise. Both rules misread the test API.
+#
+# The eager `import()` is deliberate too: a route handler has to be loaded
+# *after* `mock.module` has replaced the modules it depends on, so it
+# cannot be a static import.
+#
+# `require-await` is off for the same reason the other two are. A mock has
+# to keep the async signature of the thing it replaces — a Supabase client
+# method returns a promise, so the mock returns a promise — but it has
+# nothing to wait for, because the value is already in hand. The rule
+# would ask the mock to await a promise it just created.
+files = ["**/*.test.ts", "**/*.test.tsx", "**/setup.ts"]
+rules = {
+  "@typescript-eslint/await-thenable" = "off",
+  "@typescript-eslint/no-floating-promises" = "off",
+  "@typescript-eslint/require-await" = "off",
+  "bun/no-eager-dynamic-import" = "off",
+  # A mock of a Supabase query builder has to be thenable: `await` on it is
+  # how the production code consumes it.
+  "unicorn/no-thenable" = "off",
+}
+
+[[lint.overrides]]
+# The server actions. Next.js requires every exported action to be an
+# async function — a synchronous one fails the build with "Server Actions
+# must be async functions" — so `require-await`, which says that an async
+# function has to await something, cannot apply to them. The framework's
+# contract is the one that has to hold.
+files = ["lib/actions/**"]
+rules = {
+  "@typescript-eslint/require-await" = "off",
+}
+
+[[lint.overrides]]
+# The Supabase Edge Functions run on Deno, and the shared code in
+# `supabase/functions/_shared/` is deliberately runtime-agnostic: no `Bun.*`,
+# no `Deno.*`, no `process.env`. The Bun-specific rules would each push a
+# Bun-only API into code that has to run on Deno as well — `Bun.sleep` does
+# not exist in the edge runtime.
+files = ["supabase/functions/**"]
+rules = {
+  "bun/prefer-builtin-sleep" = "off",
+  "bun/prefer-timeout-signal" = "off",
+}
+
+[[lint.overrides]]
+# The three Deno files that `tsconfig.json` excludes, and only those.
+#
+# The `no-unsafe-*` rules are off for a sharper reason: the `Deno` global is
+# typed by the Deno runtime, through the `deno.ns` library in
+# `supabase/functions/deno.json`, and nothing in this repository's
+# dependency tree can supply that type to Bun's linter. Every `Deno.serve`
+# is therefore an `any` here, and everything reachable through it is an
+# `any` too — the findings would describe the missing type, not the code.
+#
+# The list matches the tsconfig's `exclude` exactly, so the shared code
+# the app also compiles — `senders.ts` and `egress-policy.ts` — stays under
+# the type-aware rules, because it is type-checked here.
+#
+# The gate that matters for the excluded files is `deno task check`, which
+# runs in CI against the real `deno.ns` types with `strict` on. It passes.
+files = [
+  "supabase/functions/notification-dispatch/**",
+  "supabase/functions/_shared/egress.ts",
+  "supabase/functions/_shared/egress_test.ts",
+]
+rules = {
+  "@typescript-eslint/no-unsafe-call" = "off",
+  "@typescript-eslint/no-unsafe-member-access" = "off",
+  "@typescript-eslint/no-unsafe-assignment" = "off",
+  "@typescript-eslint/no-unsafe-argument" = "off",
+  "@typescript-eslint/no-unsafe-return" = "off",
+}

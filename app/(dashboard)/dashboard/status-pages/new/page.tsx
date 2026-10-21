@@ -1,7 +1,7 @@
-import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
-import { StatusPageForm } from "@/components/status-page-form";
 
+import { StatusPageForm } from "@/components/status-page-form";
+import { createClient } from "@/lib/supabase/server";
 import { Monitor } from "@/types/application";
 
 export default async function NewStatusPage() {
@@ -25,7 +25,7 @@ export default async function NewStatusPage() {
   const monitors = (rawMonitors || []) as unknown as Monitor[];
 
   return (
-    <div className="max-w-5xl mx-auto">
+    <div className="mx-auto max-w-5xl">
       <StatusPageForm monitors={monitors || []} />
     </div>
   );

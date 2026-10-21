@@ -124,27 +124,27 @@
 
 @layer utilities {
   .glass {
-    @apply bg-white/5 backdrop-blur-xl border border-white/10;
+    @apply border border-white/10 bg-white/5 backdrop-blur-xl;
   }
 
   .glass-card {
-    @apply bg-card/80 backdrop-blur-sm border-border/50;
+    @apply border-border/50 bg-card/80 backdrop-blur-sm;
   }
 
   .glass-panel {
-    @apply bg-neutral-900/60 backdrop-blur-xl border border-white/5;
+    @apply border border-white/5 bg-neutral-900/60 backdrop-blur-xl;
   }
 
   .glass-header {
-    @apply bg-neutral-900/70 backdrop-blur-xl border-b border-white/5;
+    @apply border-b border-white/5 bg-neutral-900/70 backdrop-blur-xl;
   }
 
   .glass-sidebar {
-    @apply bg-neutral-900/80 backdrop-blur-xl border-r border-white/5;
+    @apply border-r border-white/5 bg-neutral-900/80 backdrop-blur-xl;
   }
 
   .glass-stats {
-    @apply bg-neutral-900/40 backdrop-blur-md border border-white/5 hover:bg-neutral-900/60 hover:border-white/10 transition-all duration-300;
+    @apply border border-white/5 bg-neutral-900/40 backdrop-blur-md transition-all duration-300 hover:border-white/10 hover:bg-neutral-900/60;
   }
 
   .gradient-text {
@@ -152,7 +152,7 @@
   }
 
   .gradient-border {
-    @apply relative before:absolute before:inset-0 before:rounded-[inherit] before:p-[1px] before:bg-gradient-to-r before:from-emerald-500/50 before:to-teal-500/50 before:-z-10;
+    @apply relative before:absolute before:inset-0 before:-z-10 before:rounded-[inherit] before:bg-gradient-to-r before:from-emerald-500/50 before:to-teal-500/50 before:p-[1px];
   }
 
   .status-glow-up {

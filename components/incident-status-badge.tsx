@@ -1,7 +1,8 @@
 "use client";
 
-import { cn } from "@/lib/utils";
 import { AlertTriangle, CheckCircle2, Search } from "lucide-react";
+
+import { cn } from "@/lib/utils";
 
 const statusConfig = {
   0: {
@@ -35,7 +36,7 @@ export function IncidentStatusBadge({ status }: { status: number }) {
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium border",
+        "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium",
         config.bg,
         config.color,
         config.border,

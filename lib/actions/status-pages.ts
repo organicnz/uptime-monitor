@@ -1,10 +1,11 @@
 "use server";
 
-import { createClient } from "@/lib/supabase/server";
-import { getMfaVerificationError } from "@/lib/mfa";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
+
+import { getMfaVerificationError } from "@/lib/mfa";
+import { createClient } from "@/lib/supabase/server";
 
 // Schema for validation
 const StatusPageSchema = z.object({

@@ -51,9 +51,9 @@ test("rejects unauthenticated application API reads", async ({ request }) => {
 test("signs in and reaches the dashboard when test credentials are provided", async ({
   page,
 }) => {
-  const email = process.env.E2E_EMAIL;
-  const password = process.env.E2E_PASSWORD;
-  if (process.env.CI && (!email || !password)) {
+  const email = Bun.env.E2E_EMAIL;
+  const password = Bun.env.E2E_PASSWORD;
+  if (Bun.env.CI && (!email || !password)) {
     throw new Error("CI requires E2E_EMAIL and E2E_PASSWORD");
   }
   test.skip(
@@ -70,8 +70,8 @@ test("signs in and reaches the dashboard when test credentials are provided", as
 });
 
 test("renders a configured public status page", async ({ page }) => {
-  const slug = process.env.E2E_PUBLIC_STATUS_SLUG;
-  if (process.env.CI && !slug) {
+  const slug = Bun.env.E2E_PUBLIC_STATUS_SLUG;
+  if (Bun.env.CI && !slug) {
     throw new Error("CI requires E2E_PUBLIC_STATUS_SLUG");
   }
   test.skip(!slug, "E2E_PUBLIC_STATUS_SLUG is not configured");

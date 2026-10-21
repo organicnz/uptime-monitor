@@ -1,18 +1,22 @@
 "use client";
 
 import {
-  CheckCircle2,
-  XCircle,
   AlertCircle,
   AlertTriangle,
+  CheckCircle2,
+  Copy,
+  ExternalLink,
+  MoreVertical,
+  Settings,
   Wrench,
+  XCircle,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 import { toast } from "sonner";
+
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   DropdownMenu,
@@ -21,8 +25,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { MoreVertical, Settings, ExternalLink, Copy } from "lucide-react";
 import { duplicateMonitor } from "@/lib/actions/monitors";
+import { cn } from "@/lib/utils";
 
 type Monitor = {
   id: string;
@@ -131,7 +135,7 @@ export function MonitorCard({ monitor }: MonitorCardProps) {
     <div
       key={monitor.id}
       role="article"
-      className="relative group"
+      className="group relative"
       aria-label={`Monitor: ${monitor.name}`}
     >
       <Link
@@ -141,7 +145,7 @@ export function MonitorCard({ monitor }: MonitorCardProps) {
       >
         <Card
           className={cn(
-            "bg-neutral-900/40 backdrop-blur-xl border-white/5 hover:bg-neutral-900/60 transition-all duration-300 h-full",
+            "h-full border-white/5 bg-neutral-900/40 backdrop-blur-xl transition-all duration-300 hover:bg-neutral-900/60",
             statusDisplay.bgColor,
             monitor.status === "up" && "status-glow-up",
             monitor.status === "down" && "status-glow-down",
@@ -149,12 +153,12 @@ export function MonitorCard({ monitor }: MonitorCardProps) {
         >
           <CardContent className="p-5">
             {/* Header */}
-            <div className="flex items-start justify-between mb-4">
+            <div className="mb-4 flex items-start justify-between">
               <div
                 role="img"
                 aria-label={statusDisplay.label}
                 className={cn(
-                  "relative p-2.5 rounded-xl transition-transform group-hover:scale-110",
+                  "relative rounded-xl p-2.5 transition-transform group-hover:scale-110",
                   statusDisplay.bgColor,
                 )}
               >
@@ -162,11 +166,11 @@ export function MonitorCard({ monitor }: MonitorCardProps) {
                   className={cn("h-5 w-5", statusDisplay.color)}
                 />
                 {monitor.status === "up" && (
-                  <span className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 bg-emerald-500 rounded-full animate-pulse" />
+                  <span className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 animate-pulse rounded-full bg-emerald-500" />
                 )}
               </div>
               <svg
-                className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors"
+                className="h-4 w-4 text-muted-foreground transition-colors group-hover:text-primary"
                 viewBox="0 0 24 24"
                 fill="currentColor"
               >
@@ -176,13 +180,13 @@ export function MonitorCard({ monitor }: MonitorCardProps) {
 
             {/* Name & URL */}
             <h3
-              className="font-semibold text-foreground group-hover:text-primary transition-colors truncate mb-1"
+              className="mb-1 truncate font-semibold text-foreground transition-colors group-hover:text-primary"
               aria-label={`${monitor.name} monitor`}
             >
               {monitor.name}
             </h3>
             <p
-              className="text-sm text-muted-foreground truncate mb-4"
+              className="mb-4 truncate text-sm text-muted-foreground"
               aria-label={`${
                 monitor.url || monitor.hostname || "No endpoint"
               } endpoint`}
@@ -192,11 +196,11 @@ export function MonitorCard({ monitor }: MonitorCardProps) {
 
             {/* Tags */}
             {monitor.tags && monitor.tags.length > 0 && (
-              <div className="flex flex-wrap gap-1 mb-3">
+              <div className="mb-3 flex flex-wrap gap-1">
                 {monitor.tags.map((tag) => (
                   <span
                     key={tag}
-                    className="px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
+                    className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary"
                   >
                     {tag}
                   </span>
@@ -223,7 +227,7 @@ export function MonitorCard({ monitor }: MonitorCardProps) {
                   </span>
                 )}
                 {!monitor.active && (
-                  <span className="px-2 py-0.5 rounded-full text-amber-500 bg-amber-500/10 font-medium">
+                  <span className="rounded-full bg-amber-500/10 px-2 py-0.5 font-medium text-amber-500">
                     Paused
                   </span>
                 )}
@@ -239,7 +243,7 @@ export function MonitorCard({ monitor }: MonitorCardProps) {
           <Button
             variant="ghost"
             size="icon"
-            className="absolute top-2 right-2 h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity bg-neutral-900/80 hover:bg-neutral-800"
+            className="absolute top-2 right-2 h-8 w-8 bg-neutral-900/80 opacity-0 transition-opacity group-hover:opacity-100 hover:bg-neutral-800"
           >
             <MoreVertical className="h-4 w-4" />
           </Button>

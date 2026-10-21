@@ -1,26 +1,28 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import { MonitorSidebar } from "./monitor-sidebar";
-import { MonitorDetailPanel } from "./monitor-detail-panel";
-import { LiveMonitorsList } from "./live-monitors";
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import {
   Activity,
+  AlertCircle,
+  CheckCircle2,
+  ChevronLeft,
   LayoutGrid,
   LayoutList,
-  Plus,
-  CheckCircle2,
-  XCircle,
-  AlertCircle,
-  PanelLeftClose,
   PanelLeft,
-  ChevronLeft,
+  PanelLeftClose,
+  Plus,
+  XCircle,
 } from "lucide-react";
 import Link from "next/link";
+import { useMemo, useState } from "react";
+
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { useRealtimeMonitors } from "@/hooks/use-realtime-monitors";
 import { cn } from "@/lib/utils";
+
+import { LiveMonitorsList } from "./live-monitors";
+import { MonitorDetailPanel } from "./monitor-detail-panel";
+import { MonitorSidebar } from "./monitor-sidebar";
 
 type Monitor = {
   id: string;
@@ -73,13 +75,13 @@ export function DashboardLayout({ monitors }: DashboardLayoutProps) {
   // Empty state
   if (monitors.length === 0) {
     return (
-      <div className="flex items-center justify-center h-[calc(100vh-4rem)]">
+      <div className="flex h-[calc(100vh-4rem)] items-center justify-center">
         <div className="text-center">
-          <div className="p-4 bg-green-500/10 rounded-2xl mb-4 inline-block">
+          <div className="mb-4 inline-block rounded-2xl bg-green-500/10 p-4">
             <Activity className="h-12 w-12 text-green-400" />
           </div>
-          <h3 className="text-xl font-semibold mb-2">No monitors yet</h3>
-          <p className="text-neutral-400 mb-6 max-w-md">
+          <h3 className="mb-2 text-xl font-semibold">No monitors yet</h3>
+          <p className="mb-6 max-w-md text-neutral-400">
             Create your first monitor to start tracking uptime and performance.
           </p>
           <Link href="/dashboard/monitors/new">
@@ -99,9 +101,9 @@ export function DashboardLayout({ monitors }: DashboardLayoutProps) {
   };
 
   return (
-    <div className="h-[calc(100vh-4rem)] flex flex-col overflow-hidden">
+    <div className="flex h-[calc(100vh-4rem)] flex-col overflow-hidden">
       {/* View Toggle Header */}
-      <div className="flex items-center justify-between px-3 sm:px-4 lg:px-6 py-2 glass-header">
+      <div className="glass-header flex items-center justify-between px-3 py-2 sm:px-4 lg:px-6">
         <div className="flex items-center gap-1">
           {/* Sidebar toggle for detail view */}
           {viewMode === "detail" && (
@@ -111,7 +113,7 @@ export function DashboardLayout({ monitors }: DashboardLayoutProps) {
                 variant="ghost"
                 size="sm"
                 onClick={() => setSidebarOpen(!sidebarOpen)}
-                className="hidden md:flex h-8 w-8 p-0 text-neutral-400 hover:text-white"
+                className="hidden h-8 w-8 p-0 text-neutral-400 hover:text-white md:flex"
                 title={sidebarOpen ? "Hide sidebar" : "Show sidebar"}
               >
                 {sidebarOpen ? (
@@ -125,7 +127,7 @@ export function DashboardLayout({ monitors }: DashboardLayoutProps) {
                 variant="ghost"
                 size="sm"
                 onClick={() => setMobileSidebarOpen(!mobileSidebarOpen)}
-                className="md:hidden h-8 w-8 p-0 text-neutral-400 hover:text-white"
+                className="h-8 w-8 p-0 text-neutral-400 hover:text-white md:hidden"
               >
                 <PanelLeft className="h-4 w-4" />
               </Button>
@@ -136,7 +138,7 @@ export function DashboardLayout({ monitors }: DashboardLayoutProps) {
             size="sm"
             onClick={() => setViewMode("detail")}
             className={cn(
-              "gap-2 h-8",
+              "h-8 gap-2",
               viewMode === "detail"
                 ? "bg-neutral-800 text-white"
                 : "text-neutral-400 hover:text-white",
@@ -150,7 +152,7 @@ export function DashboardLayout({ monitors }: DashboardLayoutProps) {
             size="sm"
             onClick={() => setViewMode("grid")}
             className={cn(
-              "gap-2 h-8",
+              "h-8 gap-2",
               viewMode === "grid"
                 ? "bg-neutral-800 text-white"
                 : "text-neutral-400 hover:text-white",
@@ -162,19 +164,19 @@ export function DashboardLayout({ monitors }: DashboardLayoutProps) {
         </div>
 
         {/* Quick stats in header */}
-        <div className="hidden sm:flex items-center gap-2 sm:gap-4 text-xs sm:text-sm">
-          <span className="flex items-center gap-1 sm:gap-1.5 text-green-400">
+        <div className="hidden items-center gap-2 text-xs sm:flex sm:gap-4 sm:text-sm">
+          <span className="flex items-center gap-1 text-green-400 sm:gap-1.5">
             <CheckCircle2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             {upCount} Up
           </span>
           {downCount > 0 && (
-            <span className="flex items-center gap-1 sm:gap-1.5 text-red-400">
+            <span className="flex items-center gap-1 text-red-400 sm:gap-1.5">
               <XCircle className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
               {downCount} Down
             </span>
           )}
           {pendingCount > 0 && (
-            <span className="flex items-center gap-1 sm:gap-1.5 text-neutral-400">
+            <span className="flex items-center gap-1 text-neutral-400 sm:gap-1.5">
               <AlertCircle className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
               {pendingCount} Pending
             </span>
@@ -184,7 +186,7 @@ export function DashboardLayout({ monitors }: DashboardLayoutProps) {
         {/* Add button - show in grid view or when sidebar is hidden in detail view */}
         {(viewMode === "grid" || (viewMode === "detail" && !sidebarOpen)) && (
           <Link href="/dashboard/monitors/new">
-            <Button size="sm" className="gap-2 h-8">
+            <Button size="sm" className="h-8 gap-2">
               <Plus className="h-4 w-4" />
               <span className="hidden sm:inline">Add Monitor</span>
             </Button>
@@ -194,11 +196,13 @@ export function DashboardLayout({ monitors }: DashboardLayoutProps) {
 
       {/* Content */}
       {viewMode === "detail" ? (
-        <div className="flex flex-1 overflow-hidden relative">
+        <div className="relative flex flex-1 overflow-hidden">
           {/* Mobile Sidebar Overlay */}
           {mobileSidebarOpen && (
-            <div
-              className="fixed inset-0 bg-black/60 z-40 md:hidden"
+            <button
+              type="button"
+              aria-label="Close navigation"
+              className="fixed inset-0 z-40 border-0 bg-black/60 md:hidden"
               onClick={() => setMobileSidebarOpen(false)}
             />
           )}
@@ -206,10 +210,10 @@ export function DashboardLayout({ monitors }: DashboardLayoutProps) {
           {/* Sidebar - Desktop: collapsible, Mobile: slide-over */}
           <div
             className={cn(
-              "flex-shrink-0 glass-sidebar transition-all duration-300",
+              "glass-sidebar flex-shrink-0 transition-all duration-300",
               // Desktop behavior
               "hidden md:block",
-              sidebarOpen ? "w-72 lg:w-80" : "w-0 border-r-0 overflow-hidden",
+              sidebarOpen ? "w-72 lg:w-80" : "w-0 overflow-hidden border-r-0",
             )}
           >
             <MonitorSidebar
@@ -222,11 +226,11 @@ export function DashboardLayout({ monitors }: DashboardLayoutProps) {
           {/* Mobile Sidebar - Slide over */}
           <div
             className={cn(
-              "fixed inset-y-0 left-0 z-50 w-80 max-w-[85vw] glass-sidebar transform transition-transform duration-300 ease-in-out md:hidden",
+              "glass-sidebar fixed inset-y-0 left-0 z-50 w-80 max-w-[85vw] transform transition-transform duration-300 ease-in-out md:hidden",
               mobileSidebarOpen ? "translate-x-0" : "-translate-x-full",
             )}
           >
-            <div className="flex items-center justify-between p-3 border-b border-white/5">
+            <div className="flex items-center justify-between border-b border-white/5 p-3">
               <span className="font-medium">Monitors</span>
               <Button
                 variant="ghost"
@@ -247,23 +251,23 @@ export function DashboardLayout({ monitors }: DashboardLayoutProps) {
           </div>
 
           {/* Detail Panel */}
-          <div className="flex-1 overflow-hidden min-w-0">
+          <div className="min-w-0 flex-1 overflow-hidden">
             {selectedMonitor ? (
               <MonitorDetailPanel
                 key={selectedMonitor.id}
                 monitor={selectedMonitor}
               />
             ) : (
-              <div className="flex items-center justify-center h-full text-neutral-400">
+              <div className="flex h-full items-center justify-center text-neutral-400">
                 Select a monitor to view details
               </div>
             )}
           </div>
         </div>
       ) : (
-        <div className="flex-1 overflow-auto p-3 sm:p-4 lg:p-6 space-y-4 sm:space-y-6">
+        <div className="flex-1 space-y-4 overflow-auto p-3 sm:space-y-6 sm:p-4 lg:p-6">
           {/* Stats Cards */}
-          <div className="grid gap-3 sm:gap-4 grid-cols-2 md:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-4">
             <StatsCard
               label="Total Monitors"
               value={monitors.length}
@@ -321,19 +325,19 @@ function StatsCard({
 }) {
   return (
     <Card className="glass-stats rounded-xl">
-      <CardContent className="p-3 sm:pt-5 sm:pb-4 sm:px-4">
+      <CardContent className="p-3 sm:px-4 sm:pt-5 sm:pb-4">
         <div className="flex items-center justify-between gap-2">
           <div className="min-w-0">
-            <p className="text-xs sm:text-sm text-neutral-400 truncate">
+            <p className="truncate text-xs text-neutral-400 sm:text-sm">
               {label}
             </p>
-            <p className={cn("text-xl sm:text-2xl font-bold", valueColor)}>
+            <p className={cn("text-xl font-bold sm:text-2xl", valueColor)}>
               {value}
             </p>
           </div>
           <div
             className={cn(
-              "p-2 sm:p-2.5 rounded-lg sm:rounded-xl flex-shrink-0 backdrop-blur-sm",
+              "flex-shrink-0 rounded-lg p-2 backdrop-blur-sm sm:rounded-xl sm:p-2.5",
               iconBg,
             )}
           >

@@ -2,13 +2,6 @@
 
 # dependencies
 /node_modules
-/.pnp
-.pnp.*
-.yarn/*
-!.yarn/patches
-!.yarn/plugins
-!.yarn/releases
-!.yarn/versions
 
 # testing
 /coverage
@@ -22,12 +15,18 @@
 # Regenerable CI artifacts (baseline.json stays tracked as the guard reference)
 .bundle/size.json
 .bundle/coverage-summary.json
+.bundle/scripts-check/
+.bundle/junit.xml
+.bundle/lcov/
 
 # production
 /build
 
 # misc
-.DS_Store
+# Every flavour of the macOS metadata, not just the one `.DS_Store`:
+# the `avalanche-preserved` copies and the `._` AppleDouble sidecars.
+.DS_Store*
+._*
 *.pem
 
 # IDE/Editor artifacts
@@ -38,12 +37,6 @@
 
 # Kiro MCP config (contains secrets)
 .kiro/settings/mcp.json
-
-# debug
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-.pnpm-debug.log*
 
 # env files - keep .env.local.example for documentation
 .env
@@ -67,14 +60,13 @@ yarn-error.log*
 next-env.d.ts
 scripts/generate-favicons.js
 tools/audit/target/
+tools/probe/target/
 supabase-mcp.json
 supabase/.temp/
+# The Supabase CLI's local branch state, written by `supabase start`.
+supabase/.branches/
 
 # editor/hand-rolled copies - never commit superseded source snapshots
 *.backup
 *.bak
 *.orig
-
-# python
-__pycache__/
-*.pyc

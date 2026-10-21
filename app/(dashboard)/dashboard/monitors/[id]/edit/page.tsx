@@ -1,7 +1,35 @@
 "use client";
 
-import { useState, useEffect, use } from "react";
+import {
+  AlertCircle,
+  ArrowLeft,
+  Bell,
+  CheckCircle2,
+  Clock,
+  Copy,
+  Eye,
+  EyeOff,
+  Globe,
+  Loader2,
+  Mail,
+  MessageCircle,
+  Power,
+  PowerOff,
+  Radio,
+  RefreshCw,
+  Save,
+  Search,
+  Server,
+  Shield,
+  Trash2,
+  Webhook,
+  Zap,
+} from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { use, useEffect, useState } from "react";
+import { toast } from "sonner";
+
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -18,35 +46,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { createClient } from "@/lib/supabase/client";
 import { updateMonitor } from "@/lib/actions/monitors";
 import {
-  ArrowLeft,
-  Trash2,
-  Globe,
-  Server,
-  Zap,
-  Search,
-  Radio,
-  Shield,
-  RefreshCw,
-  Copy,
-  Eye,
-  EyeOff,
-  CheckCircle2,
-  AlertCircle,
-  Loader2,
-  Save,
-  Power,
-  PowerOff,
-  Clock,
-  Bell,
-  MessageCircle,
-  Mail,
-  Webhook,
-} from "lucide-react";
-import Link from "next/link";
-import { toast } from "sonner";
+  fetchJson,
+  ScheduleResponseSchema,
+  ScheduleUpdateResponseSchema,
+} from "@/lib/api-client";
+import { createClient } from "@/lib/supabase/client";
 
 const CRON_INTERVAL_OPTIONS = [
   { value: "1", label: "Every 1 minute", dailyMessages: 1440 },
@@ -107,9 +113,23 @@ export default function EditMonitorPage(props: {
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<{
+    name: string;
+    type: "http" | "tcp" | "ping" | "keyword" | "dns";
+    url: string;
+    hostname: string;
+    port: number;
+    method: string;
+    keyword: string;
+    interval: number;
+    timeout: number;
+    max_retries: number;
+    description: string;
+    active: boolean;
+    headers: Record<string, string>;
+  }>({
     name: "",
-    type: "http" as "http" | "tcp" | "ping" | "keyword" | "dns",
+    type: "http",
     url: "",
     hostname: "",
     port: 80,
@@ -120,7 +140,7 @@ export default function EditMonitorPage(props: {
     max_retries: 3,
     description: "",
     active: true,
-    headers: {} as Record<string, string>,
+    headers: {},
   });
 
   // QStash schedule state
@@ -204,8 +224,10 @@ export default function EditMonitorPage(props: {
 
     const loadCronSchedule = async () => {
       try {
-        const res = await fetch("/api/settings/schedule");
-        const data = await res.json();
+        const data = await fetchJson(
+          "/api/settings/schedule",
+          ScheduleResponseSchema,
+        );
         if (data.schedule) {
           setCronSchedule({
             id: data.schedule.id,
@@ -230,7 +252,7 @@ export default function EditMonitorPage(props: {
           .select("id, name, type, active")
           .order("name");
 
-        setChannels((channelsData || []) as NotificationChannel[]);
+        setChannels(channelsData || []);
 
         // Load currently linked channels for this monitor
         const { data: linkedData } = await supabase
@@ -249,9 +271,9 @@ export default function EditMonitorPage(props: {
       }
     };
 
-    loadMonitor();
-    loadCronSchedule();
-    loadNotificationChannels();
+    void loadMonitor();
+    void loadCronSchedule();
+    void loadNotificationChannels();
   }, [params.id]);
 
   const handleCronIntervalChange = async (value: string) => {
@@ -259,20 +281,18 @@ export default function EditMonitorPage(props: {
 
     setCronSaving(true);
     try {
-      const res = await fetch("/api/settings/schedule", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          scheduleId: cronSchedule.id,
-          intervalMinutes: parseInt(value, 10),
-        }),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error || "Failed to update schedule");
-      }
+      const data = await fetchJson(
+        "/api/settings/schedule",
+        ScheduleUpdateResponseSchema,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            scheduleId: cronSchedule.id,
+            intervalMinutes: parseInt(value, 10),
+          }),
+        },
+      );
 
       setCronSchedule({
         ...cronSchedule,
@@ -347,9 +367,7 @@ export default function EditMonitorPage(props: {
           monitor_id: params.id,
           channel_id: channelId,
         }));
-        await supabase
-          .from("monitor_notifications")
-          .insert(links as unknown as never);
+        await supabase.from("monitor_notifications").insert(links);
       }
 
       setSuccess(true);
@@ -398,9 +416,9 @@ export default function EditMonitorPage(props: {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
+      <div className="flex min-h-[60vh] items-center justify-center">
         <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin text-green-400 mx-auto mb-4" />
+          <Loader2 className="mx-auto mb-4 h-8 w-8 animate-spin text-green-400" />
           <p className="text-neutral-400">Loading monitor...</p>
         </div>
       </div>
@@ -408,20 +426,20 @@ export default function EditMonitorPage(props: {
   }
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
+    <div className="mx-auto max-w-4xl space-y-6">
       {/* Header */}
       <div>
         <Link
           href={`/dashboard/monitors/${params.id}`}
-          className="inline-flex items-center text-sm text-neutral-400 hover:text-white transition-colors mb-4"
+          className="mb-4 inline-flex items-center text-sm text-neutral-400 transition-colors hover:text-white"
         >
-          <ArrowLeft className="h-4 w-4 mr-1" />
+          <ArrowLeft className="mr-1 h-4 w-4" />
           Back to Monitor
         </Link>
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-white">Edit Monitor</h1>
-            <p className="text-neutral-400 mt-1">{formData.name}</p>
+            <p className="mt-1 text-neutral-400">{formData.name}</p>
           </div>
           <div className="flex items-center gap-2">
             <Button
@@ -432,12 +450,12 @@ export default function EditMonitorPage(props: {
             >
               {formData.active ? (
                 <>
-                  <Power className="h-4 w-4 mr-2" />
+                  <Power className="mr-2 h-4 w-4" />
                   Active
                 </>
               ) : (
                 <>
-                  <PowerOff className="h-4 w-4 mr-2" />
+                  <PowerOff className="mr-2 h-4 w-4" />
                   Paused
                 </>
               )}
@@ -447,28 +465,28 @@ export default function EditMonitorPage(props: {
       </div>
 
       {error && (
-        <div className="flex items-center gap-3 bg-red-950/50 border border-red-800 text-red-200 px-4 py-3 rounded-lg">
-          <AlertCircle className="h-5 w-5 text-red-400 flex-shrink-0" />
+        <div className="flex items-center gap-3 rounded-lg border border-red-800 bg-red-950/50 px-4 py-3 text-red-200">
+          <AlertCircle className="h-5 w-5 flex-shrink-0 text-red-400" />
           {error}
         </div>
       )}
 
       {success && (
-        <div className="flex items-center gap-3 bg-green-950/50 border border-green-800 text-green-200 px-4 py-3 rounded-lg">
-          <CheckCircle2 className="h-5 w-5 text-green-400 flex-shrink-0" />
+        <div className="flex items-center gap-3 rounded-lg border border-green-800 bg-green-950/50 px-4 py-3 text-green-200">
+          <CheckCircle2 className="h-5 w-5 flex-shrink-0 text-green-400" />
           Monitor updated successfully! Redirecting...
         </div>
       )}
 
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Monitor Type */}
-        <Card className="bg-neutral-900/50 border-neutral-800">
+        <Card className="border-neutral-800 bg-neutral-900/50">
           <CardHeader>
             <CardTitle className="text-white">Monitor Type</CardTitle>
             <CardDescription>Type of check to perform</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
               {monitorTypes.map((type) => {
                 const Icon = type.icon;
                 const isSelected = formData.type === type.id;
@@ -477,13 +495,13 @@ export default function EditMonitorPage(props: {
                     key={type.id}
                     type="button"
                     onClick={() => updateField("type", type.id)}
-                    className={`p-4 rounded-xl border-2 transition-all text-left ${
+                    className={`rounded-xl border-2 p-4 text-left transition-all ${
                       isSelected
                         ? "border-green-500 bg-green-500/10"
                         : "border-neutral-700 bg-neutral-800/50 hover:border-neutral-600"
                     }`}
                   >
-                    <div className={`p-2 rounded-lg ${type.bg} w-fit mb-2`}>
+                    <div className={`rounded-lg p-2 ${type.bg} mb-2 w-fit`}>
                       <Icon className={`h-5 w-5 ${type.color}`} />
                     </div>
                     <p
@@ -499,11 +517,11 @@ export default function EditMonitorPage(props: {
         </Card>
 
         {/* Configuration */}
-        <Card className="bg-neutral-900/50 border-neutral-800">
+        <Card className="border-neutral-800 bg-neutral-900/50">
           <CardHeader>
-            <CardTitle className="text-white flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2 text-white">
               {selectedType && (
-                <div className={`p-1.5 rounded-lg ${selectedType.bg}`}>
+                <div className={`rounded-lg p-1.5 ${selectedType.bg}`}>
                   <selectedType.icon
                     className={`h-4 w-4 ${selectedType.color}`}
                   />
@@ -513,7 +531,7 @@ export default function EditMonitorPage(props: {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid md:grid-cols-2 gap-4">
+            <div className="grid gap-4 md:grid-cols-2">
               <div>
                 <Label htmlFor="name" className="text-neutral-300">
                   Monitor Name *
@@ -524,7 +542,7 @@ export default function EditMonitorPage(props: {
                   required
                   value={formData.name}
                   onChange={(e) => updateField("name", e.target.value)}
-                  className="mt-1.5 block w-full rounded-lg border border-neutral-700 bg-neutral-800 px-4 py-2.5 text-white focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
+                  className="mt-1.5 block w-full rounded-lg border border-neutral-700 bg-neutral-800 px-4 py-2.5 text-white focus:border-green-500 focus:ring-1 focus:ring-green-500 focus:outline-none"
                 />
               </div>
 
@@ -537,7 +555,7 @@ export default function EditMonitorPage(props: {
                     id="method"
                     value={formData.method}
                     onChange={(e) => updateField("method", e.target.value)}
-                    className="mt-1.5 block w-full rounded-lg border border-neutral-700 bg-neutral-800 px-4 py-2.5 text-white focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
+                    className="mt-1.5 block w-full rounded-lg border border-neutral-700 bg-neutral-800 px-4 py-2.5 text-white focus:border-green-500 focus:ring-1 focus:ring-green-500 focus:outline-none"
                   >
                     <option value="GET">GET</option>
                     <option value="POST">POST</option>
@@ -560,7 +578,7 @@ export default function EditMonitorPage(props: {
                   required
                   value={formData.url}
                   onChange={(e) => updateField("url", e.target.value)}
-                  className="mt-1.5 block w-full rounded-lg border border-neutral-700 bg-neutral-800 px-4 py-2.5 text-white focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
+                  className="mt-1.5 block w-full rounded-lg border border-neutral-700 bg-neutral-800 px-4 py-2.5 text-white focus:border-green-500 focus:ring-1 focus:ring-green-500 focus:outline-none"
                   placeholder="https://example.com"
                 />
               </div>
@@ -577,7 +595,7 @@ export default function EditMonitorPage(props: {
                   required
                   value={formData.keyword}
                   onChange={(e) => updateField("keyword", e.target.value)}
-                  className="mt-1.5 block w-full rounded-lg border border-neutral-700 bg-neutral-800 px-4 py-2.5 text-white focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
+                  className="mt-1.5 block w-full rounded-lg border border-neutral-700 bg-neutral-800 px-4 py-2.5 text-white focus:border-green-500 focus:ring-1 focus:ring-green-500 focus:outline-none"
                 />
               </div>
             )}
@@ -585,7 +603,7 @@ export default function EditMonitorPage(props: {
             {(formData.type === "tcp" ||
               formData.type === "ping" ||
               formData.type === "dns") && (
-              <div className="grid md:grid-cols-2 gap-4">
+              <div className="grid gap-4 md:grid-cols-2">
                 <div className={formData.type === "tcp" ? "" : "md:col-span-2"}>
                   <Label htmlFor="hostname" className="text-neutral-300">
                     Hostname *
@@ -596,7 +614,7 @@ export default function EditMonitorPage(props: {
                     required
                     value={formData.hostname}
                     onChange={(e) => updateField("hostname", e.target.value)}
-                    className="mt-1.5 block w-full rounded-lg border border-neutral-700 bg-neutral-800 px-4 py-2.5 text-white focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
+                    className="mt-1.5 block w-full rounded-lg border border-neutral-700 bg-neutral-800 px-4 py-2.5 text-white focus:border-green-500 focus:ring-1 focus:ring-green-500 focus:outline-none"
                   />
                 </div>
                 {formData.type === "tcp" && (
@@ -614,7 +632,7 @@ export default function EditMonitorPage(props: {
                       onChange={(e) =>
                         updateField("port", parseInt(e.target.value))
                       }
-                      className="mt-1.5 block w-full rounded-lg border border-neutral-700 bg-neutral-800 px-4 py-2.5 text-white focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
+                      className="mt-1.5 block w-full rounded-lg border border-neutral-700 bg-neutral-800 px-4 py-2.5 text-white focus:border-green-500 focus:ring-1 focus:ring-green-500 focus:outline-none"
                     />
                   </div>
                 )}
@@ -630,7 +648,7 @@ export default function EditMonitorPage(props: {
                 rows={2}
                 value={formData.description}
                 onChange={(e) => updateField("description", e.target.value)}
-                className="mt-1.5 block w-full rounded-lg border border-neutral-700 bg-neutral-800 px-4 py-2.5 text-white focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500 resize-none"
+                className="mt-1.5 block w-full resize-none rounded-lg border border-neutral-700 bg-neutral-800 px-4 py-2.5 text-white focus:border-green-500 focus:ring-1 focus:ring-green-500 focus:outline-none"
               />
             </div>
           </CardContent>
@@ -638,9 +656,9 @@ export default function EditMonitorPage(props: {
 
         {/* Custom Headers - only for HTTP types */}
         {(formData.type === "http" || formData.type === "keyword") && (
-          <Card className="bg-neutral-900/50 border-neutral-800">
+          <Card className="border-neutral-800 bg-neutral-900/50">
             <CardHeader>
-              <CardTitle className="text-white flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2 text-white">
                 <Shield className="h-5 w-5 text-amber-400" />
                 Custom Headers
               </CardTitle>
@@ -676,7 +694,7 @@ export default function EditMonitorPage(props: {
                     setFormData((prev) => ({ ...prev, headers: newHeaders }));
                   }}
                 >
-                  <Shield className="h-4 w-4 mr-1" />
+                  <Shield className="mr-1 h-4 w-4" />
                   {formData.headers["x-vercel-protection-bypass"]
                     ? "Remove Vercel Bypass"
                     : "Generate & Add Vercel Bypass"}
@@ -703,7 +721,7 @@ export default function EditMonitorPage(props: {
                         toast.success("New secret generated!");
                       }}
                     >
-                      <RefreshCw className="h-4 w-4 mr-1" />
+                      <RefreshCw className="mr-1 h-4 w-4" />
                       Regenerate
                     </Button>
                     <Button
@@ -712,7 +730,7 @@ export default function EditMonitorPage(props: {
                       size="sm"
                       className="border-blue-600 text-blue-400 hover:bg-blue-950"
                       onClick={() => {
-                        navigator.clipboard.writeText(
+                        void navigator.clipboard.writeText(
                           formData.headers["x-vercel-protection-bypass"] || "",
                         );
                         toast.success(
@@ -720,7 +738,7 @@ export default function EditMonitorPage(props: {
                         );
                       }}
                     >
-                      <Copy className="h-4 w-4 mr-1" />
+                      <Copy className="mr-1 h-4 w-4" />
                       Copy Secret
                     </Button>
                   </>
@@ -730,7 +748,7 @@ export default function EditMonitorPage(props: {
               {/* Current Headers */}
               {Object.keys(formData.headers).length > 0 && (
                 <div className="space-y-2">
-                  <Label className="text-neutral-300 text-sm">
+                  <Label className="text-sm text-neutral-300">
                     Active Headers
                   </Label>
                   {Object.entries(formData.headers).map(([key, value]) => {
@@ -748,7 +766,7 @@ export default function EditMonitorPage(props: {
                           readOnly
                           className="flex-1 rounded-lg border border-neutral-700 bg-neutral-800/50 px-3 py-2 text-sm text-neutral-300"
                         />
-                        <div className="flex-1 relative">
+                        <div className="relative flex-1">
                           <input
                             type={isSecret && !isVisible ? "password" : "text"}
                             value={value}
@@ -765,12 +783,12 @@ export default function EditMonitorPage(props: {
                                 ? "Enter your 32-char secret"
                                 : "Value"
                             }
-                            className="w-full rounded-lg border border-neutral-700 bg-neutral-800 px-3 py-2 pr-10 text-sm text-white focus:border-green-500 focus:outline-none font-mono"
+                            className="w-full rounded-lg border border-neutral-700 bg-neutral-800 px-3 py-2 pr-10 font-mono text-sm text-white focus:border-green-500 focus:outline-none"
                           />
                           {isSecret && (
                             <button
                               type="button"
-                              className="absolute right-2 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-white"
+                              className="absolute top-1/2 right-2 -translate-y-1/2 text-neutral-400 hover:text-white"
                               onClick={() => {
                                 const newVisible = new Set(visibleSecrets);
                                 if (isVisible) {
@@ -793,7 +811,7 @@ export default function EditMonitorPage(props: {
                           type="button"
                           variant="ghost"
                           size="sm"
-                          className="text-red-400 hover:text-red-300 hover:bg-red-950/50"
+                          className="text-red-400 hover:bg-red-950/50 hover:text-red-300"
                           onClick={() => {
                             const newHeaders = { ...formData.headers };
                             delete newHeaders[key];
@@ -812,7 +830,7 @@ export default function EditMonitorPage(props: {
               )}
 
               {/* Add Custom Header */}
-              <div className="pt-2 border-t border-neutral-800">
+              <div className="border-t border-neutral-800 pt-2">
                 <button
                   type="button"
                   className="text-sm text-green-400 hover:text-green-300"
@@ -830,9 +848,9 @@ export default function EditMonitorPage(props: {
               </div>
 
               {formData.headers["x-vercel-protection-bypass"] && (
-                <div className="mt-3 p-3 bg-amber-950/30 border border-amber-900/50 rounded-lg text-sm text-amber-200">
-                  <p className="font-medium mb-1">To get your bypass secret:</p>
-                  <ol className="list-decimal list-inside space-y-1 text-xs">
+                <div className="mt-3 rounded-lg border border-amber-900/50 bg-amber-950/30 p-3 text-sm text-amber-200">
+                  <p className="mb-1 font-medium">To get your bypass secret:</p>
+                  <ol className="list-inside list-decimal space-y-1 text-xs">
                     <li>Go to Vercel Dashboard → Project → Settings</li>
                     <li>Navigate to Deployment Protection</li>
                     <li>
@@ -848,7 +866,7 @@ export default function EditMonitorPage(props: {
         )}
 
         {/* Advanced */}
-        <Card className="bg-neutral-900/50 border-neutral-800">
+        <Card className="border-neutral-800 bg-neutral-900/50">
           <CardHeader>
             <CardTitle className="text-white">Advanced Settings</CardTitle>
           </CardHeader>
@@ -858,7 +876,7 @@ export default function EditMonitorPage(props: {
                 <Label htmlFor="interval" className="text-neutral-300">
                   Interval
                 </Label>
-                <div className="mt-1.5 relative">
+                <div className="relative mt-1.5">
                   <input
                     id="interval"
                     type="number"
@@ -867,9 +885,9 @@ export default function EditMonitorPage(props: {
                     onChange={(e) =>
                       updateField("interval", parseInt(e.target.value))
                     }
-                    className="block w-full rounded-lg border border-neutral-700 bg-neutral-800 px-4 py-2.5 pr-12 text-white focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
+                    className="block w-full rounded-lg border border-neutral-700 bg-neutral-800 px-4 py-2.5 pr-12 text-white focus:border-green-500 focus:ring-1 focus:ring-green-500 focus:outline-none"
                   />
-                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-neutral-500 text-sm">
+                  <span className="absolute top-1/2 right-4 -translate-y-1/2 text-sm text-neutral-500">
                     sec
                   </span>
                 </div>
@@ -878,7 +896,7 @@ export default function EditMonitorPage(props: {
                 <Label htmlFor="timeout" className="text-neutral-300">
                   Timeout
                 </Label>
-                <div className="mt-1.5 relative">
+                <div className="relative mt-1.5">
                   <input
                     id="timeout"
                     type="number"
@@ -888,9 +906,9 @@ export default function EditMonitorPage(props: {
                     onChange={(e) =>
                       updateField("timeout", parseInt(e.target.value))
                     }
-                    className="block w-full rounded-lg border border-neutral-700 bg-neutral-800 px-4 py-2.5 pr-12 text-white focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
+                    className="block w-full rounded-lg border border-neutral-700 bg-neutral-800 px-4 py-2.5 pr-12 text-white focus:border-green-500 focus:ring-1 focus:ring-green-500 focus:outline-none"
                   />
-                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-neutral-500 text-sm">
+                  <span className="absolute top-1/2 right-4 -translate-y-1/2 text-sm text-neutral-500">
                     sec
                   </span>
                 </div>
@@ -908,25 +926,25 @@ export default function EditMonitorPage(props: {
                   onChange={(e) =>
                     updateField("max_retries", parseInt(e.target.value))
                   }
-                  className="mt-1.5 block w-full rounded-lg border border-neutral-700 bg-neutral-800 px-4 py-2.5 text-white focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
+                  className="mt-1.5 block w-full rounded-lg border border-neutral-700 bg-neutral-800 px-4 py-2.5 text-white focus:border-green-500 focus:ring-1 focus:ring-green-500 focus:outline-none"
                 />
               </div>
             </div>
 
             {/* Global Cron Schedule */}
-            <div className="pt-4 border-t border-neutral-800">
-              <div className="flex items-center gap-2 mb-3">
+            <div className="border-t border-neutral-800 pt-4">
+              <div className="mb-3 flex items-center gap-2">
                 <Clock className="h-4 w-4 text-neutral-400" />
-                <Label className="text-neutral-300 font-medium">
+                <Label className="font-medium text-neutral-300">
                   Global Check Interval
                 </Label>
               </div>
-              <p className="text-xs text-neutral-500 mb-3">
+              <p className="mb-3 text-xs text-neutral-500">
                 How often QStash triggers monitor checks (applies to all
                 monitors)
               </p>
               {cronLoading ? (
-                <div className="flex items-center gap-2 text-neutral-400 text-sm">
+                <div className="flex items-center gap-2 text-sm text-neutral-400">
                   <Loader2 className="h-4 w-4 animate-spin" />
                   Loading schedule...
                 </div>
@@ -937,7 +955,7 @@ export default function EditMonitorPage(props: {
                     onValueChange={handleCronIntervalChange}
                     disabled={cronSaving}
                   >
-                    <SelectTrigger className="w-[200px] bg-neutral-800 border-neutral-700">
+                    <SelectTrigger className="w-[200px] border-neutral-700 bg-neutral-800">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -952,7 +970,7 @@ export default function EditMonitorPage(props: {
                     <Loader2 className="h-4 w-4 animate-spin text-green-400" />
                   )}
                   {cronSchedule.isPaused && (
-                    <span className="text-xs text-yellow-400 bg-yellow-500/20 px-2 py-1 rounded">
+                    <span className="rounded bg-yellow-500/20 px-2 py-1 text-xs text-yellow-400">
                       Paused
                     </span>
                   )}
@@ -967,9 +985,9 @@ export default function EditMonitorPage(props: {
         </Card>
 
         {/* Notification Channels */}
-        <Card className="bg-neutral-900/50 border-neutral-800">
+        <Card className="border-neutral-800 bg-neutral-900/50">
           <CardHeader>
-            <CardTitle className="text-white flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2 text-white">
               <Bell className="h-5 w-5 text-blue-400" />
               Notification Channels
             </CardTitle>
@@ -979,14 +997,14 @@ export default function EditMonitorPage(props: {
           </CardHeader>
           <CardContent>
             {channelsLoading ? (
-              <div className="flex items-center gap-2 text-neutral-400 text-sm">
+              <div className="flex items-center gap-2 text-sm text-neutral-400">
                 <Loader2 className="h-4 w-4 animate-spin" />
                 Loading channels...
               </div>
             ) : channels.length === 0 ? (
-              <div className="text-center py-6">
-                <Bell className="h-8 w-8 text-neutral-600 mx-auto mb-2" />
-                <p className="text-neutral-400 text-sm mb-3">
+              <div className="py-6 text-center">
+                <Bell className="mx-auto mb-2 h-8 w-8 text-neutral-600" />
+                <p className="mb-3 text-sm text-neutral-400">
                   No notification channels configured
                 </p>
                 <Link href="/dashboard/notifications/new">
@@ -1057,13 +1075,13 @@ export default function EditMonitorPage(props: {
                             : [...prev, channel.id],
                         );
                       }}
-                      className={`w-full flex items-center gap-3 p-3 rounded-lg border transition-all ${
+                      className={`flex w-full items-center gap-3 rounded-lg border p-3 transition-all ${
                         isSelected
                           ? "border-green-500 bg-green-500/10"
                           : "border-neutral-700 bg-neutral-800/50 hover:border-neutral-600"
                       }`}
                     >
-                      <div className={`p-2 rounded-lg ${config.bg}`}>
+                      <div className={`rounded-lg p-2 ${config.bg}`}>
                         <Icon className={`h-4 w-4 ${config.color}`} />
                       </div>
                       <div className="flex-1 text-left">
@@ -1077,7 +1095,7 @@ export default function EditMonitorPage(props: {
                         </p>
                       </div>
                       <div
-                        className={`h-5 w-5 rounded border-2 flex items-center justify-center ${
+                        className={`flex h-5 w-5 items-center justify-center rounded border-2 ${
                           isSelected
                             ? "border-green-500 bg-green-500"
                             : "border-neutral-600"
@@ -1100,21 +1118,21 @@ export default function EditMonitorPage(props: {
           <Button
             type="submit"
             disabled={saving || success}
-            className="flex-1 bg-green-600 hover:bg-green-700 text-white py-3"
+            className="flex-1 bg-green-600 py-3 text-white hover:bg-green-700"
           >
             {saving ? (
               <>
-                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 Saving...
               </>
             ) : success ? (
               <>
-                <CheckCircle2 className="h-4 w-4 mr-2" />
+                <CheckCircle2 className="mr-2 h-4 w-4" />
                 Saved!
               </>
             ) : (
               <>
-                <Save className="h-4 w-4 mr-2" />
+                <Save className="mr-2 h-4 w-4" />
                 Save Changes
               </>
             )}

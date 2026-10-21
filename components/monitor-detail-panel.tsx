@@ -1,25 +1,20 @@
 "use client";
 
-import { useRealtimeMonitor } from "@/hooks/use-realtime-monitors";
-import { Button } from "@/components/ui/button";
 import {
-  Pause,
-  Play,
-  Pencil,
-  Trash2,
-  ExternalLink,
   Clock,
   Copy,
+  ExternalLink,
   Loader2,
+  Pause,
+  Pencil,
+  Play,
+  Trash2,
 } from "lucide-react";
 import Link from "next/link";
-import { useState, useMemo, useTransition } from "react";
-import { createClient } from "@/lib/supabase/client";
-import { cn } from "@/lib/utils";
-import { StatBox } from "@/components/ui/stat-box";
-import { ResponseChart } from "@/components/ui/response-chart";
-import { duplicateMonitor } from "@/lib/actions/monitors";
+import { useRouter } from "next/navigation";
+import { useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
+
 import {
   AlertDialog,
   AlertDialogAction,
@@ -31,7 +26,13 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { ResponseChart } from "@/components/ui/response-chart";
+import { StatBox } from "@/components/ui/stat-box";
+import { useRealtimeMonitor } from "@/hooks/use-realtime-monitors";
+import { duplicateMonitor } from "@/lib/actions/monitors";
+import { createClient } from "@/lib/supabase/client";
+import { cn } from "@/lib/utils";
 
 type Monitor = {
   id: string;
@@ -142,12 +143,12 @@ export function MonitorDetailPanel({
   };
 
   return (
-    <div className="flex flex-col h-full overflow-y-auto bg-neutral-950/30">
+    <div className="flex h-full flex-col overflow-y-auto bg-neutral-950/30">
       {/* Header */}
-      <div className="p-4 sm:p-6 border-b border-white/5 bg-neutral-900/40 backdrop-blur-sm">
+      <div className="border-b border-white/5 bg-neutral-900/40 p-4 backdrop-blur-sm sm:p-6">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
-            <h1 className="text-xl sm:text-2xl font-bold truncate">
+            <h1 className="truncate text-xl font-bold sm:text-2xl">
               {monitor.name}
             </h1>
             {monitor.url && (
@@ -155,14 +156,14 @@ export function MonitorDetailPanel({
                 href={monitor.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-green-400 hover:text-green-300 text-xs sm:text-sm inline-flex items-center gap-1 mt-1 break-all"
+                className="mt-1 inline-flex items-center gap-1 text-xs break-all text-green-400 hover:text-green-300 sm:text-sm"
               >
                 <span className="truncate">{monitor.url}</span>
                 <ExternalLink className="h-3 w-3 flex-shrink-0" />
               </a>
             )}
             {monitor.hostname && !monitor.url && (
-              <p className="text-neutral-400 text-xs sm:text-sm mt-1 truncate">
+              <p className="mt-1 truncate text-xs text-neutral-400 sm:text-sm">
                 {monitor.hostname}
               </p>
             )}
@@ -170,14 +171,14 @@ export function MonitorDetailPanel({
 
           {/* Paused Badge */}
           {isPaused && (
-            <span className="px-2 sm:px-3 py-1 rounded-full bg-amber-500/20 text-amber-400 text-xs sm:text-sm font-medium flex-shrink-0">
+            <span className="flex-shrink-0 rounded-full bg-amber-500/20 px-2 py-1 text-xs font-medium text-amber-400 sm:px-3 sm:text-sm">
               Paused
             </span>
           )}
         </div>
 
         {/* Action Buttons */}
-        <div className="flex flex-wrap items-center gap-2 mt-3 sm:mt-4">
+        <div className="mt-3 flex flex-wrap items-center gap-2 sm:mt-4">
           <Button
             variant="outline"
             size="sm"
@@ -226,7 +227,7 @@ export function MonitorDetailPanel({
                 Delete
               </Button>
             </AlertDialogTrigger>
-            <AlertDialogContent className="bg-neutral-900 border-neutral-800">
+            <AlertDialogContent className="border-neutral-800 bg-neutral-900">
               <AlertDialogHeader>
                 <AlertDialogTitle>Delete Monitor</AlertDialogTitle>
                 <AlertDialogDescription className="text-neutral-400">
@@ -251,10 +252,10 @@ export function MonitorDetailPanel({
       </div>
 
       {/* Heartbeat Bar + Status Badge */}
-      <div className="p-4 sm:p-6 border-b border-white/5 bg-neutral-900/20">
+      <div className="border-b border-white/5 bg-neutral-900/20 p-4 sm:p-6">
         <div className="flex items-center gap-3 sm:gap-4">
           {/* Heartbeat visualization */}
-          <div className="flex-1 flex gap-[2px] sm:gap-[3px] items-center overflow-hidden">
+          <div className="flex flex-1 items-center gap-[2px] overflow-hidden sm:gap-[3px]">
             {heartbeats.length > 0
               ? heartbeats
                   .slice(0, 50)
@@ -263,7 +264,7 @@ export function MonitorDetailPanel({
                     <div
                       key={hb.id || i}
                       className={cn(
-                        "flex-1 h-7 sm:h-9 rounded-[2px] sm:rounded-[3px] min-w-[3px] sm:min-w-[4px] max-w-[8px] sm:max-w-[10px] transition-colors cursor-pointer",
+                        "h-7 max-w-[8px] min-w-[3px] flex-1 cursor-pointer rounded-[2px] transition-colors sm:h-9 sm:max-w-[10px] sm:min-w-[4px] sm:rounded-[3px]",
                         hb.status === 1 && "bg-green-500 hover:bg-green-400",
                         hb.status === 0 && "bg-red-500 hover:bg-red-400",
                         hb.status === 2 &&
@@ -279,7 +280,7 @@ export function MonitorDetailPanel({
                   .map((_, i) => (
                     <div
                       key={i}
-                      className="flex-1 h-7 sm:h-9 rounded-[2px] sm:rounded-[3px] min-w-[3px] sm:min-w-[4px] max-w-[8px] sm:max-w-[10px] bg-neutral-700"
+                      className="h-7 max-w-[8px] min-w-[3px] flex-1 rounded-[2px] bg-neutral-700 sm:h-9 sm:max-w-[10px] sm:min-w-[4px] sm:rounded-[3px]"
                     />
                   ))}
           </div>
@@ -287,7 +288,7 @@ export function MonitorDetailPanel({
           {/* Status Badge */}
           <div
             className={cn(
-              "px-3 sm:px-5 py-2 sm:py-2.5 rounded-lg text-sm sm:text-lg font-bold shrink-0",
+              "shrink-0 rounded-lg px-3 py-2 text-sm font-bold sm:px-5 sm:py-2.5 sm:text-lg",
               isPaused && "bg-amber-500 text-white",
               !isPaused && isUp && "bg-green-500 text-white",
               !isPaused && isDown && "bg-red-500 text-white",
@@ -314,14 +315,14 @@ export function MonitorDetailPanel({
                       : "Pending"}
           </div>
         </div>
-        <p className="text-xs sm:text-sm text-neutral-500 mt-2 sm:mt-3 flex items-center gap-1.5">
+        <p className="mt-2 flex items-center gap-1.5 text-xs text-neutral-500 sm:mt-3 sm:text-sm">
           <Clock className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
           Check every {monitor.interval} seconds.
         </p>
       </div>
 
       {/* Stats Grid - responsive */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 border-b border-white/5 bg-neutral-900/30 backdrop-blur-sm">
+      <div className="grid grid-cols-2 border-b border-white/5 bg-neutral-900/30 backdrop-blur-sm sm:grid-cols-3 md:grid-cols-5">
         <StatBox
           label="Response"
           sublabel="(Current)"
@@ -353,15 +354,15 @@ export function MonitorDetailPanel({
       </div>
 
       {/* Response Time Chart */}
-      <div className="px-4 sm:px-6 py-3">
-        <h3 className="text-xs font-medium text-neutral-400 mb-1">
+      <div className="px-4 py-3 sm:px-6">
+        <h3 className="mb-1 text-xs font-medium text-neutral-400">
           Response Time (ms)
         </h3>
         <ResponseChart heartbeats={stats.validPings} maxPing={stats.maxPing} />
       </div>
 
       {/* Footer */}
-      <div className="px-6 py-3 border-t border-white/5 bg-neutral-900/30 backdrop-blur-sm text-xs text-neutral-500 flex items-center justify-between">
+      <div className="flex items-center justify-between border-t border-white/5 bg-neutral-900/30 px-6 py-3 text-xs text-neutral-500 backdrop-blur-sm">
         <span>Created {new Date(monitor.created_at).toLocaleDateString()}</span>
         <span
           className={cn(
@@ -372,7 +373,7 @@ export function MonitorDetailPanel({
           <span
             className={cn(
               "h-2 w-2 rounded-full",
-              isConnected ? "bg-green-500 animate-pulse" : "bg-neutral-600",
+              isConnected ? "animate-pulse bg-green-500" : "bg-neutral-600",
             )}
           />
           {isConnected ? "Live" : "Connecting..."}

@@ -22,21 +22,37 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v5
-        with:
-          node-version: "22"
-
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:
-          bun-version: "1.4.2"
+          # The latest Bun canary. The canary is a moving target: the npm
+          # dist-tag is what tracks it, not a version string in
+          # package.json, so `bun-version: canary` is the only thing that
+          # stays correct as new canaries ship.
+          bun-version: canary
+
+      - name: Cache Bun packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+          restore-keys: bun-${{ runner.os }}-
 
       - name: Install dependencies
-        run: bun install --frozen-lockfile
+        run: bun install --frozen-lockfile --ignore-scripts
+
+      - name: Build the Rust probe
+        run: bun run build:probe
+
+      - name: Verify the toolchain is Bun-only
+        run: bun run doctor
 
       - name: Run tests with coverage gate (70% funcs / 80% lines)
         run: bun run coverage-check
+        env:
+          # Bun writes both reports from the same single test run.
+          COVERAGE_JUNIT_PATH: .bundle/junit.xml
+          COVERAGE_LCOV_DIR: .bundle/lcov
 
       - name: Upload coverage artifact
         if: always()
@@ -44,3 +60,13 @@ jobs:
         with:
           name: coverage-summary
           path: .bundle/coverage-summary.json
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: |
+            .bundle/junit.xml
+            .bundle/lcov/lcov.info
+          if-no-files-found: ignore

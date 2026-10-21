@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test";
+
 import { HEARTBEAT_RAW_RETENTION_DAYS } from "@/lib/uptime-reports";
 
 const rpc = {

@@ -1,6 +1,14 @@
-import { createClient } from "@/lib/supabase/server";
-import { redirect } from "next/navigation";
+import { Bell, ExternalLink, Mail, Plus, Webhook } from "lucide-react";
 import Link from "next/link";
+import { redirect } from "next/navigation";
+
+import {
+  DiscordIcon,
+  SlackIcon,
+  TeamsIcon,
+  TelegramIcon,
+} from "@/components/icons";
+import { TestNotificationButton } from "@/components/test-notification-button";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -9,14 +17,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Bell, Plus, Mail, Webhook, ExternalLink } from "lucide-react";
-import {
-  TelegramIcon,
-  DiscordIcon,
-  SlackIcon,
-  TeamsIcon,
-} from "@/components/icons";
-import { TestNotificationButton } from "@/components/test-notification-button";
+import { createClient } from "@/lib/supabase/server";
 
 type NotificationChannel = {
   id: string;
@@ -100,14 +101,14 @@ export default async function NotificationsPage() {
 
   return (
     <div className="p-4 sm:p-6 lg:p-8">
-      <div className="max-w-4xl mx-auto space-y-8">
+      <div className="mx-auto max-w-4xl space-y-8">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
           <div>
-            <h1 className="text-3xl font-bold gradient-text">
+            <h1 className="gradient-text text-3xl font-bold">
               Notification Channels
             </h1>
-            <p className="text-muted-foreground mt-1">
+            <p className="mt-1 text-muted-foreground">
               Configure how you receive alerts when monitors go down
             </p>
           </div>
@@ -158,7 +159,7 @@ export default async function NotificationsPage() {
                       <a
                         href={item.link}
                         target="_blank"
-                        className="text-blue-500 hover:underline inline-flex items-center gap-1"
+                        className="inline-flex items-center gap-1 text-blue-500 hover:underline"
                       >
                         @BotFather
                         <ExternalLink className="h-3 w-3" />
@@ -184,37 +185,37 @@ export default async function NotificationsPage() {
               return (
                 <Card
                   key={channel.id}
-                  className="glass-card hover:shadow-md transition-shadow"
+                  className="glass-card transition-shadow hover:shadow-md"
                 >
                   <CardContent className="flex flex-col gap-4 p-5">
                     <div className="flex items-start justify-between">
                       <div
-                        className={`p-3 rounded-xl ${config.bg} transition-colors`}
+                        className={`rounded-xl p-3 ${config.bg} transition-colors`}
                       >
                         <Icon className={`h-6 w-6 ${config.color}`} />
                       </div>
                       <span
-                        className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium border ${
+                        className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium ${
                           channel.active
-                            ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
-                            : "bg-muted text-muted-foreground border-border"
+                            ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-500"
+                            : "border-border bg-muted text-muted-foreground"
                         }`}
                       >
                         {channel.active && (
-                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                          <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
                         )}
                         {channel.active ? "Active" : "Paused"}
                       </span>
                     </div>
 
                     <div>
-                      <h3 className="font-semibold text-lg">{channel.name}</h3>
+                      <h3 className="text-lg font-semibold">{channel.name}</h3>
                       <p className="text-sm text-muted-foreground">
                         {config.label}
                       </p>
                     </div>
 
-                    <div className="flex items-center gap-2 mt-auto pt-2">
+                    <div className="mt-auto flex items-center gap-2 pt-2">
                       <TestNotificationButton channelId={channel.id} />
                       <Link
                         href={`/dashboard/notifications/${channel.id}/edit`}
@@ -233,13 +234,13 @@ export default async function NotificationsPage() {
         ) : (
           <Card className="glass-card border-dashed">
             <CardContent className="flex flex-col items-center justify-center py-16">
-              <div className="p-4 bg-primary/10 rounded-2xl mb-4">
+              <div className="mb-4 rounded-2xl bg-primary/10 p-4">
                 <Bell className="h-12 w-12 text-primary" />
               </div>
-              <h3 className="text-xl font-semibold mb-2">
+              <h3 className="mb-2 text-xl font-semibold">
                 No notification channels
               </h3>
-              <p className="text-muted-foreground mb-6 text-center max-w-md">
+              <p className="mb-6 max-w-md text-center text-muted-foreground">
                 Add a notification channel to receive alerts when your monitors
                 go down.
               </p>

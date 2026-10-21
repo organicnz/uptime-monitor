@@ -1,8 +1,11 @@
 "use client";
 
+import { AlertTriangle, Loader2 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useState, useTransition } from "react";
+import { toast } from "sonner";
+
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Card,
   CardContent,
@@ -10,6 +13,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -17,10 +22,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
-import { toast } from "sonner";
-import { Loader2, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type Monitor = {
@@ -137,7 +138,7 @@ export function IncidentForm({
               name="content"
               defaultValue={incident?.content || ""}
               placeholder="Detailed information about the incident, what's affected, and expected resolution..."
-              className="flex min-h-[120px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              className="flex min-h-[120px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
             />
           </div>
 
@@ -151,10 +152,10 @@ export function IncidentForm({
                   type="button"
                   onClick={() => setStatus(option.value)}
                   className={cn(
-                    "px-4 py-2 rounded-lg border text-sm font-medium transition-colors",
+                    "rounded-lg border px-4 py-2 text-sm font-medium transition-colors",
                     status === option.value
                       ? "border-primary bg-primary/10 text-primary"
-                      : "border-border bg-muted/30 hover:bg-muted/50 text-muted-foreground",
+                      : "border-border bg-muted/30 text-muted-foreground hover:bg-muted/50",
                   )}
                 >
                   <span className={status === option.value ? option.color : ""}>

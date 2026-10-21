@@ -1,19 +1,3 @@
-# Daily heartbeat retention.
-#
-# Rolls full UTC days older than HEARTBEAT_RAW_RETENTION_DAYS into
-# heartbeat_daily and prunes the raw rows they came from, by calling
-# POST /api/cron/cleanup (auth: CRON_SECRET bearer, same as check-monitors).
-#
-# This is not optional housekeeping: the 30d/90d uptime reports read raw
-# rows only for the last HEARTBEAT_RAW_RETENTION_DAYS and older days from
-# heartbeat_daily. If this job never runs, those reports silently cover
-# only the raw window while labelling it with the full period.
-#
-# Required repository variable: SITE_URL (the app's public URL, no secret).
-# Required repository secret: CRON_SECRET.
-#
-# Notes: scheduled runs only fire from the default branch, and GitHub pauses
-# them after 60 days of repository inactivity. Use "Run workflow" to backfill.
 name: Retention cleanup
 
 on:

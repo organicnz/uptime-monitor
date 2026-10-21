@@ -724,12 +724,10 @@ fn check_deps(old_head: &str, new_head: &str) -> Result<CheckResult> {
     let diff = String::from_utf8(output.stdout)?;
 
     if diff.lines().any(|l| {
-        l.contains("package-lock.json")
-            || l.contains("yarn.lock")
-            || l.contains("pnpm-lock.yaml")
+        l.contains("bun.lock")
     }) {
         println!("{}", "⚠️  Dependencies changed!".yellow());
-        println!("Run 'npm install' or 'yarn' to update your local dependencies.");
+        println!("Run 'bun install' to update your local dependencies.");
     }
 
     Ok(result)
@@ -746,12 +744,10 @@ fn remind_deps() -> Result<CheckResult> {
     let diff = String::from_utf8(output.stdout)?;
 
     if diff.lines().any(|l| {
-        l.contains("package-lock.json")
-            || l.contains("yarn.lock")
-            || l.contains("pnpm-lock.yaml")
+        l.contains("bun.lock")
     }) {
         println!("{}", "⚠️  Dependencies changed!".yellow());
-        println!("Run 'npm install' or 'yarn' to update your local dependencies.");
+        println!("Run 'bun install' to update your local dependencies.");
     }
 
     Ok(result)
@@ -781,7 +777,7 @@ fn vercel_cleanup(delete: bool, errors_only: bool) -> Result<CheckResult> {
 
     if vercel_check.is_err() || !vercel_check.unwrap().status.success() {
         println!("{}", "Error: Vercel CLI not found".red());
-        println!("Install with: npm i -g vercel");
+        println!("Install with: bun add -g vercel");
         result.add_violation(Violation {
             file: String::new(),
             line: None,

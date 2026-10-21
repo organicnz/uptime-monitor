@@ -415,7 +415,7 @@ export async function sendWebhookNotification(
 ): Promise<SendResult> {
   const method = config.method || "POST";
   const headers = {
-    ...(method === "POST" ? { "Content-Type": "application/json" } : {}),
+    ...(method === "POST" && { "Content-Type": "application/json" }),
     ...config.headers,
   };
 
@@ -423,7 +423,7 @@ export async function sendWebhookNotification(
     const response = await send(config.url, {
       method,
       headers,
-      ...(method === "GET" ? {} : { body: JSON.stringify(payload) }),
+      ...(method !== "GET" && { body: JSON.stringify(payload) }),
     });
 
     return response.ok
@@ -483,6 +483,9 @@ export async function sendNotification(
         error: "Email notifications not yet implemented",
       };
     default:
-      return { success: false, error: `Unknown notification type: ${type}` };
+      return {
+        success: false,
+        error: `Unknown notification type: ${String(type)}`,
+      };
   }
 }

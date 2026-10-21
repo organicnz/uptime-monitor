@@ -1,9 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { createClient } from "@/lib/supabase/server";
 import { notFound, redirect } from "next/navigation";
-import { StatusPageForm } from "@/components/status-page-form";
 
-import { StatusPage } from "@/types/application";
+import { StatusPageForm } from "@/components/status-page-form";
+import { createClient } from "@/lib/supabase/server";
 
 export default async function EditStatusPage({
   params,
@@ -33,9 +32,6 @@ export default async function EditStatusPage({
     notFound();
   }
 
-  // Cast to defined type since Supabase types might be loosely defined in this context
-  const typedStatusPage = statusPage as unknown as StatusPage;
-
   // 2. Fetch Linked Monitors
   const { data: linkedMonitors } = await supabase
     .from("status_page_monitors")
@@ -52,16 +48,16 @@ export default async function EditStatusPage({
 
   // Format initial data
   const initialData = {
-    id: typedStatusPage.id,
-    title: typedStatusPage.title,
-    slug: typedStatusPage.slug,
-    description: typedStatusPage.description,
-    is_public: typedStatusPage.is_public,
+    id: statusPage.id,
+    title: statusPage.title,
+    slug: statusPage.slug,
+    description: statusPage.description,
+    is_public: statusPage.is_public,
     monitors: linkedMonitors || [],
   };
 
   return (
-    <div className="max-w-5xl mx-auto">
+    <div className="mx-auto max-w-5xl">
       <StatusPageForm
         monitors={(allMonitors as any[]) || []}
         initialData={initialData}

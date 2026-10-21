@@ -1,18 +1,19 @@
 import { track } from "@vercel/analytics/server";
-import { fetchWithSsrfProtection, resolveAndValidateUrl } from "@/lib/security";
-import { createServiceClient } from "@/lib/supabase/service";
+
 import { resolveChannelConfigs } from "@/lib/notification-channels";
 import type {
   NotificationConfig,
   NotificationType,
 } from "@/lib/notification-types";
+import { fetchWithSsrfProtection, resolveAndValidateUrl } from "@/lib/security";
+import { createServiceClient } from "@/lib/supabase/service";
 
 import {
-  sendNotification as sendSharedNotification,
-  withRetry,
   type NotificationPayload,
   type NotificationTransport,
+  sendNotification as sendSharedNotification,
   type SendResult,
+  withRetry,
 } from "../supabase/functions/_shared/senders";
 
 export type { NotificationPayload };
@@ -38,20 +39,161 @@ type NotificationChannel = {
 };
 
 /**
+ * The rows this module reads.
+ *
+ * A narrow port, for the same reason as the channel store: `mock.module` in
+ * Bun is process-wide, so a test that replaced one would silently change
+ * what every other test file sees.
+ */
+export type NotificationStore = {
+  /** The owner of a monitor. */
+  monitorOwner(
+    monitorId: string,
+  ): Promise<{ userId: string | null; error: string | null }>;
+
+  /** The channels linked to a monitor. */
+  linkedChannelIds(
+    monitorId: string,
+  ): Promise<{ ids: string[]; error: string | null }>;
+
+  /** The user's active channels, among a set of ids. */
+  channelsByIds(
+    userId: string,
+    ids: string[],
+  ): Promise<{ channels: NotificationChannel[]; error: string | null }>;
+
+  /** The user's default active channel. */
+  defaultChannels(
+    userId: string,
+  ): Promise<{ channels: NotificationChannel[]; error: string | null }>;
+
+  /** Every active channel the user has. */
+  allActiveChannels(
+    userId: string,
+  ): Promise<{ channels: NotificationChannel[]; error: string | null }>;
+};
+
+const CHANNEL_COLUMNS = "id, user_id, name, type, config, active";
+
+function createSupabaseStore(): NotificationStore {
+  return {
+    async monitorOwner(monitorId) {
+      const supabase = createServiceClient();
+      const { data, error } = await supabase
+        .from("monitors")
+        .select("user_id")
+        .eq("id", monitorId)
+        .maybeSingle();
+
+      if (error) return { userId: null, error: error.message };
+      return { userId: data?.user_id ?? null, error: null };
+    },
+
+    async linkedChannelIds(monitorId) {
+      const supabase = createServiceClient();
+      const { data, error } = await supabase
+        .from("monitor_notifications")
+        .select("channel_id")
+        .eq("monitor_id", monitorId);
+
+      if (error) return { ids: [], error: error.message };
+      return {
+        ids: (data ?? []).map((link) => link.channel_id),
+        error: null,
+      };
+    },
+
+    async channelsByIds(userId, ids) {
+      const supabase = createServiceClient();
+      const { data, error } = await supabase
+        .from("notification_channels")
+        .select(CHANNEL_COLUMNS)
+        .in("id", ids)
+        .eq("user_id", userId)
+        .eq("active", true);
+
+      if (error) return { channels: [], error: error.message };
+      return {
+        channels: (data ?? []) as unknown as NotificationChannel[],
+        error: null,
+      };
+    },
+
+    async defaultChannels(userId) {
+      const supabase = createServiceClient();
+      const { data, error } = await supabase
+        .from("notification_channels")
+        .select(CHANNEL_COLUMNS)
+        .eq("user_id", userId)
+        .eq("active", true)
+        .eq("is_default", true);
+
+      if (error) return { channels: [], error: error.message };
+      return {
+        channels: (data ?? []) as unknown as NotificationChannel[],
+        error: null,
+      };
+    },
+
+    async allActiveChannels(userId) {
+      const supabase = createServiceClient();
+      const { data, error } = await supabase
+        .from("notification_channels")
+        .select(CHANNEL_COLUMNS)
+        .eq("user_id", userId)
+        .eq("active", true);
+
+      if (error) return { channels: [], error: error.message };
+      return {
+        channels: (data ?? []) as unknown as NotificationChannel[],
+        error: null,
+      };
+    },
+  };
+}
+
+/**
+ * Everything this module reaches for.
+ *
+ * The transport and the URL check are here because the difference between
+ * them is the whole safety story: a fixed-vendor destination is contacted
+ * directly, and a user-supplied one is filtered. A test that cannot tell
+ * the two apart cannot test either.
+ */
+export type NotificationDependencies = {
+  store: NotificationStore;
+  /** Resolve the full config a sender needs, in one batch. */
+  resolveConfigs: typeof resolveChannelConfigs;
+  /** The plain transport, for a fixed-vendor destination. */
+  fetch: (url: string, init: RequestInit) => Promise<Response>;
+  /** The SSRF-protected transport, for a user-supplied destination. */
+  ssrfFetch: typeof fetchWithSsrfProtection;
+  /** Validate a destination before it is contacted. */
+  validateUrl: typeof resolveAndValidateUrl;
+};
+
+export const defaultNotificationDependencies: NotificationDependencies = {
+  store: createSupabaseStore(),
+  resolveConfigs: resolveChannelConfigs,
+  fetch: (url, init) => fetch(url, init),
+  ssrfFetch: fetchWithSsrfProtection,
+  validateUrl: resolveAndValidateUrl,
+};
+
+/**
  * Fixed-vendor endpoints. Their host is part of the integration rather than
  * user input, so they skip the SSRF filter; every user-supplied destination
- * goes through `ssrfProtectedTransport`.
+ * goes through the SSRF-protected transport.
  */
-const directSender = withRetry((url: string, init: RequestInit) =>
-  fetch(url, init),
-);
-const ssrfSender = withRetry(fetchWithSsrfProtection);
-
-/** Only user-supplied destinations are SSRF-filtered. */
-function senderFor(type: NotificationType): NotificationTransport {
-  return type === "telegram" || type === "pushover" || type === "email"
-    ? directSender
-    : ssrfSender;
+function senderFor(
+  type: NotificationType,
+  dependencies: NotificationDependencies,
+): NotificationTransport {
+  const transport =
+    type === "telegram" || type === "pushover" || type === "email"
+      ? dependencies.fetch
+      : dependencies.ssrfFetch;
+  return withRetry(transport);
 }
 
 function safeTrack(event: string, props?: Parameters<typeof track>[1]) {
@@ -66,9 +208,12 @@ function safeTrack(event: string, props?: Parameters<typeof track>[1]) {
   }
 }
 
-async function validateOutboundUrl(url: string): Promise<SendResult | null> {
+async function validateOutboundUrl(
+  url: string,
+  dependencies: NotificationDependencies,
+): Promise<SendResult | null> {
   try {
-    await resolveAndValidateUrl(url);
+    await dependencies.validateUrl(url);
     return null;
   } catch (error) {
     return {
@@ -96,12 +241,13 @@ export async function sendNotification(
   type: NotificationType,
   config: NotificationConfig,
   payload: NotificationPayload,
+  dependencies: NotificationDependencies = defaultNotificationDependencies,
 ): Promise<SendResult> {
   // Validate before sending so a blocked destination is reported as a
   // blocked destination rather than as a generic fetch failure.
   const url = outboundUrlFor(type, config);
   if (url) {
-    const blocked = await validateOutboundUrl(url);
+    const blocked = await validateOutboundUrl(url, dependencies);
     if (blocked) return blocked;
   }
 
@@ -109,7 +255,7 @@ export async function sendNotification(
     type,
     config as unknown as Record<string, unknown>,
     payload,
-    senderFor(type),
+    senderFor(type, dependencies),
   );
 }
 
@@ -143,70 +289,45 @@ export async function notifyMonitor(
   userId: string,
   payload: NotificationPayload,
   deadlineAt?: number,
+  dependencies: NotificationDependencies = defaultNotificationDependencies,
 ): Promise<NotifyOutcome> {
-  const supabase = createServiceClient();
-  const { data: monitor, error: monitorError } = await supabase
-    .from("monitors")
-    .select("user_id")
-    .eq("id", monitorId)
-    .maybeSingle();
+  const { store } = dependencies;
 
-  if (monitorError || !monitor) {
+  const { userId: ownerId, error: monitorError } =
+    await store.monitorOwner(monitorId);
+
+  if (monitorError || !ownerId) {
     return {
       sent: 0,
       failed: 1,
-      errors: [monitorError?.message || "Monitor not found"],
+      errors: [monitorError || "Monitor not found"],
     };
   }
 
-  if (monitor.user_id !== userId) {
+  if (ownerId !== userId) {
     return { sent: 0, failed: 1, errors: ["Monitor ownership mismatch"] };
   }
 
-  const { data: linkedChannels, error: linkError } = await supabase
-    .from("monitor_notifications")
-    .select("channel_id")
-    .eq("monitor_id", monitorId);
+  const { ids: linkedIds, error: linkError } =
+    await store.linkedChannelIds(monitorId);
 
   if (linkError) {
-    return { sent: 0, failed: 1, errors: [linkError.message] };
+    return { sent: 0, failed: 1, errors: [linkError] };
   }
 
-  const linkedIds = ((linkedChannels || []) as { channel_id: string }[]).map(
-    (link) => link.channel_id,
-  );
+  const { channels, error: channelError } =
+    linkedIds.length > 0
+      ? await store.channelsByIds(userId, linkedIds)
+      : await store.defaultChannels(userId);
 
-  let channels: NotificationChannel[] = [];
-  if (linkedIds.length > 0) {
-    const { data: channelData, error: channelError } = await supabase
-      .from("notification_channels")
-      .select("id, user_id, name, type, config, active")
-      .in("id", linkedIds)
-      .eq("user_id", userId)
-      .eq("active", true);
-
-    if (channelError) {
-      return { sent: 0, failed: 1, errors: [channelError.message] };
-    }
-    channels = (channelData || []) as unknown as NotificationChannel[];
-  } else {
-    const { data: channelData, error: defaultError } = await supabase
-      .from("notification_channels")
-      .select("id, user_id, name, type, config, active")
-      .eq("user_id", userId)
-      .eq("active", true)
-      .eq("is_default", true);
-
-    if (defaultError) {
-      return { sent: 0, failed: 1, errors: [defaultError.message] };
-    }
-    channels = (channelData || []) as unknown as NotificationChannel[];
+  if (channelError) {
+    return { sent: 0, failed: 1, errors: [channelError] };
   }
 
   const candidates = channels.slice(0, MAX_CHANNELS_PER_FANOUT);
   // One batched vault read for the whole fan-out: credentials never reach
   // this process's own database queries, and never a response body.
-  const configs = await resolveChannelConfigs(candidates);
+  const configs = await dependencies.resolveConfigs(candidates);
 
   const results: Array<{ channel: string } & SendResult> = [];
   let deadlineExceeded = false;
@@ -230,7 +351,12 @@ export async function notifyMonitor(
       continue;
     }
 
-    const result = await sendNotification(channel.type, config, payload);
+    const result = await sendNotification(
+      channel.type,
+      config,
+      payload,
+      dependencies,
+    );
 
     if (result.success) {
       if (payload.status === "down") {
@@ -255,20 +381,16 @@ export async function notifyMonitor(
 export async function notifyUser(
   userId: string,
   payload: NotificationPayload,
+  dependencies: NotificationDependencies = defaultNotificationDependencies,
 ): Promise<NotifyOutcome> {
-  const supabase = createServiceClient();
-  const { data: channelsData, error } = await supabase
-    .from("notification_channels")
-    .select("id, user_id, name, type, config, active")
-    .eq("user_id", userId)
-    .eq("active", true);
+  const { channels, error } =
+    await dependencies.store.allActiveChannels(userId);
 
   if (error) {
-    return { sent: 0, failed: 1, errors: [error.message] };
+    return { sent: 0, failed: 1, errors: [error] };
   }
 
-  const channels = (channelsData || []) as unknown as NotificationChannel[];
-  const configs = await resolveChannelConfigs(channels);
+  const configs = await dependencies.resolveConfigs(channels);
   const results: Array<{ channel: string } & SendResult> = [];
 
   for (const channel of channels) {
@@ -281,7 +403,12 @@ export async function notifyUser(
       });
       continue;
     }
-    const result = await sendNotification(channel.type, config, payload);
+    const result = await sendNotification(
+      channel.type,
+      config,
+      payload,
+      dependencies,
+    );
     results.push({ channel: channel.name, ...result });
   }
 

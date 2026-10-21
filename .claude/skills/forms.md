@@ -6,11 +6,12 @@
 "use client";
 
 import { useState } from "react";
-import { createClient } from "@/lib/supabase/client";
+import { toast } from "sonner";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { toast } from "sonner";
+import { createClient } from "@/lib/supabase/client";
 
 export function MonitorForm() {
   const [name, setName] = useState("");
@@ -58,10 +59,11 @@ export function MonitorForm() {
 // lib/actions/monitors.ts
 "use server";
 
-import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
+
+import { createClient } from "@/lib/supabase/server";
 
 const schema = z.object({
   name: z.string().min(1),
@@ -100,7 +102,7 @@ export async function createMonitor(formData: FormData) {
 ```tsx
 {
   error && (
-    <div className="p-3 rounded-md bg-red-500/20 text-red-400 flex items-center gap-2">
+    <div className="flex items-center gap-2 rounded-md bg-red-500/20 p-3 text-red-400">
       <AlertCircle className="h-4 w-4" />
       {error}
     </div>

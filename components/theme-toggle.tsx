@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useSyncExternalStore } from "react";
 import { Moon, Sun } from "lucide-react";
+import { useState, useSyncExternalStore } from "react";
+
 import { Button } from "@/components/ui/button";
 
 function getThemeFromStorage(): "light" | "dark" {

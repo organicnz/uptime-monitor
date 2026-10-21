@@ -30,7 +30,7 @@ type WebhookConfig = {
 
 ```typescript
 // lib/notifications.ts
-import { sendTelegram, sendDiscord, sendSlack } from "@/lib/notifications";
+import { sendDiscord, sendSlack, sendTelegram } from "@/lib/notifications";
 
 async function notifyChannel(channel: NotificationChannel, message: string) {
   switch (channel.type) {

@@ -1,7 +1,22 @@
 "use client";
 
-import { useState, useEffect, use } from "react";
+import {
+  AlertCircle,
+  ArrowLeft,
+  Bell,
+  CheckCircle2,
+  Loader2,
+  Mail,
+  MessageCircle,
+  ShieldCheck,
+  Trash2,
+  Webhook,
+} from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { use, useEffect, useState } from "react";
+import { toast } from "sonner";
+
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -14,33 +29,41 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import {
-  ArrowLeft,
-  Trash2,
-  MessageCircle,
-  Mail,
-  Webhook,
-  Loader2,
-  CheckCircle2,
-  AlertCircle,
-  Bell,
-  ShieldCheck,
-} from "lucide-react";
-import Link from "next/link";
-import { toast } from "sonner";
-import { splitChannelConfig } from "@/lib/notification-types";
-
-type ChannelType =
-  "telegram" | "discord" | "slack" | "webhook" | "email" | "teams" | "pushover";
+  ChannelDeleteResponseSchema,
+  ChannelResponseSchema,
+  ChannelViewResponseSchema,
+  fetchJson,
+  NotificationTestResponseSchema,
+} from "@/lib/api-client";
+import {
+  type NotificationType,
+  splitChannelConfig,
+} from "@/lib/notification-types";
 
 type NotificationChannel = {
   id: string;
   name: string;
-  type: ChannelType;
-  config: Record<string, string>;
+  type: NotificationType;
+  config: Record<string, unknown>;
   active: boolean;
   is_default: boolean;
   has_secret: boolean;
 };
+
+/**
+ * A config value as the text input shows it.
+ *
+ * The config on the wire is `Record<string, unknown>`, so a value that is
+ * not text is not text — showing `42` is right, showing
+ * `[object Object]` is not.
+ */
+function asText(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean") {
+    return String(value);
+  }
+  return "";
+}
 
 const SECRET_PLACEHOLDER = "••••••••••••";
 
@@ -57,7 +80,7 @@ const typeConfig = {
 /** Credential fields per type, and how to label them. */
 type FieldDef = { key: string; label: string; hint?: string; type?: string };
 
-const secretFields: Record<ChannelType, FieldDef[]> = {
+const secretFields: Record<NotificationType, FieldDef[]> = {
   telegram: [
     {
       key: "bot_token",
@@ -83,7 +106,7 @@ const secretFields: Record<ChannelType, FieldDef[]> = {
 };
 
 /** Non-credential fields that stay in the `config` column. */
-const publicFields: Record<ChannelType, FieldDef[]> = {
+const publicFields: Record<NotificationType, FieldDef[]> = {
   telegram: [
     { key: "chat_id", label: "Chat ID", hint: "Your user ID or group chat ID" },
   ],
@@ -120,23 +143,17 @@ export default function EditNotificationPage(props: {
   useEffect(() => {
     const loadChannel = async () => {
       try {
-        const response = await fetch(
+        const body = await fetchJson(
           `/api/notifications/channels?id=${encodeURIComponent(params.id)}`,
+          ChannelViewResponseSchema,
         );
-        if (!response.ok) throw new Error("Channel not found");
-
-        const body = (await response.json()) as {
-          channel?: NotificationChannel;
-        };
-        if (!body.channel) throw new Error("Channel not found");
-
         const loaded = body.channel;
         setChannel(loaded);
 
         const config = loaded.config || {};
         const publicValues: Record<string, string> = {};
         for (const field of publicFields[loaded.type] ?? []) {
-          publicValues[field.key] = config[field.key] ?? "";
+          publicValues[field.key] = asText(config[field.key]);
         }
         setPublicForm(publicValues);
         setFormData({
@@ -151,7 +168,7 @@ export default function EditNotificationPage(props: {
       }
     };
 
-    loadChannel();
+    void loadChannel();
   }, [params.id]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -167,9 +184,9 @@ export default function EditNotificationPage(props: {
       const { config, secret } = splitChannelConfig(channel.type, {
         ...publicForm,
         ...secretForm,
-      } as Record<string, unknown>);
+      });
 
-      const response = await fetch("/api/notifications/channels", {
+      await fetchJson("/api/notifications/channels", ChannelResponseSchema, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -181,11 +198,6 @@ export default function EditNotificationPage(props: {
           secret,
         }),
       });
-
-      if (!response.ok) {
-        const body = (await response.json()) as { error?: string };
-        throw new Error(body.error || "Failed to update channel");
-      }
 
       setSuccess(true);
       toast.success("Channel updated successfully");
@@ -209,15 +221,11 @@ export default function EditNotificationPage(props: {
     setError(null);
 
     try {
-      const response = await fetch(
+      await fetchJson(
         `/api/notifications/channels?id=${encodeURIComponent(params.id)}`,
+        ChannelDeleteResponseSchema,
         { method: "DELETE" },
       );
-
-      if (!response.ok) {
-        const body = (await response.json()) as { error?: string };
-        throw new Error(body.error || "Failed to delete channel");
-      }
 
       toast.success("Channel deleted");
       router.push("/dashboard/notifications");
@@ -229,28 +237,33 @@ export default function EditNotificationPage(props: {
 
   const handleTest = async () => {
     try {
-      const response = await fetch("/api/notifications/test", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ channelId: params.id }),
-      });
-      const data = await response.json();
+      const data = await fetchJson(
+        "/api/notifications/test",
+        NotificationTestResponseSchema,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ channelId: params.id }),
+        },
+      );
 
       if (data.success) {
         toast.success("Test notification sent!");
       } else {
         toast.error(data.error || "Test failed");
       }
-    } catch {
-      toast.error("Failed to send test notification");
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Failed to send test notification",
+      );
     }
   };
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
+      <div className="flex min-h-[60vh] items-center justify-center">
         <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-4" />
+          <Loader2 className="mx-auto mb-4 h-8 w-8 animate-spin text-primary" />
           <p className="text-muted-foreground">Loading channel...</p>
         </div>
       </div>
@@ -259,9 +272,9 @@ export default function EditNotificationPage(props: {
 
   if (!channel) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
+      <div className="flex min-h-[60vh] items-center justify-center">
         <div className="text-center">
-          <AlertCircle className="h-8 w-8 text-destructive mx-auto mb-4" />
+          <AlertCircle className="mx-auto mb-4 h-8 w-8 text-destructive" />
           <p className="text-muted-foreground">Channel not found</p>
           <Link href="/dashboard/notifications">
             <Button variant="outline" className="mt-4">
@@ -278,19 +291,19 @@ export default function EditNotificationPage(props: {
 
   return (
     <div className="p-4 sm:p-6 lg:p-8">
-      <div className="max-w-2xl mx-auto space-y-6">
+      <div className="mx-auto max-w-2xl space-y-6">
         {/* Header */}
         <div>
           <Link
             href="/dashboard/notifications"
-            className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground transition-colors mb-4"
+            className="mb-4 inline-flex items-center text-sm text-muted-foreground transition-colors hover:text-foreground"
           >
-            <ArrowLeft className="h-4 w-4 mr-1" />
+            <ArrowLeft className="mr-1 h-4 w-4" />
             Back to Notifications
           </Link>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-primary/10">
+              <div className="rounded-lg bg-primary/10 p-2">
                 <Icon className="h-5 w-5 text-primary" />
               </div>
               <div>
@@ -304,14 +317,14 @@ export default function EditNotificationPage(props: {
         </div>
 
         {error && (
-          <div className="flex items-center gap-3 bg-destructive/10 border border-destructive/30 text-destructive px-4 py-3 rounded-lg">
+          <div className="flex items-center gap-3 rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-destructive">
             <AlertCircle className="h-5 w-5 flex-shrink-0" />
             {error}
           </div>
         )}
 
         {success && (
-          <div className="flex items-center gap-3 bg-emerald-500/10 border border-emerald-500/30 text-emerald-500 px-4 py-3 rounded-lg">
+          <div className="flex items-center gap-3 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-emerald-500">
             <CheckCircle2 className="h-5 w-5 flex-shrink-0" />
             Channel updated successfully! Redirecting...
           </div>
@@ -363,7 +376,7 @@ export default function EditNotificationPage(props: {
 
               {channel.has_secret && (
                 <div className="flex items-start gap-3 rounded-lg border border-neutral-800 bg-neutral-900/50 px-4 py-3 text-xs text-muted-foreground">
-                  <ShieldCheck className="h-4 w-4 mt-0.5 flex-shrink-0 text-emerald-500" />
+                  <ShieldCheck className="mt-0.5 h-4 w-4 flex-shrink-0 text-emerald-500" />
                   <span>
                     Credentials are encrypted at rest in Supabase Vault and are
                     never sent to this page. Leave a field below empty to keep
@@ -406,7 +419,7 @@ export default function EditNotificationPage(props: {
                 </div>
               ))}
 
-              <div className="flex items-center justify-between pt-4 border-t">
+              <div className="flex items-center justify-between border-t pt-4">
                 <div className="space-y-0.5">
                   <Label htmlFor="active">Active</Label>
                   <p className="text-xs text-muted-foreground">
@@ -448,9 +461,9 @@ export default function EditNotificationPage(props: {
               disabled={deleting}
             >
               {deleting ? (
-                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : (
-                <Trash2 className="h-4 w-4 mr-2" />
+                <Trash2 className="mr-2 h-4 w-4" />
               )}
               Delete Channel
             </Button>
@@ -460,7 +473,7 @@ export default function EditNotificationPage(props: {
                 Test
               </Button>
               <Button type="submit" disabled={saving}>
-                {saving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Save Changes
               </Button>
             </div>

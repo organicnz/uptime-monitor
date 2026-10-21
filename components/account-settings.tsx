@@ -1,16 +1,9 @@
 "use client";
 
+import { Chrome, Github, Lock, Mail, Trash2, User } from "lucide-react";
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { toast } from "sonner";
+
 import {
   AlertDialog,
   AlertDialogAction,
@@ -22,14 +15,23 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button";
 import {
-  updateProfile,
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  deleteAccount,
   updateEmail,
   updatePassword,
-  deleteAccount,
+  updateProfile,
 } from "@/lib/actions/auth";
-import { toast } from "sonner";
-import { User, Mail, Lock, Trash2, Github, Chrome } from "lucide-react";
+
 import { MFASettings } from "./mfa-settings";
 
 type Props = {
@@ -208,7 +210,7 @@ export function AccountSettings({ user }: Props) {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="flex items-center gap-3 p-3 bg-neutral-100 dark:bg-neutral-800 rounded-lg">
+            <div className="flex items-center gap-3 rounded-lg bg-neutral-100 p-3 dark:bg-neutral-800">
               {user.provider === "github" && <Github className="h-5 w-5" />}
               {user.provider === "google" && <Chrome className="h-5 w-5" />}
               <div>

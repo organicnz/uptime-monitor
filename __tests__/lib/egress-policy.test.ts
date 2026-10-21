@@ -1,5 +1,7 @@
 import { describe, expect, it } from "bun:test";
+
 import { isSafeIp } from "@/lib/security";
+
 import {
   BLOCKED_HOSTNAME_SUFFIXES,
   isBlockedHostname,

@@ -1,19 +1,19 @@
 {
-  "gzipBytes": 15278954,
-  "rawBytes": 61213926,
-  "files": 950,
+  "gzipBytes": 14645809,
+  "rawBytes": 58813243,
+  "files": 986,
   "byFile": {
     "BUILD_ID": {
       "raw": 21,
       "gzip": 41
     },
     "app-path-routes-manifest.json": {
-      "raw": 2527,
-      "gzip": 470
+      "raw": 2616,
+      "gzip": 495
     },
     "build-manifest.json": {
       "raw": 721,
-      "gzip": 352
+      "gzip": 351
     },
     "build/chunks/[root-of-the-server]__05i36w1._.js": {
       "raw": 17795,
@@ -108,8 +108,8 @@
       "gzip": 57
     },
     "diagnostics/route-bundle-stats.json": {
-      "raw": 21329,
-      "gzip": 1160
+      "raw": 21961,
+      "gzip": 1192
     },
     "export-marker.json": {
       "raw": 111,
@@ -129,7 +129,7 @@
     },
     "next-server.js.nft.json": {
       "raw": 96872,
-      "gzip": 26173
+      "gzip": 26176
     },
     "node_modules/import-in-the-middle-ac114f323ad7e863/CHANGELOG.md": {
       "raw": 19286,
@@ -236,28 +236,28 @@
       "gzip": 40
     },
     "prerender-manifest.json": {
-      "raw": 8564,
-      "gzip": 917
+      "raw": 9289,
+      "gzip": 941
     },
     "required-server-files.js": {
-      "raw": 17300,
-      "gzip": 4710
+      "raw": 17075,
+      "gzip": 4630
     },
     "required-server-files.json": {
-      "raw": 17271,
-      "gzip": 4691
+      "raw": 17046,
+      "gzip": 4612
     },
     "routes-manifest.json": {
-      "raw": 11165,
-      "gzip": 1845
+      "raw": 11991,
+      "gzip": 1963
     },
     "server/app-paths-manifest.json": {
-      "raw": 3252,
-      "gzip": 483
+      "raw": 3364,
+      "gzip": 508
     },
     "server/app/(auth)/forgot-password/page.js": {
       "raw": 1055,
-      "gzip": 361
+      "gzip": 358
     },
     "server/app/(auth)/forgot-password/page.js.map": {
       "raw": 53,
@@ -265,7 +265,7 @@
     },
     "server/app/(auth)/forgot-password/page.js.nft.json": {
       "raw": 31858,
-      "gzip": 8587
+      "gzip": 8585
     },
     "server/app/(auth)/forgot-password/page/app-paths-manifest.json": {
       "raw": 74,
@@ -273,7 +273,7 @@
     },
     "server/app/(auth)/forgot-password/page/build-manifest.json": {
       "raw": 573,
-      "gzip": 296
+      "gzip": 295
     },
     "server/app/(auth)/forgot-password/page/next-font-manifest.json": {
       "raw": 278,
@@ -288,12 +288,12 @@
       "gzip": 43
     },
     "server/app/(auth)/forgot-password/page_client-reference-manifest.js": {
-      "raw": 7793,
-      "gzip": 1104
+      "raw": 7772,
+      "gzip": 1090
     },
     "server/app/(auth)/login/page.js": {
       "raw": 1123,
-      "gzip": 352
+      "gzip": 349
     },
     "server/app/(auth)/login/page.js.map": {
       "raw": 53,
@@ -301,7 +301,7 @@
     },
     "server/app/(auth)/login/page.js.nft.json": {
       "raw": 32034,
-      "gzip": 8634
+      "gzip": 8631
     },
     "server/app/(auth)/login/page/app-paths-manifest.json": {
       "raw": 54,
@@ -309,7 +309,7 @@
     },
     "server/app/(auth)/login/page/build-manifest.json": {
       "raw": 573,
-      "gzip": 296
+      "gzip": 295
     },
     "server/app/(auth)/login/page/next-font-manifest.json": {
       "raw": 268,
@@ -321,11 +321,11 @@
     },
     "server/app/(auth)/login/page/server-reference-manifest.json": {
       "raw": 328,
-      "gzip": 228
+      "gzip": 227
     },
     "server/app/(auth)/login/page_client-reference-manifest.js": {
-      "raw": 7753,
-      "gzip": 1096
+      "raw": 7732,
+      "gzip": 1081
     },
     "server/app/(auth)/mfa/page.js": {
       "raw": 1031,
@@ -337,7 +337,7 @@
     },
     "server/app/(auth)/mfa/page.js.nft.json": {
       "raw": 31753,
-      "gzip": 8552
+      "gzip": 8548
     },
     "server/app/(auth)/mfa/page/app-paths-manifest.json": {
       "raw": 50,
@@ -345,7 +345,7 @@
     },
     "server/app/(auth)/mfa/page/build-manifest.json": {
       "raw": 573,
-      "gzip": 296
+      "gzip": 295
     },
     "server/app/(auth)/mfa/page/next-font-manifest.json": {
       "raw": 266,
@@ -360,12 +360,12 @@
       "gzip": 43
     },
     "server/app/(auth)/mfa/page_client-reference-manifest.js": {
-      "raw": 7691,
-      "gzip": 1096
+      "raw": 7670,
+      "gzip": 1083
     },
     "server/app/(auth)/reset-password/page.js": {
       "raw": 1053,
-      "gzip": 358
+      "gzip": 356
     },
     "server/app/(auth)/reset-password/page.js.map": {
       "raw": 53,
@@ -373,7 +373,7 @@
     },
     "server/app/(auth)/reset-password/page.js.nft.json": {
       "raw": 31857,
-      "gzip": 8579
+      "gzip": 8582
     },
     "server/app/(auth)/reset-password/page/app-paths-manifest.json": {
       "raw": 72,
@@ -381,7 +381,7 @@
     },
     "server/app/(auth)/reset-password/page/build-manifest.json": {
       "raw": 573,
-      "gzip": 296
+      "gzip": 295
     },
     "server/app/(auth)/reset-password/page/next-font-manifest.json": {
       "raw": 277,
@@ -396,12 +396,12 @@
       "gzip": 43
     },
     "server/app/(auth)/reset-password/page_client-reference-manifest.js": {
-      "raw": 7789,
-      "gzip": 1105
+      "raw": 7768,
+      "gzip": 1091
     },
     "server/app/(auth)/signup/page.js": {
       "raw": 1098,
-      "gzip": 360
+      "gzip": 356
     },
     "server/app/(auth)/signup/page.js.map": {
       "raw": 53,
@@ -409,7 +409,7 @@
     },
     "server/app/(auth)/signup/page.js.nft.json": {
       "raw": 31565,
-      "gzip": 8475
+      "gzip": 8476
     },
     "server/app/(auth)/signup/page/app-paths-manifest.json": {
       "raw": 56,
@@ -417,7 +417,7 @@
     },
     "server/app/(auth)/signup/page/build-manifest.json": {
       "raw": 573,
-      "gzip": 296
+      "gzip": 295
     },
     "server/app/(auth)/signup/page/next-font-manifest.json": {
       "raw": 269,
@@ -432,12 +432,12 @@
       "gzip": 43
     },
     "server/app/(auth)/signup/page_client-reference-manifest.js": {
-      "raw": 6558,
-      "gzip": 968
+      "raw": 6537,
+      "gzip": 954
     },
     "server/app/(dashboard)/dashboard/incidents/[id]/edit/page.js": {
       "raw": 1264,
-      "gzip": 379
+      "gzip": 377
     },
     "server/app/(dashboard)/dashboard/incidents/[id]/edit/page.js.map": {
       "raw": 53,
@@ -445,7 +445,7 @@
     },
     "server/app/(dashboard)/dashboard/incidents/[id]/edit/page.js.nft.json": {
       "raw": 35164,
-      "gzip": 8846
+      "gzip": 8849
     },
     "server/app/(dashboard)/dashboard/incidents/[id]/edit/page/app-paths-manifest.json": {
       "raw": 112,
@@ -453,7 +453,7 @@
     },
     "server/app/(dashboard)/dashboard/incidents/[id]/edit/page/build-manifest.json": {
       "raw": 573,
-      "gzip": 296
+      "gzip": 295
     },
     "server/app/(dashboard)/dashboard/incidents/[id]/edit/page/next-font-manifest.json": {
       "raw": 297,
@@ -465,15 +465,15 @@
     },
     "server/app/(dashboard)/dashboard/incidents/[id]/edit/page/server-reference-manifest.json": {
       "raw": 2058,
-      "gzip": 453
+      "gzip": 459
     },
     "server/app/(dashboard)/dashboard/incidents/[id]/edit/page_client-reference-manifest.js": {
-      "raw": 12032,
-      "gzip": 1419
+      "raw": 12011,
+      "gzip": 1404
     },
     "server/app/(dashboard)/dashboard/incidents/new/page.js": {
       "raw": 1196,
-      "gzip": 368
+      "gzip": 366
     },
     "server/app/(dashboard)/dashboard/incidents/new/page.js.map": {
       "raw": 53,
@@ -481,7 +481,7 @@
     },
     "server/app/(dashboard)/dashboard/incidents/new/page.js.nft.json": {
       "raw": 34109,
-      "gzip": 8777
+      "gzip": 8776
     },
     "server/app/(dashboard)/dashboard/incidents/new/page/app-paths-manifest.json": {
       "raw": 100,
@@ -489,7 +489,7 @@
     },
     "server/app/(dashboard)/dashboard/incidents/new/page/build-manifest.json": {
       "raw": 573,
-      "gzip": 296
+      "gzip": 295
     },
     "server/app/(dashboard)/dashboard/incidents/new/page/next-font-manifest.json": {
       "raw": 291,
@@ -501,15 +501,15 @@
     },
     "server/app/(dashboard)/dashboard/incidents/new/page/server-reference-manifest.json": {
       "raw": 1662,
-      "gzip": 410
+      "gzip": 416
     },
     "server/app/(dashboard)/dashboard/incidents/new/page_client-reference-manifest.js": {
-      "raw": 10492,
-      "gzip": 1327
+      "raw": 10471,
+      "gzip": 1312
     },
     "server/app/(dashboard)/dashboard/incidents/page.js": {
       "raw": 1228,
-      "gzip": 372
+      "gzip": 371
     },
     "server/app/(dashboard)/dashboard/incidents/page.js.map": {
       "raw": 53,
@@ -517,7 +517,7 @@
     },
     "server/app/(dashboard)/dashboard/incidents/page.js.nft.json": {
       "raw": 33316,
-      "gzip": 8790
+      "gzip": 8791
     },
     "server/app/(dashboard)/dashboard/incidents/page/app-paths-manifest.json": {
       "raw": 92,
@@ -525,7 +525,7 @@
     },
     "server/app/(dashboard)/dashboard/incidents/page/build-manifest.json": {
       "raw": 573,
-      "gzip": 296
+      "gzip": 295
     },
     "server/app/(dashboard)/dashboard/incidents/page/next-font-manifest.json": {
       "raw": 287,
@@ -537,15 +537,15 @@
     },
     "server/app/(dashboard)/dashboard/incidents/page/server-reference-manifest.json": {
       "raw": 685,
-      "gzip": 306
+      "gzip": 307
     },
     "server/app/(dashboard)/dashboard/incidents/page_client-reference-manifest.js": {
-      "raw": 11589,
-      "gzip": 1369
+      "raw": 11568,
+      "gzip": 1352
     },
     "server/app/(dashboard)/dashboard/maintenance/[id]/edit/page.js": {
       "raw": 1268,
-      "gzip": 379
+      "gzip": 378
     },
     "server/app/(dashboard)/dashboard/maintenance/[id]/edit/page.js.map": {
       "raw": 53,
@@ -553,7 +553,7 @@
     },
     "server/app/(dashboard)/dashboard/maintenance/[id]/edit/page.js.nft.json": {
       "raw": 34926,
-      "gzip": 8767
+      "gzip": 8772
     },
     "server/app/(dashboard)/dashboard/maintenance/[id]/edit/page/app-paths-manifest.json": {
       "raw": 116,
@@ -561,7 +561,7 @@
     },
     "server/app/(dashboard)/dashboard/maintenance/[id]/edit/page/build-manifest.json": {
       "raw": 573,
-      "gzip": 296
+      "gzip": 295
     },
     "server/app/(dashboard)/dashboard/maintenance/[id]/edit/page/next-font-manifest.json": {
       "raw": 299,
@@ -573,11 +573,11 @@
     },
     "server/app/(dashboard)/dashboard/maintenance/[id]/edit/page/server-reference-manifest.json": {
       "raw": 1750,
-      "gzip": 422
+      "gzip": 426
     },
     "server/app/(dashboard)/dashboard/maintenance/[id]/edit/page_client-reference-manifest.js": {
-      "raw": 11300,
-      "gzip": 1349
+      "raw": 11279,
+      "gzip": 1335
     },
     "server/app/(dashboard)/dashboard/maintenance/new/page.js": {
       "raw": 1198,
@@ -589,7 +589,7 @@
     },
     "server/app/(dashboard)/dashboard/maintenance/new/page.js.nft.json": {
       "raw": 33776,
-      "gzip": 8668
+      "gzip": 8666
     },
     "server/app/(dashboard)/dashboard/maintenance/new/page/app-paths-manifest.json": {
       "raw": 104,
@@ -597,7 +597,7 @@
     },
     "server/app/(dashboard)/dashboard/maintenance/new/page/build-manifest.json": {
       "raw": 573,
-      "gzip": 296
+      "gzip": 295
     },
     "server/app/(dashboard)/dashboard/maintenance/new/page/next-font-manifest.json": {
       "raw": 293,
@@ -612,8 +612,8 @@
       "gzip": 381
     },
     "server/app/(dashboard)/dashboard/maintenance/new/page_client-reference-manifest.js": {
-      "raw": 9754,
-      "gzip": 1230
+      "raw": 9733,
+      "gzip": 1216
     },
     "server/app/(dashboard)/dashboard/maintenance/page.js": {
       "raw": 1307,
@@ -625,7 +625,7 @@
     },
     "server/app/(dashboard)/dashboard/maintenance/page.js.nft.json": {
       "raw": 32910,
-      "gzip": 8651
+      "gzip": 8654
     },
     "server/app/(dashboard)/dashboard/maintenance/page/app-paths-manifest.json": {
       "raw": 96,
@@ -633,7 +633,7 @@
     },
     "server/app/(dashboard)/dashboard/maintenance/page/build-manifest.json": {
       "raw": 573,
-      "gzip": 296
+      "gzip": 295
     },
     "server/app/(dashboard)/dashboard/maintenance/page/next-font-manifest.json": {
       "raw": 289,
@@ -648,12 +648,12 @@
       "gzip": 245
     },
     "server/app/(dashboard)/dashboard/maintenance/page_client-reference-manifest.js": {
-      "raw": 8754,
-      "gzip": 1147
+      "raw": 8733,
+      "gzip": 1134
     },
     "server/app/(dashboard)/dashboard/monitors/[id]/edit/page.js": {
       "raw": 1204,
-      "gzip": 371
+      "gzip": 372
     },
     "server/app/(dashboard)/dashboard/monitors/[id]/edit/page.js.map": {
       "raw": 53,
@@ -661,7 +661,7 @@
     },
     "server/app/(dashboard)/dashboard/monitors/[id]/edit/page.js.nft.json": {
       "raw": 35165,
-      "gzip": 8871
+      "gzip": 8874
     },
     "server/app/(dashboard)/dashboard/monitors/[id]/edit/page/app-paths-manifest.json": {
       "raw": 110,
@@ -669,7 +669,7 @@
     },
     "server/app/(dashboard)/dashboard/monitors/[id]/edit/page/build-manifest.json": {
       "raw": 573,
-      "gzip": 296
+      "gzip": 295
     },
     "server/app/(dashboard)/dashboard/monitors/[id]/edit/page/next-font-manifest.json": {
       "raw": 296,
@@ -681,23 +681,23 @@
     },
     "server/app/(dashboard)/dashboard/monitors/[id]/edit/page/server-reference-manifest.json": {
       "raw": 695,
-      "gzip": 312
+      "gzip": 314
     },
     "server/app/(dashboard)/dashboard/monitors/[id]/edit/page_client-reference-manifest.js": {
-      "raw": 10294,
-      "gzip": 1379
+      "raw": 10273,
+      "gzip": 1364
     },
     "server/app/(dashboard)/dashboard/monitors/[id]/page.js": {
       "raw": 1196,
-      "gzip": 367
+      "gzip": 363
     },
     "server/app/(dashboard)/dashboard/monitors/[id]/page.js.map": {
       "raw": 53,
       "gzip": 62
     },
     "server/app/(dashboard)/dashboard/monitors/[id]/page.js.nft.json": {
-      "raw": 34019,
-      "gzip": 8745
+      "raw": 34007,
+      "gzip": 8746
     },
     "server/app/(dashboard)/dashboard/monitors/[id]/page/app-paths-manifest.json": {
       "raw": 100,
@@ -705,7 +705,7 @@
     },
     "server/app/(dashboard)/dashboard/monitors/[id]/page/build-manifest.json": {
       "raw": 573,
-      "gzip": 296
+      "gzip": 295
     },
     "server/app/(dashboard)/dashboard/monitors/[id]/page/next-font-manifest.json": {
       "raw": 291,
@@ -713,19 +713,19 @@
     },
     "server/app/(dashboard)/dashboard/monitors/[id]/page/react-loadable-manifest.json": {
       "raw": 139,
-      "gzip": 123
+      "gzip": 121
     },
     "server/app/(dashboard)/dashboard/monitors/[id]/page/server-reference-manifest.json": {
       "raw": 688,
       "gzip": 310
     },
     "server/app/(dashboard)/dashboard/monitors/[id]/page_client-reference-manifest.js": {
-      "raw": 9978,
-      "gzip": 1296
+      "raw": 9945,
+      "gzip": 1281
     },
     "server/app/(dashboard)/dashboard/monitors/new/page.js": {
       "raw": 1195,
-      "gzip": 364
+      "gzip": 361
     },
     "server/app/(dashboard)/dashboard/monitors/new/page.js.map": {
       "raw": 53,
@@ -733,7 +733,7 @@
     },
     "server/app/(dashboard)/dashboard/monitors/new/page.js.nft.json": {
       "raw": 33699,
-      "gzip": 8637
+      "gzip": 8638
     },
     "server/app/(dashboard)/dashboard/monitors/new/page/app-paths-manifest.json": {
       "raw": 98,
@@ -741,7 +741,7 @@
     },
     "server/app/(dashboard)/dashboard/monitors/new/page/build-manifest.json": {
       "raw": 573,
-      "gzip": 296
+      "gzip": 295
     },
     "server/app/(dashboard)/dashboard/monitors/new/page/next-font-manifest.json": {
       "raw": 290,
@@ -753,15 +753,15 @@
     },
     "server/app/(dashboard)/dashboard/monitors/new/page/server-reference-manifest.json": {
       "raw": 683,
-      "gzip": 307
+      "gzip": 306
     },
     "server/app/(dashboard)/dashboard/monitors/new/page_client-reference-manifest.js": {
-      "raw": 9619,
-      "gzip": 1216
+      "raw": 9598,
+      "gzip": 1203
     },
     "server/app/(dashboard)/dashboard/monitors/page.js": {
       "raw": 1216,
-      "gzip": 387
+      "gzip": 385
     },
     "server/app/(dashboard)/dashboard/monitors/page.js.map": {
       "raw": 53,
@@ -769,7 +769,7 @@
     },
     "server/app/(dashboard)/dashboard/monitors/page.js.nft.json": {
       "raw": 32787,
-      "gzip": 8619
+      "gzip": 8622
     },
     "server/app/(dashboard)/dashboard/monitors/page/app-paths-manifest.json": {
       "raw": 90,
@@ -777,7 +777,7 @@
     },
     "server/app/(dashboard)/dashboard/monitors/page/build-manifest.json": {
       "raw": 573,
-      "gzip": 296
+      "gzip": 295
     },
     "server/app/(dashboard)/dashboard/monitors/page/next-font-manifest.json": {
       "raw": 286,
@@ -789,15 +789,15 @@
     },
     "server/app/(dashboard)/dashboard/monitors/page/server-reference-manifest.json": {
       "raw": 359,
-      "gzip": 244
+      "gzip": 243
     },
     "server/app/(dashboard)/dashboard/monitors/page_client-reference-manifest.js": {
-      "raw": 8387,
-      "gzip": 1133
+      "raw": 8366,
+      "gzip": 1118
     },
     "server/app/(dashboard)/dashboard/notifications/[id]/edit/page.js": {
       "raw": 1242,
-      "gzip": 394
+      "gzip": 393
     },
     "server/app/(dashboard)/dashboard/notifications/[id]/edit/page.js.map": {
       "raw": 53,
@@ -805,7 +805,7 @@
     },
     "server/app/(dashboard)/dashboard/notifications/[id]/edit/page.js.nft.json": {
       "raw": 34602,
-      "gzip": 8699
+      "gzip": 8702
     },
     "server/app/(dashboard)/dashboard/notifications/[id]/edit/page/app-paths-manifest.json": {
       "raw": 120,
@@ -813,7 +813,7 @@
     },
     "server/app/(dashboard)/dashboard/notifications/[id]/edit/page/build-manifest.json": {
       "raw": 573,
-      "gzip": 296
+      "gzip": 295
     },
     "server/app/(dashboard)/dashboard/notifications/[id]/edit/page/next-font-manifest.json": {
       "raw": 301,
@@ -825,15 +825,15 @@
     },
     "server/app/(dashboard)/dashboard/notifications/[id]/edit/page/server-reference-manifest.json": {
       "raw": 373,
-      "gzip": 256
+      "gzip": 257
     },
     "server/app/(dashboard)/dashboard/notifications/[id]/edit/page_client-reference-manifest.js": {
-      "raw": 9697,
-      "gzip": 1234
+      "raw": 9676,
+      "gzip": 1221
     },
     "server/app/(dashboard)/dashboard/notifications/new/page.js": {
       "raw": 1227,
-      "gzip": 390
+      "gzip": 388
     },
     "server/app/(dashboard)/dashboard/notifications/new/page.js.map": {
       "raw": 53,
@@ -841,7 +841,7 @@
     },
     "server/app/(dashboard)/dashboard/notifications/new/page.js.nft.json": {
       "raw": 33688,
-      "gzip": 8658
+      "gzip": 8661
     },
     "server/app/(dashboard)/dashboard/notifications/new/page/app-paths-manifest.json": {
       "raw": 108,
@@ -849,7 +849,7 @@
     },
     "server/app/(dashboard)/dashboard/notifications/new/page/build-manifest.json": {
       "raw": 573,
-      "gzip": 296
+      "gzip": 295
     },
     "server/app/(dashboard)/dashboard/notifications/new/page/next-font-manifest.json": {
       "raw": 295,
@@ -861,15 +861,15 @@
     },
     "server/app/(dashboard)/dashboard/notifications/new/page/server-reference-manifest.json": {
       "raw": 368,
-      "gzip": 250
+      "gzip": 251
     },
     "server/app/(dashboard)/dashboard/notifications/new/page_client-reference-manifest.js": {
-      "raw": 9636,
-      "gzip": 1216
+      "raw": 9615,
+      "gzip": 1201
     },
     "server/app/(dashboard)/dashboard/notifications/page.js": {
       "raw": 1216,
-      "gzip": 382
+      "gzip": 380
     },
     "server/app/(dashboard)/dashboard/notifications/page.js.map": {
       "raw": 53,
@@ -877,7 +877,7 @@
     },
     "server/app/(dashboard)/dashboard/notifications/page.js.nft.json": {
       "raw": 32856,
-      "gzip": 8648
+      "gzip": 8650
     },
     "server/app/(dashboard)/dashboard/notifications/page/app-paths-manifest.json": {
       "raw": 100,
@@ -885,7 +885,7 @@
     },
     "server/app/(dashboard)/dashboard/notifications/page/build-manifest.json": {
       "raw": 573,
-      "gzip": 296
+      "gzip": 295
     },
     "server/app/(dashboard)/dashboard/notifications/page/next-font-manifest.json": {
       "raw": 291,
@@ -897,15 +897,15 @@
     },
     "server/app/(dashboard)/dashboard/notifications/page/server-reference-manifest.json": {
       "raw": 364,
-      "gzip": 247
+      "gzip": 249
     },
     "server/app/(dashboard)/dashboard/notifications/page_client-reference-manifest.js": {
-      "raw": 9688,
-      "gzip": 1222
+      "raw": 9667,
+      "gzip": 1209
     },
     "server/app/(dashboard)/dashboard/page.js": {
       "raw": 1174,
-      "gzip": 356
+      "gzip": 353
     },
     "server/app/(dashboard)/dashboard/page.js.map": {
       "raw": 53,
@@ -913,7 +913,7 @@
     },
     "server/app/(dashboard)/dashboard/page.js.nft.json": {
       "raw": 32744,
-      "gzip": 8884
+      "gzip": 8887
     },
     "server/app/(dashboard)/dashboard/page/app-paths-manifest.json": {
       "raw": 72,
@@ -921,7 +921,7 @@
     },
     "server/app/(dashboard)/dashboard/page/build-manifest.json": {
       "raw": 573,
-      "gzip": 296
+      "gzip": 295
     },
     "server/app/(dashboard)/dashboard/page/next-font-manifest.json": {
       "raw": 277,
@@ -936,12 +936,12 @@
       "gzip": 303
     },
     "server/app/(dashboard)/dashboard/page_client-reference-manifest.js": {
-      "raw": 10337,
-      "gzip": 1383
+      "raw": 10316,
+      "gzip": 1369
     },
     "server/app/(dashboard)/dashboard/settings/page.js": {
       "raw": 1188,
-      "gzip": 363
+      "gzip": 362
     },
     "server/app/(dashboard)/dashboard/settings/page.js.map": {
       "raw": 53,
@@ -949,7 +949,7 @@
     },
     "server/app/(dashboard)/dashboard/settings/page.js.nft.json": {
       "raw": 33518,
-      "gzip": 8859
+      "gzip": 8857
     },
     "server/app/(dashboard)/dashboard/settings/page/app-paths-manifest.json": {
       "raw": 90,
@@ -957,7 +957,7 @@
     },
     "server/app/(dashboard)/dashboard/settings/page/build-manifest.json": {
       "raw": 573,
-      "gzip": 296
+      "gzip": 295
     },
     "server/app/(dashboard)/dashboard/settings/page/next-font-manifest.json": {
       "raw": 286,
@@ -972,12 +972,12 @@
       "gzip": 422
     },
     "server/app/(dashboard)/dashboard/settings/page_client-reference-manifest.js": {
-      "raw": 11815,
-      "gzip": 1445
+      "raw": 11794,
+      "gzip": 1430
     },
     "server/app/(dashboard)/dashboard/status-pages/[id]/page.js": {
       "raw": 1200,
-      "gzip": 371
+      "gzip": 369
     },
     "server/app/(dashboard)/dashboard/status-pages/[id]/page.js.map": {
       "raw": 53,
@@ -985,7 +985,7 @@
     },
     "server/app/(dashboard)/dashboard/status-pages/[id]/page.js.nft.json": {
       "raw": 33984,
-      "gzip": 8733
+      "gzip": 8735
     },
     "server/app/(dashboard)/dashboard/status-pages/[id]/page/app-paths-manifest.json": {
       "raw": 108,
@@ -993,7 +993,7 @@
     },
     "server/app/(dashboard)/dashboard/status-pages/[id]/page/build-manifest.json": {
       "raw": 573,
-      "gzip": 296
+      "gzip": 295
     },
     "server/app/(dashboard)/dashboard/status-pages/[id]/page/next-font-manifest.json": {
       "raw": 295,
@@ -1008,12 +1008,12 @@
       "gzip": 387
     },
     "server/app/(dashboard)/dashboard/status-pages/[id]/page_client-reference-manifest.js": {
-      "raw": 9919,
-      "gzip": 1291
+      "raw": 9898,
+      "gzip": 1277
     },
     "server/app/(dashboard)/dashboard/status-pages/new/page.js": {
       "raw": 1199,
-      "gzip": 370
+      "gzip": 369
     },
     "server/app/(dashboard)/dashboard/status-pages/new/page.js.map": {
       "raw": 53,
@@ -1021,7 +1021,7 @@
     },
     "server/app/(dashboard)/dashboard/status-pages/new/page.js.nft.json": {
       "raw": 33984,
-      "gzip": 8737
+      "gzip": 8736
     },
     "server/app/(dashboard)/dashboard/status-pages/new/page/app-paths-manifest.json": {
       "raw": 106,
@@ -1029,7 +1029,7 @@
     },
     "server/app/(dashboard)/dashboard/status-pages/new/page/build-manifest.json": {
       "raw": 573,
-      "gzip": 296
+      "gzip": 295
     },
     "server/app/(dashboard)/dashboard/status-pages/new/page/next-font-manifest.json": {
       "raw": 294,
@@ -1041,15 +1041,15 @@
     },
     "server/app/(dashboard)/dashboard/status-pages/new/page/server-reference-manifest.json": {
       "raw": 1360,
-      "gzip": 385
+      "gzip": 386
     },
     "server/app/(dashboard)/dashboard/status-pages/new/page_client-reference-manifest.js": {
-      "raw": 9916,
-      "gzip": 1288
+      "raw": 9895,
+      "gzip": 1275
     },
     "server/app/(dashboard)/dashboard/status-pages/page.js": {
       "raw": 1214,
-      "gzip": 384
+      "gzip": 380
     },
     "server/app/(dashboard)/dashboard/status-pages/page.js.map": {
       "raw": 53,
@@ -1065,7 +1065,7 @@
     },
     "server/app/(dashboard)/dashboard/status-pages/page/build-manifest.json": {
       "raw": 573,
-      "gzip": 296
+      "gzip": 295
     },
     "server/app/(dashboard)/dashboard/status-pages/page/next-font-manifest.json": {
       "raw": 290,
@@ -1080,12 +1080,12 @@
       "gzip": 246
     },
     "server/app/(dashboard)/dashboard/status-pages/page_client-reference-manifest.js": {
-      "raw": 8757,
-      "gzip": 1147
+      "raw": 8736,
+      "gzip": 1133
     },
     "server/app/_global-error.html": {
-      "raw": 9472,
-      "gzip": 2712
+      "raw": 9457,
+      "gzip": 2699
     },
     "server/app/_global-error.meta": {
       "raw": 421,
@@ -1093,23 +1093,23 @@
     },
     "server/app/_global-error.rsc": {
       "raw": 4947,
-      "gzip": 1845
+      "gzip": 1844
     },
     "server/app/_global-error.segments/__PAGE__.segment.rsc": {
       "raw": 4652,
-      "gzip": 1788
+      "gzip": 1786
     },
     "server/app/_global-error.segments/_full.segment.rsc": {
       "raw": 4947,
-      "gzip": 1845
+      "gzip": 1844
     },
     "server/app/_global-error.segments/_tree.segment.rsc": {
       "raw": 195,
-      "gzip": 157
+      "gzip": 158
     },
     "server/app/_global-error/page.js": {
       "raw": 642,
-      "gzip": 266
+      "gzip": 265
     },
     "server/app/_global-error/page.js.map": {
       "raw": 53,
@@ -1125,7 +1125,7 @@
     },
     "server/app/_global-error/page/build-manifest.json": {
       "raw": 573,
-      "gzip": 296
+      "gzip": 295
     },
     "server/app/_global-error/page/next-font-manifest.json": {
       "raw": 94,
@@ -1140,12 +1140,12 @@
       "gzip": 43
     },
     "server/app/_global-error/page_client-reference-manifest.js": {
-      "raw": 3921,
-      "gzip": 716
+      "raw": 3900,
+      "gzip": 702
     },
     "server/app/_not-found.html": {
-      "raw": 12326,
-      "gzip": 2966
+      "raw": 12281,
+      "gzip": 2953
     },
     "server/app/_not-found.meta": {
       "raw": 517,
@@ -1153,15 +1153,15 @@
     },
     "server/app/_not-found.rsc": {
       "raw": 7459,
-      "gzip": 1988
+      "gzip": 1987
     },
     "server/app/_not-found.segments/_full.segment.rsc": {
       "raw": 7459,
-      "gzip": 1988
+      "gzip": 1987
     },
     "server/app/_not-found.segments/_not-found/__PAGE__.segment.rsc": {
       "raw": 6254,
-      "gzip": 1922
+      "gzip": 1920
     },
     "server/app/_not-found.segments/_tree.segment.rsc": {
       "raw": 381,
@@ -1169,7 +1169,7 @@
     },
     "server/app/_not-found/page.js": {
       "raw": 909,
-      "gzip": 311
+      "gzip": 310
     },
     "server/app/_not-found/page.js.map": {
       "raw": 53,
@@ -1177,7 +1177,7 @@
     },
     "server/app/_not-found/page.js.nft.json": {
       "raw": 30485,
-      "gzip": 8356
+      "gzip": 8358
     },
     "server/app/_not-found/page/app-paths-manifest.json": {
       "raw": 50,
@@ -1185,7 +1185,7 @@
     },
     "server/app/_not-found/page/build-manifest.json": {
       "raw": 573,
-      "gzip": 296
+      "gzip": 295
     },
     "server/app/_not-found/page/next-font-manifest.json": {
       "raw": 266,
@@ -1200,20 +1200,20 @@
       "gzip": 43
     },
     "server/app/_not-found/page_client-reference-manifest.js": {
-      "raw": 6555,
-      "gzip": 961
+      "raw": 6534,
+      "gzip": 948
     },
     "server/app/api/cron/check-monitors/route.js": {
-      "raw": 744,
-      "gzip": 328
+      "raw": 788,
+      "gzip": 330
     },
     "server/app/api/cron/check-monitors/route.js.map": {
       "raw": 53,
       "gzip": 62
     },
     "server/app/api/cron/check-monitors/route.js.nft.json": {
-      "raw": 17728,
-      "gzip": 4800
+      "raw": 17807,
+      "gzip": 4827
     },
     "server/app/api/cron/check-monitors/route/app-paths-manifest.json": {
       "raw": 78,
@@ -1228,20 +1228,48 @@
       "gzip": 43
     },
     "server/app/api/cron/check-monitors/route_client-reference-manifest.js": {
-      "raw": 330,
-      "gzip": 199
+      "raw": 309,
+      "gzip": 186
+    },
+    "server/app/api/cron/cleanup/route.js": {
+      "raw": 557,
+      "gzip": 268
+    },
+    "server/app/api/cron/cleanup/route.js.map": {
+      "raw": 53,
+      "gzip": 62
+    },
+    "server/app/api/cron/cleanup/route.js.nft.json": {
+      "raw": 17443,
+      "gzip": 4680
+    },
+    "server/app/api/cron/cleanup/route/app-paths-manifest.json": {
+      "raw": 64,
+      "gzip": 63
+    },
+    "server/app/api/cron/cleanup/route/build-manifest.json": {
+      "raw": 255,
+      "gzip": 162
+    },
+    "server/app/api/cron/cleanup/route/server-reference-manifest.json": {
+      "raw": 30,
+      "gzip": 43
+    },
+    "server/app/api/cron/cleanup/route_client-reference-manifest.js": {
+      "raw": 302,
+      "gzip": 180
     },
     "server/app/api/cron/failure-callback/route.js": {
-      "raw": 494,
-      "gzip": 261
+      "raw": 503,
+      "gzip": 257
     },
     "server/app/api/cron/failure-callback/route.js.map": {
       "raw": 53,
       "gzip": 62
     },
     "server/app/api/cron/failure-callback/route.js.nft.json": {
-      "raw": 17303,
-      "gzip": 4636
+      "raw": 17312,
+      "gzip": 4634
     },
     "server/app/api/cron/failure-callback/route/app-paths-manifest.json": {
       "raw": 82,
@@ -1256,8 +1284,8 @@
       "gzip": 43
     },
     "server/app/api/cron/failure-callback/route_client-reference-manifest.js": {
-      "raw": 332,
-      "gzip": 201
+      "raw": 311,
+      "gzip": 187
     },
     "server/app/api/health/route.js": {
       "raw": 416,
@@ -1269,7 +1297,7 @@
     },
     "server/app/api/health/route.js.nft.json": {
       "raw": 16768,
-      "gzip": 4596
+      "gzip": 4597
     },
     "server/app/api/health/route/app-paths-manifest.json": {
       "raw": 52,
@@ -1284,20 +1312,20 @@
       "gzip": 43
     },
     "server/app/api/health/route_client-reference-manifest.js": {
-      "raw": 317,
-      "gzip": 190
+      "raw": 296,
+      "gzip": 177
     },
     "server/app/api/monitors/[id]/check/route.js": {
-      "raw": 665,
-      "gzip": 311
+      "raw": 679,
+      "gzip": 318
     },
     "server/app/api/monitors/[id]/check/route.js.map": {
       "raw": 53,
       "gzip": 62
     },
     "server/app/api/monitors/[id]/check/route.js.nft.json": {
-      "raw": 18026,
-      "gzip": 4753
+      "raw": 18078,
+      "gzip": 4778
     },
     "server/app/api/monitors/[id]/check/route/app-paths-manifest.json": {
       "raw": 78,
@@ -1312,8 +1340,8 @@
       "gzip": 43
     },
     "server/app/api/monitors/[id]/check/route_client-reference-manifest.js": {
-      "raw": 330,
-      "gzip": 200
+      "raw": 309,
+      "gzip": 186
     },
     "server/app/api/notifications/channels/route.js": {
       "raw": 588,
@@ -1325,7 +1353,7 @@
     },
     "server/app/api/notifications/channels/route.js.nft.json": {
       "raw": 17466,
-      "gzip": 4710
+      "gzip": 4714
     },
     "server/app/api/notifications/channels/route/app-paths-manifest.json": {
       "raw": 84,
@@ -1340,20 +1368,20 @@
       "gzip": 43
     },
     "server/app/api/notifications/channels/route_client-reference-manifest.js": {
-      "raw": 333,
-      "gzip": 200
+      "raw": 312,
+      "gzip": 187
     },
     "server/app/api/notifications/test/route.js": {
-      "raw": 638,
-      "gzip": 297
+      "raw": 655,
+      "gzip": 303
     },
     "server/app/api/notifications/test/route.js.map": {
       "raw": 53,
       "gzip": 62
     },
     "server/app/api/notifications/test/route.js.nft.json": {
-      "raw": 17553,
-      "gzip": 4731
+      "raw": 17605,
+      "gzip": 4763
     },
     "server/app/api/notifications/test/route/app-paths-manifest.json": {
       "raw": 76,
@@ -1368,20 +1396,20 @@
       "gzip": 43
     },
     "server/app/api/notifications/test/route_client-reference-manifest.js": {
-      "raw": 329,
-      "gzip": 198
+      "raw": 308,
+      "gzip": 184
     },
     "server/app/api/reports/route.js": {
-      "raw": 557,
-      "gzip": 279
+      "raw": 522,
+      "gzip": 271
     },
     "server/app/api/reports/route.js.map": {
       "raw": 53,
       "gzip": 62
     },
     "server/app/api/reports/route.js.nft.json": {
-      "raw": 17004,
-      "gzip": 4699
+      "raw": 16937,
+      "gzip": 4671
     },
     "server/app/api/reports/route/app-paths-manifest.json": {
       "raw": 54,
@@ -1396,20 +1424,20 @@
       "gzip": 43
     },
     "server/app/api/reports/route_client-reference-manifest.js": {
-      "raw": 318,
-      "gzip": 190
+      "raw": 297,
+      "gzip": 177
     },
     "server/app/api/settings/schedule/route.js": {
-      "raw": 558,
-      "gzip": 274
+      "raw": 567,
+      "gzip": 273
     },
     "server/app/api/settings/schedule/route.js.map": {
       "raw": 53,
       "gzip": 62
     },
     "server/app/api/settings/schedule/route.js.nft.json": {
-      "raw": 17439,
-      "gzip": 4690
+      "raw": 17448,
+      "gzip": 4687
     },
     "server/app/api/settings/schedule/route/app-paths-manifest.json": {
       "raw": 74,
@@ -1424,8 +1452,8 @@
       "gzip": 43
     },
     "server/app/api/settings/schedule/route_client-reference-manifest.js": {
-      "raw": 328,
-      "gzip": 197
+      "raw": 307,
+      "gzip": 183
     },
     "server/app/api/status-pages/[id]/route.js": {
       "raw": 545,
@@ -1437,7 +1465,7 @@
     },
     "server/app/api/status-pages/[id]/route.js.nft.json": {
       "raw": 17391,
-      "gzip": 4676
+      "gzip": 4675
     },
     "server/app/api/status-pages/[id]/route/app-paths-manifest.json": {
       "raw": 74,
@@ -1452,8 +1480,8 @@
       "gzip": 43
     },
     "server/app/api/status-pages/[id]/route_client-reference-manifest.js": {
-      "raw": 328,
-      "gzip": 198
+      "raw": 307,
+      "gzip": 184
     },
     "server/app/api/status-pages/route.js": {
       "raw": 567,
@@ -1465,7 +1493,7 @@
     },
     "server/app/api/status-pages/route.js.nft.json": {
       "raw": 17009,
-      "gzip": 4698
+      "gzip": 4699
     },
     "server/app/api/status-pages/route/app-paths-manifest.json": {
       "raw": 64,
@@ -1480,12 +1508,12 @@
       "gzip": 43
     },
     "server/app/api/status-pages/route_client-reference-manifest.js": {
-      "raw": 323,
-      "gzip": 194
+      "raw": 302,
+      "gzip": 181
     },
     "server/app/auth/auth-code-error.html": {
-      "raw": 17080,
-      "gzip": 4045
+      "raw": 17020,
+      "gzip": 4039
     },
     "server/app/auth/auth-code-error.meta": {
       "raw": 672,
@@ -1493,23 +1521,23 @@
     },
     "server/app/auth/auth-code-error.rsc": {
       "raw": 9978,
-      "gzip": 2909
+      "gzip": 2908
     },
     "server/app/auth/auth-code-error.segments/_full.segment.rsc": {
       "raw": 9978,
-      "gzip": 2909
+      "gzip": 2908
     },
     "server/app/auth/auth-code-error.segments/_tree.segment.rsc": {
       "raw": 684,
-      "gzip": 327
+      "gzip": 328
     },
     "server/app/auth/auth-code-error.segments/auth/auth-code-error/__PAGE__.segment.rsc": {
       "raw": 8404,
-      "gzip": 2712
+      "gzip": 2710
     },
     "server/app/auth/auth-code-error/page.js": {
       "raw": 1054,
-      "gzip": 358
+      "gzip": 355
     },
     "server/app/auth/auth-code-error/page.js.map": {
       "raw": 53,
@@ -1517,7 +1545,7 @@
     },
     "server/app/auth/auth-code-error/page.js.nft.json": {
       "raw": 31668,
-      "gzip": 8491
+      "gzip": 8493
     },
     "server/app/auth/auth-code-error/page/app-paths-manifest.json": {
       "raw": 70,
@@ -1525,7 +1553,7 @@
     },
     "server/app/auth/auth-code-error/page/build-manifest.json": {
       "raw": 573,
-      "gzip": 296
+      "gzip": 295
     },
     "server/app/auth/auth-code-error/page/next-font-manifest.json": {
       "raw": 276,
@@ -1540,8 +1568,8 @@
       "gzip": 43
     },
     "server/app/auth/auth-code-error/page_client-reference-manifest.js": {
-      "raw": 7571,
-      "gzip": 1053
+      "raw": 7550,
+      "gzip": 1040
     },
     "server/app/auth/callback/route.js": {
       "raw": 457,
@@ -1568,8 +1596,8 @@
       "gzip": 43
     },
     "server/app/auth/callback/route_client-reference-manifest.js": {
-      "raw": 320,
-      "gzip": 193
+      "raw": 299,
+      "gzip": 179
     },
     "server/app/auth/confirm/route.js": {
       "raw": 455,
@@ -1581,7 +1609,7 @@
     },
     "server/app/auth/confirm/route.js.nft.json": {
       "raw": 16837,
-      "gzip": 4628
+      "gzip": 4627
     },
     "server/app/auth/confirm/route/app-paths-manifest.json": {
       "raw": 56,
@@ -1596,12 +1624,12 @@
       "gzip": 43
     },
     "server/app/auth/confirm/route_client-reference-manifest.js": {
-      "raw": 319,
-      "gzip": 192
+      "raw": 298,
+      "gzip": 178
     },
     "server/app/auth/verify-email.html": {
-      "raw": 14290,
-      "gzip": 3745
+      "raw": 14215,
+      "gzip": 3739
     },
     "server/app/auth/verify-email.meta": {
       "raw": 660,
@@ -1617,15 +1645,15 @@
     },
     "server/app/auth/verify-email.segments/_tree.segment.rsc": {
       "raw": 681,
-      "gzip": 328
+      "gzip": 330
     },
     "server/app/auth/verify-email.segments/auth/verify-email/__PAGE__.segment.rsc": {
       "raw": 6137,
-      "gzip": 1988
+      "gzip": 1987
     },
     "server/app/auth/verify-email/page.js": {
       "raw": 1070,
-      "gzip": 336
+      "gzip": 333
     },
     "server/app/auth/verify-email/page.js.map": {
       "raw": 53,
@@ -1633,7 +1661,7 @@
     },
     "server/app/auth/verify-email/page.js.nft.json": {
       "raw": 31800,
-      "gzip": 8535
+      "gzip": 8532
     },
     "server/app/auth/verify-email/page/app-paths-manifest.json": {
       "raw": 64,
@@ -1641,7 +1669,7 @@
     },
     "server/app/auth/verify-email/page/build-manifest.json": {
       "raw": 573,
-      "gzip": 296
+      "gzip": 295
     },
     "server/app/auth/verify-email/page/next-font-manifest.json": {
       "raw": 273,
@@ -1653,11 +1681,11 @@
     },
     "server/app/auth/verify-email/page/server-reference-manifest.json": {
       "raw": 341,
-      "gzip": 228
+      "gzip": 230
     },
     "server/app/auth/verify-email/page_client-reference-manifest.js": {
-      "raw": 7632,
-      "gzip": 1069
+      "raw": 7611,
+      "gzip": 1055
     },
     "server/app/favicon.ico.body": {
       "raw": 925,
@@ -1677,7 +1705,7 @@
     },
     "server/app/favicon.ico/route.js.nft.json": {
       "raw": 16144,
-      "gzip": 4503
+      "gzip": 4502
     },
     "server/app/favicon.ico/route/app-paths-manifest.json": {
       "raw": 54,
@@ -1688,8 +1716,8 @@
       "gzip": 162
     },
     "server/app/forgot-password.html": {
-      "raw": 17766,
-      "gzip": 4547
+      "raw": 17676,
+      "gzip": 4538
     },
     "server/app/forgot-password.meta": {
       "raw": 678,
@@ -1697,23 +1725,83 @@
     },
     "server/app/forgot-password.rsc": {
       "raw": 8977,
-      "gzip": 2273
+      "gzip": 2274
     },
     "server/app/forgot-password.segments/!KGF1dGgp/forgot-password/__PAGE__.segment.rsc": {
       "raw": 7275,
-      "gzip": 2104
+      "gzip": 2102
     },
     "server/app/forgot-password.segments/_full.segment.rsc": {
       "raw": 8977,
-      "gzip": 2273
+      "gzip": 2274
     },
     "server/app/forgot-password.segments/_tree.segment.rsc": {
       "raw": 686,
-      "gzip": 334
+      "gzip": 335
+    },
+    "server/app/gpu-fixture.html": {
+      "raw": 9442,
+      "gzip": 2561
+    },
+    "server/app/gpu-fixture.meta": {
+      "raw": 521,
+      "gzip": 254
+    },
+    "server/app/gpu-fixture.rsc": {
+      "raw": 6705,
+      "gzip": 2041
+    },
+    "server/app/gpu-fixture.segments/_full.segment.rsc": {
+      "raw": 6705,
+      "gzip": 2041
+    },
+    "server/app/gpu-fixture.segments/_tree.segment.rsc": {
+      "raw": 609,
+      "gzip": 323
+    },
+    "server/app/gpu-fixture.segments/gpu-fixture/__PAGE__.segment.rsc": {
+      "raw": 5412,
+      "gzip": 1868
+    },
+    "server/app/gpu-fixture/page.js": {
+      "raw": 1031,
+      "gzip": 339
+    },
+    "server/app/gpu-fixture/page.js.map": {
+      "raw": 53,
+      "gzip": 62
+    },
+    "server/app/gpu-fixture/page.js.nft.json": {
+      "raw": 30732,
+      "gzip": 8451
+    },
+    "server/app/gpu-fixture/page/app-paths-manifest.json": {
+      "raw": 52,
+      "gzip": 57
+    },
+    "server/app/gpu-fixture/page/build-manifest.json": {
+      "raw": 573,
+      "gzip": 295
+    },
+    "server/app/gpu-fixture/page/next-font-manifest.json": {
+      "raw": 267,
+      "gzip": 198
+    },
+    "server/app/gpu-fixture/page/react-loadable-manifest.json": {
+      "raw": 274,
+      "gzip": 151
+    },
+    "server/app/gpu-fixture/page/server-reference-manifest.json": {
+      "raw": 30,
+      "gzip": 43
+    },
+    "server/app/gpu-fixture/page_client-reference-manifest.js": {
+      "raw": 8060,
+      "gzip": 1080
     },
     "server/app/index.html": {
-      "raw": 51889,
-      "gzip": 8079
+      "raw": 51829,
+      "gzip": 8074
     },
     "server/app/index.meta": {
       "raw": 362,
@@ -1721,23 +1809,23 @@
     },
     "server/app/index.rsc": {
       "raw": 27667,
-      "gzip": 5500
+      "gzip": 5499
     },
     "server/app/index.segments/__PAGE__.segment.rsc": {
       "raw": 26288,
-      "gzip": 5318
+      "gzip": 5315
     },
     "server/app/index.segments/_full.segment.rsc": {
       "raw": 27667,
-      "gzip": 5500
+      "gzip": 5499
     },
     "server/app/index.segments/_tree.segment.rsc": {
       "raw": 531,
-      "gzip": 306
+      "gzip": 308
     },
     "server/app/login.html": {
-      "raw": 16055,
-      "gzip": 3999
+      "raw": 15965,
+      "gzip": 3993
     },
     "server/app/login.meta": {
       "raw": 638,
@@ -1757,11 +1845,11 @@
     },
     "server/app/login.segments/_tree.segment.rsc": {
       "raw": 676,
-      "gzip": 326
+      "gzip": 328
     },
     "server/app/mfa.html": {
-      "raw": 16380,
-      "gzip": 4142
+      "raw": 16290,
+      "gzip": 4138
     },
     "server/app/mfa.meta": {
       "raw": 630,
@@ -1769,23 +1857,23 @@
     },
     "server/app/mfa.rsc": {
       "raw": 8608,
-      "gzip": 2154
+      "gzip": 2153
     },
     "server/app/mfa.segments/!KGF1dGgp/mfa/__PAGE__.segment.rsc": {
       "raw": 6997,
-      "gzip": 2026
+      "gzip": 2024
     },
     "server/app/mfa.segments/_full.segment.rsc": {
       "raw": 8608,
-      "gzip": 2154
+      "gzip": 2153
     },
     "server/app/mfa.segments/_tree.segment.rsc": {
       "raw": 674,
-      "gzip": 325
+      "gzip": 327
     },
     "server/app/page.js": {
       "raw": 1043,
-      "gzip": 345
+      "gzip": 341
     },
     "server/app/page.js.map": {
       "raw": 53,
@@ -1801,7 +1889,7 @@
     },
     "server/app/page/build-manifest.json": {
       "raw": 573,
-      "gzip": 296
+      "gzip": 295
     },
     "server/app/page/next-font-manifest.json": {
       "raw": 255,
@@ -1816,12 +1904,12 @@
       "gzip": 43
     },
     "server/app/page_client-reference-manifest.js": {
-      "raw": 7508,
-      "gzip": 1041
+      "raw": 7487,
+      "gzip": 1028
     },
     "server/app/reset-password.html": {
-      "raw": 18638,
-      "gzip": 4483
+      "raw": 18548,
+      "gzip": 4476
     },
     "server/app/reset-password.meta": {
       "raw": 674,
@@ -1829,23 +1917,23 @@
     },
     "server/app/reset-password.rsc": {
       "raw": 8975,
-      "gzip": 2270
+      "gzip": 2271
     },
     "server/app/reset-password.segments/!KGF1dGgp/reset-password/__PAGE__.segment.rsc": {
       "raw": 7275,
-      "gzip": 2100
+      "gzip": 2099
     },
     "server/app/reset-password.segments/_full.segment.rsc": {
       "raw": 8975,
-      "gzip": 2270
+      "gzip": 2271
     },
     "server/app/reset-password.segments/_tree.segment.rsc": {
       "raw": 685,
-      "gzip": 332
+      "gzip": 334
     },
     "server/app/signup.html": {
       "raw": 10932,
-      "gzip": 2635
+      "gzip": 2631
     },
     "server/app/signup.meta": {
       "raw": 710,
@@ -1853,23 +1941,23 @@
     },
     "server/app/signup.rsc": {
       "raw": 8118,
-      "gzip": 2125
+      "gzip": 2123
     },
     "server/app/signup.segments/!KGF1dGgp/signup/__PAGE__.segment.rsc": {
       "raw": 6574,
-      "gzip": 1985
+      "gzip": 1982
     },
     "server/app/signup.segments/_full.segment.rsc": {
       "raw": 8118,
-      "gzip": 2125
+      "gzip": 2123
     },
     "server/app/signup.segments/_tree.segment.rsc": {
       "raw": 677,
-      "gzip": 327
+      "gzip": 329
     },
     "server/app/status/[slug]/page.js": {
       "raw": 1077,
-      "gzip": 351
+      "gzip": 349
     },
     "server/app/status/[slug]/page.js.map": {
       "raw": 53,
@@ -1885,7 +1973,7 @@
     },
     "server/app/status/[slug]/page/build-manifest.json": {
       "raw": 573,
-      "gzip": 296
+      "gzip": 295
     },
     "server/app/status/[slug]/page/next-font-manifest.json": {
       "raw": 269,
@@ -1900,8 +1988,8 @@
       "gzip": 43
     },
     "server/app/status/[slug]/page_client-reference-manifest.js": {
-      "raw": 7470,
-      "gzip": 1050
+      "raw": 7449,
+      "gzip": 1036
     },
     "server/chunks/[externals]__02_e4rh._.js": {
       "raw": 1768,
@@ -1919,53 +2007,45 @@
       "raw": 207,
       "gzip": 170
     },
-    "server/chunks/[root-of-the-server]__00vnn94._.js": {
+    "server/chunks/[root-of-the-server]__0aqzmkr._.js": {
       "raw": 8588,
-      "gzip": 2905
+      "gzip": 2906
     },
-    "server/chunks/[root-of-the-server]__00vnn94._.js.map": {
+    "server/chunks/[root-of-the-server]__0aqzmkr._.js.map": {
       "raw": 27795,
       "gzip": 8158
     },
-    "server/chunks/[root-of-the-server]__075-ih9._.js": {
-      "raw": 2302,
-      "gzip": 787
+    "server/chunks/[root-of-the-server]__0dm5kjo._.js": {
+      "raw": 7564,
+      "gzip": 3072
     },
-    "server/chunks/[root-of-the-server]__075-ih9._.js.map": {
-      "raw": 1438,
-      "gzip": 749
+    "server/chunks/[root-of-the-server]__0dm5kjo._.js.map": {
+      "raw": 31123,
+      "gzip": 10782
     },
-    "server/chunks/[root-of-the-server]__07ek2mb._.js": {
-      "raw": 564957,
-      "gzip": 176921
+    "server/chunks/[root-of-the-server]__0ohhnin._.js": {
+      "raw": 17122,
+      "gzip": 5954
     },
-    "server/chunks/[root-of-the-server]__07ek2mb._.js.map": {
-      "raw": 2172798,
-      "gzip": 563630
-    },
-    "server/chunks/[root-of-the-server]__0k1jy9y._.js": {
-      "raw": 10066,
-      "gzip": 3513
-    },
-    "server/chunks/[root-of-the-server]__0k1jy9y._.js.map": {
-      "raw": 31307,
-      "gzip": 9845
-    },
-    "server/chunks/[root-of-the-server]__0q8-rk2._.js": {
-      "raw": 4668,
-      "gzip": 1692
-    },
-    "server/chunks/[root-of-the-server]__0q8-rk2._.js.map": {
-      "raw": 3102,
-      "gzip": 1394
+    "server/chunks/[root-of-the-server]__0ohhnin._.js.map": {
+      "raw": 66770,
+      "gzip": 18198
     },
     "server/chunks/[root-of-the-server]__0rt_x3o._.js": {
-      "raw": 9941,
-      "gzip": 3935
+      "raw": 9698,
+      "gzip": 3905
     },
     "server/chunks/[root-of-the-server]__0rt_x3o._.js.map": {
-      "raw": 38127,
-      "gzip": 12760
+      "raw": 37310,
+      "gzip": 12651
+    },
+    "server/chunks/[root-of-the-server]__0upatnf._.js": {
+      "raw": 2228,
+      "gzip": 774
+    },
+    "server/chunks/[root-of-the-server]__0upatnf._.js.map": {
+      "raw": 1438,
+      "gzip": 750
     },
     "server/chunks/[root-of-the-server]__0vidsce._.js": {
       "raw": 8707,
@@ -1974,14 +2054,6 @@
     "server/chunks/[root-of-the-server]__0vidsce._.js.map": {
       "raw": 33303,
       "gzip": 11427
-    },
-    "server/chunks/[root-of-the-server]__10anc_o._.js": {
-      "raw": 9632,
-      "gzip": 3140
-    },
-    "server/chunks/[root-of-the-server]__10anc_o._.js.map": {
-      "raw": 27794,
-      "gzip": 8159
     },
     "server/chunks/[root-of-the-server]__110uxdr._.js": {
       "raw": 11016,
@@ -1992,12 +2064,12 @@
       "gzip": 13558
     },
     "server/chunks/[root-of-the-server]__14_qotf._.js": {
-      "raw": 445697,
-      "gzip": 120628
+      "raw": 445769,
+      "gzip": 120646
     },
     "server/chunks/[root-of-the-server]__14_qotf._.js.map": {
-      "raw": 2909017,
-      "gzip": 701005
+      "raw": 2909717,
+      "gzip": 701196
     },
     "server/chunks/[root-of-the-server]__14feh-n._.js": {
       "raw": 9717,
@@ -2006,6 +2078,14 @@
     "server/chunks/[root-of-the-server]__14feh-n._.js.map": {
       "raw": 33142,
       "gzip": 12131
+    },
+    "server/chunks/[root-of-the-server]__158c-zu._.js": {
+      "raw": 4575,
+      "gzip": 1655
+    },
+    "server/chunks/[root-of-the-server]__158c-zu._.js.map": {
+      "raw": 2947,
+      "gzip": 1346
     },
     "server/chunks/[root-of-the-server]__19vrhl-._.js": {
       "raw": 187038,
@@ -2023,6 +2103,14 @@
       "raw": 3565,
       "gzip": 1433
     },
+    "server/chunks/[root-of-the-server]__1hwajsd._.js": {
+      "raw": 2175,
+      "gzip": 1173
+    },
+    "server/chunks/[root-of-the-server]__1hwajsd._.js.map": {
+      "raw": 8913,
+      "gzip": 3653
+    },
     "server/chunks/[root-of-the-server]__1jxvevd._.js": {
       "raw": 8679,
       "gzip": 3577
@@ -2031,29 +2119,29 @@
       "raw": 33052,
       "gzip": 11392
     },
-    "server/chunks/[root-of-the-server]__1rjgjef._.js": {
-      "raw": 10732,
-      "gzip": 4290
+    "server/chunks/[root-of-the-server]__1kc1nys._.js": {
+      "raw": 10658,
+      "gzip": 4275
     },
-    "server/chunks/[root-of-the-server]__1rjgjef._.js.map": {
-      "raw": 39427,
-      "gzip": 13452
+    "server/chunks/[root-of-the-server]__1kc1nys._.js.map": {
+      "raw": 39428,
+      "gzip": 13455
     },
-    "server/chunks/[root-of-the-server]__1uvcyxy._.js": {
-      "raw": 17869,
-      "gzip": 6709
+    "server/chunks/[root-of-the-server]__1rcizv-._.js": {
+      "raw": 16120,
+      "gzip": 6418
     },
-    "server/chunks/[root-of-the-server]__1uvcyxy._.js.map": {
-      "raw": 66563,
-      "gzip": 21464
+    "server/chunks/[root-of-the-server]__1rcizv-._.js.map": {
+      "raw": 69612,
+      "gzip": 23174
     },
-    "server/chunks/[root-of-the-server]__1zp8sg5._.js": {
-      "raw": 3923,
-      "gzip": 1662
+    "server/chunks/[root-of-the-server]__1z_afyc._.js": {
+      "raw": 123457,
+      "gzip": 41266
     },
-    "server/chunks/[root-of-the-server]__1zp8sg5._.js.map": {
-      "raw": 10427,
-      "gzip": 4215
+    "server/chunks/[root-of-the-server]__1z_afyc._.js.map": {
+      "raw": 624631,
+      "gzip": 130187
     },
     "server/chunks/[turbopack]_runtime.js": {
       "raw": 32194,
@@ -2080,12 +2168,12 @@
       "gzip": 13892
     },
     "server/chunks/_0kfhfuk._.js": {
-      "raw": 11711,
-      "gzip": 4947
+      "raw": 11582,
+      "gzip": 4904
     },
     "server/chunks/_0kfhfuk._.js.map": {
-      "raw": 50711,
-      "gzip": 16919
+      "raw": 49867,
+      "gzip": 16746
     },
     "server/chunks/_11yum5t._.js": {
       "raw": 36598,
@@ -2103,6 +2191,22 @@
       "raw": 40280,
       "gzip": 12768
     },
+    "server/chunks/_1513jfm._.js": {
+      "raw": 9745,
+      "gzip": 4416
+    },
+    "server/chunks/_1513jfm._.js.map": {
+      "raw": 44182,
+      "gzip": 15424
+    },
+    "server/chunks/_17-p308._.js": {
+      "raw": 15851,
+      "gzip": 5293
+    },
+    "server/chunks/_17-p308._.js.map": {
+      "raw": 85087,
+      "gzip": 21934
+    },
     "server/chunks/_186jrs1._.js": {
       "raw": 13687,
       "gzip": 5067
@@ -2111,13 +2215,13 @@
       "raw": 57894,
       "gzip": 16937
     },
-    "server/chunks/_1t-ihvv._.js": {
-      "raw": 10399,
-      "gzip": 4447
+    "server/chunks/_19-lj8a._.js": {
+      "raw": 9430,
+      "gzip": 4053
     },
-    "server/chunks/_1t-ihvv._.js.map": {
-      "raw": 46651,
-      "gzip": 15500
+    "server/chunks/_19-lj8a._.js.map": {
+      "raw": 40692,
+      "gzip": 13803
     },
     "server/chunks/_next-internal_server_app_api_cron_check-monitors_route_actions_1h82frx.js": {
       "raw": 471,
@@ -2126,6 +2230,14 @@
     "server/chunks/_next-internal_server_app_api_cron_check-monitors_route_actions_1h82frx.js.map": {
       "raw": 207,
       "gzip": 171
+    },
+    "server/chunks/_next-internal_server_app_api_cron_cleanup_route_actions_17pyy6n.js": {
+      "raw": 464,
+      "gzip": 309
+    },
+    "server/chunks/_next-internal_server_app_api_cron_cleanup_route_actions_17pyy6n.js.map": {
+      "raw": 207,
+      "gzip": 170
     },
     "server/chunks/_next-internal_server_app_api_cron_failure-callback_route_actions_0ird47y.js": {
       "raw": 473,
@@ -2223,29 +2335,29 @@
       "raw": 207,
       "gzip": 170
     },
+    "server/chunks/lib_15s3xu3._.js": {
+      "raw": 1313,
+      "gzip": 687
+    },
+    "server/chunks/lib_15s3xu3._.js.map": {
+      "raw": 3564,
+      "gzip": 1434
+    },
     "server/chunks/lib_monitor-checker_ts_145qg-5._.js": {
-      "raw": 14414,
-      "gzip": 4838
+      "raw": 14630,
+      "gzip": 4858
     },
     "server/chunks/lib_monitor-checker_ts_145qg-5._.js.map": {
-      "raw": 60763,
-      "gzip": 16221
+      "raw": 61985,
+      "gzip": 16464
     },
     "server/chunks/node_modules_0j2ikld._.js": {
-      "raw": 1583754,
-      "gzip": 429155
+      "raw": 1583756,
+      "gzip": 429126
     },
     "server/chunks/node_modules_0j2ikld._.js.map": {
-      "raw": 7236861,
-      "gzip": 1711130
-    },
-    "server/chunks/node_modules_1g4ljzm._.js": {
-      "raw": 123370,
-      "gzip": 41228
-    },
-    "server/chunks/node_modules_1g4ljzm._.js.map": {
-      "raw": 624637,
-      "gzip": 130163
+      "raw": 7236792,
+      "gzip": 1710887
     },
     "server/chunks/node_modules_@supabase_supabase-js_dist_index_mjs_0u-n9p7._.js": {
       "raw": 205790,
@@ -2281,27 +2393,27 @@
     },
     "server/chunks/ssr/1oeh_server_app_(dashboard)_dashboard_notifications_new_page_actions_1ehxy3g.js": {
       "raw": 618,
-      "gzip": 422
+      "gzip": 421
     },
     "server/chunks/ssr/1oeh_server_app_(dashboard)_dashboard_notifications_new_page_actions_1ehxy3g.js.map": {
       "raw": 495,
-      "gzip": 361
+      "gzip": 362
     },
     "server/chunks/ssr/1oeh_server_app_(dashboard)_dashboard_notifications_page_actions_1tx2162.js": {
       "raw": 614,
-      "gzip": 418
+      "gzip": 420
     },
     "server/chunks/ssr/1oeh_server_app_(dashboard)_dashboard_notifications_page_actions_1tx2162.js.map": {
       "raw": 491,
-      "gzip": 358
+      "gzip": 359
     },
     "server/chunks/ssr/1oeh_server_app_(dashboard)_dashboard_status-pages_page_actions_0lrv3q4.js": {
       "raw": 611,
-      "gzip": 415
+      "gzip": 416
     },
     "server/chunks/ssr/1oeh_server_app_(dashboard)_dashboard_status-pages_page_actions_0lrv3q4.js.map": {
       "raw": 490,
-      "gzip": 358
+      "gzip": 360
     },
     "server/chunks/ssr/[externals]_node_inspector_0_z8m0y._.js": {
       "raw": 501,
@@ -2310,14 +2422,6 @@
     "server/chunks/ssr/[externals]_node_inspector_0_z8m0y._.js.map": {
       "raw": 207,
       "gzip": 170
-    },
-    "server/chunks/ssr/[root-of-the-server]__054qsnh._.js": {
-      "raw": 8417,
-      "gzip": 3139
-    },
-    "server/chunks/ssr/[root-of-the-server]__054qsnh._.js.map": {
-      "raw": 28786,
-      "gzip": 9169
     },
     "server/chunks/ssr/[root-of-the-server]__08iduik._.js": {
       "raw": 5999,
@@ -2352,20 +2456,12 @@
       "gzip": 2196
     },
     "server/chunks/ssr/[root-of-the-server]__0k4ntja._.js": {
-      "raw": 12649,
-      "gzip": 4725
+      "raw": 12984,
+      "gzip": 4819
     },
     "server/chunks/ssr/[root-of-the-server]__0k4ntja._.js.map": {
-      "raw": 51013,
-      "gzip": 11820
-    },
-    "server/chunks/ssr/[root-of-the-server]__0l9jm-k._.js": {
-      "raw": 5894,
-      "gzip": 2000
-    },
-    "server/chunks/ssr/[root-of-the-server]__0l9jm-k._.js.map": {
-      "raw": 13285,
-      "gzip": 4857
+      "raw": 52345,
+      "gzip": 12044
     },
     "server/chunks/ssr/[root-of-the-server]__0m38hmv._.js": {
       "raw": 4761,
@@ -2391,6 +2487,14 @@
       "raw": 8533,
       "gzip": 2424
     },
+    "server/chunks/ssr/[root-of-the-server]__0xd0ybi._.js": {
+      "raw": 5641,
+      "gzip": 2159
+    },
+    "server/chunks/ssr/[root-of-the-server]__0xd0ybi._.js.map": {
+      "raw": 9534,
+      "gzip": 3264
+    },
     "server/chunks/ssr/[root-of-the-server]__0xppud8._.js": {
       "raw": 5316,
       "gzip": 1872
@@ -2406,6 +2510,14 @@
     "server/chunks/ssr/[root-of-the-server]__0zsmdel._.js.map": {
       "raw": 13192,
       "gzip": 4229
+    },
+    "server/chunks/ssr/[root-of-the-server]__0zwar9p._.js": {
+      "raw": 5894,
+      "gzip": 2000
+    },
+    "server/chunks/ssr/[root-of-the-server]__0zwar9p._.js.map": {
+      "raw": 13285,
+      "gzip": 4857
     },
     "server/chunks/ssr/[root-of-the-server]__169c7v0._.js": {
       "raw": 5243,
@@ -2495,13 +2607,13 @@
       "raw": 39591,
       "gzip": 10232
     },
-    "server/chunks/ssr/[root-of-the-server]__1n0x4wd._.js": {
-      "raw": 11823,
-      "gzip": 3217
+    "server/chunks/ssr/[root-of-the-server]__1mmupzr._.js": {
+      "raw": 8417,
+      "gzip": 3139
     },
-    "server/chunks/ssr/[root-of-the-server]__1n0x4wd._.js.map": {
-      "raw": 26689,
-      "gzip": 8262
+    "server/chunks/ssr/[root-of-the-server]__1mmupzr._.js.map": {
+      "raw": 28786,
+      "gzip": 9169
     },
     "server/chunks/ssr/[root-of-the-server]__1qlvnl6._.js": {
       "raw": 4751,
@@ -2551,6 +2663,14 @@
       "raw": 26470,
       "gzip": 7492
     },
+    "server/chunks/ssr/[root-of-the-server]__1vs8b2_._.js": {
+      "raw": 11823,
+      "gzip": 3217
+    },
+    "server/chunks/ssr/[root-of-the-server]__1vs8b2_._.js.map": {
+      "raw": 26689,
+      "gzip": 8262
+    },
     "server/chunks/ssr/[root-of-the-server]__1wf1van._.js": {
       "raw": 5077,
       "gzip": 1836
@@ -2593,11 +2713,11 @@
     },
     "server/chunks/ssr/_0-kg438._.js": {
       "raw": 6157,
-      "gzip": 2182
+      "gzip": 2186
     },
     "server/chunks/ssr/_0-kg438._.js.map": {
       "raw": 16134,
-      "gzip": 4422
+      "gzip": 4425
     },
     "server/chunks/ssr/_0-o8-_8._.js": {
       "raw": 15452,
@@ -2617,7 +2737,7 @@
     },
     "server/chunks/ssr/_03h4042._.js": {
       "raw": 10526,
-      "gzip": 3284
+      "gzip": 3283
     },
     "server/chunks/ssr/_03h4042._.js.map": {
       "raw": 44094,
@@ -2632,24 +2752,16 @@
       "gzip": 4436
     },
     "server/chunks/ssr/_05n62_s._.js": {
-      "raw": 387463,
-      "gzip": 110544
+      "raw": 387167,
+      "gzip": 110467
     },
     "server/chunks/ssr/_05n62_s._.js.map": {
-      "raw": 2049126,
-      "gzip": 472127
-    },
-    "server/chunks/ssr/_074u3rs._.js": {
-      "raw": 14519,
-      "gzip": 5298
-    },
-    "server/chunks/ssr/_074u3rs._.js.map": {
-      "raw": 89474,
-      "gzip": 20878
+      "raw": 2048455,
+      "gzip": 473785
     },
     "server/chunks/ssr/_07fwr7c._.js": {
       "raw": 5074,
-      "gzip": 1612
+      "gzip": 1615
     },
     "server/chunks/ssr/_07fwr7c._.js.map": {
       "raw": 13486,
@@ -2663,14 +2775,6 @@
       "raw": 69766,
       "gzip": 17168
     },
-    "server/chunks/ssr/_0aaulpx._.js": {
-      "raw": 14519,
-      "gzip": 5298
-    },
-    "server/chunks/ssr/_0aaulpx._.js.map": {
-      "raw": 89474,
-      "gzip": 20878
-    },
     "server/chunks/ssr/_0aepkys._.js": {
       "raw": 3052,
       "gzip": 1524
@@ -2681,11 +2785,19 @@
     },
     "server/chunks/ssr/_0an37rh._.js": {
       "raw": 18353,
-      "gzip": 6113
+      "gzip": 6111
     },
     "server/chunks/ssr/_0an37rh._.js.map": {
       "raw": 67247,
-      "gzip": 17026
+      "gzip": 17024
+    },
+    "server/chunks/ssr/_0b-o2us._.js": {
+      "raw": 14555,
+      "gzip": 5310
+    },
+    "server/chunks/ssr/_0b-o2us._.js.map": {
+      "raw": 89677,
+      "gzip": 21054
     },
     "server/chunks/ssr/_0bk_hsl._.js": {
       "raw": 14170,
@@ -2695,9 +2807,17 @@
       "raw": 61416,
       "gzip": 17187
     },
+    "server/chunks/ssr/_0ce-4z3._.js": {
+      "raw": 10441,
+      "gzip": 3872
+    },
+    "server/chunks/ssr/_0ce-4z3._.js.map": {
+      "raw": 65848,
+      "gzip": 14137
+    },
     "server/chunks/ssr/_0cgc01i._.js": {
       "raw": 8219,
-      "gzip": 3068
+      "gzip": 3066
     },
     "server/chunks/ssr/_0cgc01i._.js.map": {
       "raw": 26237,
@@ -2709,7 +2829,7 @@
     },
     "server/chunks/ssr/_0f7tec6._.js.map": {
       "raw": 26245,
-      "gzip": 7679
+      "gzip": 7682
     },
     "server/chunks/ssr/_0hgsy65._.js": {
       "raw": 15388,
@@ -2768,12 +2888,12 @@
       "gzip": 19257
     },
     "server/chunks/ssr/_0uic-fd._.js": {
-      "raw": 36676,
-      "gzip": 11077
+      "raw": 36608,
+      "gzip": 11038
     },
     "server/chunks/ssr/_0uic-fd._.js.map": {
-      "raw": 149779,
-      "gzip": 36570
+      "raw": 149359,
+      "gzip": 36387
     },
     "server/chunks/ssr/_0v4ck8_._.js": {
       "raw": 4299,
@@ -2793,11 +2913,11 @@
     },
     "server/chunks/ssr/_0z-kt_w._.js": {
       "raw": 5272,
-      "gzip": 1632
+      "gzip": 1635
     },
     "server/chunks/ssr/_0z-kt_w._.js.map": {
       "raw": 13776,
-      "gzip": 2943
+      "gzip": 2944
     },
     "server/chunks/ssr/_0z0b3za._.js": {
       "raw": 7645,
@@ -2813,7 +2933,7 @@
     },
     "server/chunks/ssr/_1-38y-f._.js.map": {
       "raw": 62738,
-      "gzip": 13510
+      "gzip": 13509
     },
     "server/chunks/ssr/_1-m97du._.js": {
       "raw": 1507,
@@ -2828,16 +2948,24 @@
       "gzip": 1636
     },
     "server/chunks/ssr/_1-su2jf._.js.map": {
-      "raw": 14071,
-      "gzip": 5243
+      "raw": 14092,
+      "gzip": 5246
+    },
+    "server/chunks/ssr/_11x9i2c._.js": {
+      "raw": 4352,
+      "gzip": 1764
+    },
+    "server/chunks/ssr/_11x9i2c._.js.map": {
+      "raw": 14849,
+      "gzip": 5451
     },
     "server/chunks/ssr/_125f4u8._.js": {
       "raw": 8219,
-      "gzip": 3069
+      "gzip": 3066
     },
     "server/chunks/ssr/_125f4u8._.js.map": {
       "raw": 26247,
-      "gzip": 7685
+      "gzip": 7686
     },
     "server/chunks/ssr/_12kiysi._.js": {
       "raw": 243487,
@@ -2847,21 +2975,13 @@
       "raw": 1675107,
       "gzip": 388548
     },
-    "server/chunks/ssr/_13-xmm0._.js": {
-      "raw": 10441,
-      "gzip": 3872
-    },
-    "server/chunks/ssr/_13-xmm0._.js.map": {
-      "raw": 65848,
-      "gzip": 14137
-    },
     "server/chunks/ssr/_14-os1w._.js": {
       "raw": 8222,
-      "gzip": 3063
+      "gzip": 3064
     },
     "server/chunks/ssr/_14-os1w._.js.map": {
       "raw": 26227,
-      "gzip": 7669
+      "gzip": 7672
     },
     "server/chunks/ssr/_19a37kk._.js": {
       "raw": 4814,
@@ -2913,27 +3033,27 @@
     },
     "server/chunks/ssr/_1gh5sjm._.js": {
       "raw": 3956,
-      "gzip": 1700
+      "gzip": 1701
     },
     "server/chunks/ssr/_1gh5sjm._.js.map": {
       "raw": 17217,
-      "gzip": 4589
+      "gzip": 4590
     },
     "server/chunks/ssr/_1h0er80._.js": {
       "raw": 4710,
-      "gzip": 1737
+      "gzip": 1736
     },
     "server/chunks/ssr/_1h0er80._.js.map": {
       "raw": 13366,
-      "gzip": 3526
+      "gzip": 3527
     },
     "server/chunks/ssr/_1hsgh77._.js": {
       "raw": 6094,
-      "gzip": 2182
+      "gzip": 2185
     },
     "server/chunks/ssr/_1hsgh77._.js.map": {
       "raw": 16067,
-      "gzip": 4396
+      "gzip": 4389
     },
     "server/chunks/ssr/_1in0s7p._.js": {
       "raw": 9114,
@@ -2942,6 +3062,14 @@
     "server/chunks/ssr/_1in0s7p._.js.map": {
       "raw": 35247,
       "gzip": 9255
+    },
+    "server/chunks/ssr/_1jo5a2f._.js": {
+      "raw": 6717,
+      "gzip": 2660
+    },
+    "server/chunks/ssr/_1jo5a2f._.js.map": {
+      "raw": 39387,
+      "gzip": 8808
     },
     "server/chunks/ssr/_1ku5g3t._.js": {
       "raw": 9922,
@@ -2959,13 +3087,21 @@
       "raw": 94351,
       "gzip": 20187
     },
+    "server/chunks/ssr/_1l0yvad._.js": {
+      "raw": 14555,
+      "gzip": 5310
+    },
+    "server/chunks/ssr/_1l0yvad._.js.map": {
+      "raw": 89677,
+      "gzip": 21054
+    },
     "server/chunks/ssr/_1l35w2-._.js": {
-      "raw": 1591939,
-      "gzip": 432976
+      "raw": 1591941,
+      "gzip": 432950
     },
     "server/chunks/ssr/_1l35w2-._.js.map": {
-      "raw": 7279527,
-      "gzip": 1723446
+      "raw": 7279382,
+      "gzip": 1723311
     },
     "server/chunks/ssr/_1p_czsf._.js": {
       "raw": 397365,
@@ -2977,35 +3113,35 @@
     },
     "server/chunks/ssr/_1plf9y4._.js": {
       "raw": 9669,
-      "gzip": 3895
+      "gzip": 3894
     },
     "server/chunks/ssr/_1plf9y4._.js.map": {
       "raw": 72548,
-      "gzip": 18794
+      "gzip": 18793
     },
     "server/chunks/ssr/_1pmsige._.js": {
       "raw": 7858,
-      "gzip": 2778
+      "gzip": 2781
     },
     "server/chunks/ssr/_1pmsige._.js.map": {
       "raw": 22300,
-      "gzip": 6124
+      "gzip": 6126
     },
     "server/chunks/ssr/_1r4k7cc._.js": {
       "raw": 14347,
-      "gzip": 4541
+      "gzip": 4540
     },
     "server/chunks/ssr/_1r4k7cc._.js.map": {
       "raw": 55527,
-      "gzip": 16029
+      "gzip": 16028
     },
     "server/chunks/ssr/_1se9due._.js": {
       "raw": 6102,
-      "gzip": 2180
+      "gzip": 2184
     },
     "server/chunks/ssr/_1se9due._.js.map": {
       "raw": 16076,
-      "gzip": 4389
+      "gzip": 4388
     },
     "server/chunks/ssr/_1t26b26._.js": {
       "raw": 5232,
@@ -3033,11 +3169,11 @@
     },
     "server/chunks/ssr/_1wevx70._.js": {
       "raw": 8269,
-      "gzip": 2661
+      "gzip": 2666
     },
     "server/chunks/ssr/_1wevx70._.js.map": {
       "raw": 22186,
-      "gzip": 5568
+      "gzip": 5574
     },
     "server/chunks/ssr/_1yncoxy._.js": {
       "raw": 3809,
@@ -3081,11 +3217,11 @@
     },
     "server/chunks/ssr/_next-internal_server_app_(dashboard)_dashboard_maintenance_page_actions_0ayeete.js": {
       "raw": 618,
-      "gzip": 422
+      "gzip": 421
     },
     "server/chunks/ssr/_next-internal_server_app_(dashboard)_dashboard_maintenance_page_actions_0ayeete.js.map": {
       "raw": 489,
-      "gzip": 357
+      "gzip": 356
     },
     "server/chunks/ssr/_next-internal_server_app_(dashboard)_dashboard_monitors_page_actions_17bbi99.js": {
       "raw": 619,
@@ -3093,7 +3229,7 @@
     },
     "server/chunks/ssr/_next-internal_server_app_(dashboard)_dashboard_monitors_page_actions_17bbi99.js.map": {
       "raw": 486,
-      "gzip": 357
+      "gzip": 356
     },
     "server/chunks/ssr/_next-internal_server_app__global-error_page_actions_0zi5s8-.js": {
       "raw": 460,
@@ -3116,6 +3252,14 @@
       "gzip": 310
     },
     "server/chunks/ssr/_next-internal_server_app_auth_auth-code-error_page_actions_0fe28cb.js.map": {
+      "raw": 207,
+      "gzip": 170
+    },
+    "server/chunks/ssr/_next-internal_server_app_gpu-fixture_page_actions_1ocpbuj.js": {
+      "raw": 458,
+      "gzip": 307
+    },
+    "server/chunks/ssr/_next-internal_server_app_gpu-fixture_page_actions_1ocpbuj.js.map": {
       "raw": 207,
       "gzip": 170
     },
@@ -3168,12 +3312,12 @@
       "gzip": 571
     },
     "server/chunks/ssr/components_dashboard-layout_tsx_0vq_tbw._.js": {
-      "raw": 31689,
-      "gzip": 8454
+      "raw": 31713,
+      "gzip": 8465
     },
     "server/chunks/ssr/components_dashboard-layout_tsx_0vq_tbw._.js.map": {
-      "raw": 101261,
-      "gzip": 21735
+      "raw": 101490,
+      "gzip": 21906
     },
     "server/chunks/ssr/components_ui_alert-dialog_tsx_1t09w10._.js": {
       "raw": 9621,
@@ -3254,14 +3398,6 @@
     "server/chunks/ssr/node_modules_1brorzu._.js.map": {
       "raw": 52092,
       "gzip": 14919
-    },
-    "server/chunks/ssr/node_modules_1e6nwxo._.js": {
-      "raw": 6329,
-      "gzip": 2461
-    },
-    "server/chunks/ssr/node_modules_1e6nwxo._.js.map": {
-      "raw": 38610,
-      "gzip": 8518
     },
     "server/chunks/ssr/node_modules_1powdgk._.js": {
       "raw": 5190,
@@ -3399,21 +3535,21 @@
       "raw": 107138,
       "gzip": 26789
     },
-    "server/edge/chunks/[root-of-the-server]__04-edqq._.js": {
-      "raw": 2737,
-      "gzip": 1422
+    "server/edge/chunks/[root-of-the-server]__0nls3-s._.js": {
+      "raw": 2644,
+      "gzip": 1384
     },
-    "server/edge/chunks/[root-of-the-server]__04-edqq._.js.map": {
-      "raw": 6841,
-      "gzip": 2883
+    "server/edge/chunks/[root-of-the-server]__0nls3-s._.js.map": {
+      "raw": 6697,
+      "gzip": 2839
     },
     "server/edge/chunks/_0264s3_._.js": {
-      "raw": 133168,
-      "gzip": 43894
+      "raw": 133178,
+      "gzip": 43867
     },
     "server/edge/chunks/_0264s3_._.js.map": {
-      "raw": 2366717,
-      "gzip": 493178
+      "raw": 2364541,
+      "gzip": 492534
     },
     "server/edge/chunks/node_modules_@sentry_0rbjmy-._.js": {
       "raw": 66710,
@@ -3423,21 +3559,21 @@
       "raw": 436921,
       "gzip": 128088
     },
-    "server/edge/chunks/node_modules_next_dist_esm_build_templates_edge-wrapper_0x09utj.js.map": {
+    "server/edge/chunks/node_modules_next_dist_esm_build_templates_edge-wrapper_05b9t_y.js.map": {
       "raw": 72614,
       "gzip": 22701
     },
-    "server/edge/chunks/turbopack-node_modules_next_dist_esm_build_templates_edge-wrapper_0x09utj.js": {
+    "server/edge/chunks/turbopack-node_modules_next_dist_esm_build_templates_edge-wrapper_05b9t_y.js": {
       "raw": 8631,
-      "gzip": 3469
+      "gzip": 3468
     },
     "server/functions-config-manifest.json": {
-      "raw": 661,
-      "gzip": 340
+      "raw": 690,
+      "gzip": 348
     },
     "server/instrumentation.js": {
       "raw": 228,
-      "gzip": 165
+      "gzip": 167
     },
     "server/instrumentation.js.map": {
       "raw": 53,
@@ -3445,7 +3581,7 @@
     },
     "server/instrumentation.js.nft.json": {
       "raw": 12719,
-      "gzip": 3728
+      "gzip": 3730
     },
     "server/instrumentation/middleware-manifest.json": {
       "raw": 419,
@@ -3457,7 +3593,7 @@
     },
     "server/middleware-build-manifest.js": {
       "raw": 753,
-      "gzip": 378
+      "gzip": 377
     },
     "server/middleware-manifest.json": {
       "raw": 83,
@@ -3480,52 +3616,56 @@
       "gzip": 90
     },
     "server/next-font-manifest.js": {
-      "raw": 5702,
-      "gzip": 446
+      "raw": 5884,
+      "gzip": 457
     },
     "server/next-font-manifest.json": {
-      "raw": 5380,
-      "gzip": 409
+      "raw": 5552,
+      "gzip": 422
     },
     "server/pages-manifest.json": {
       "raw": 58,
       "gzip": 60
     },
     "server/pages/404.html": {
-      "raw": 12326,
-      "gzip": 2966
+      "raw": 12281,
+      "gzip": 2953
     },
     "server/pages/500.html": {
-      "raw": 9472,
-      "gzip": 2712
+      "raw": 9457,
+      "gzip": 2699
     },
     "server/prefetch-hints.json": {
-      "raw": 2895,
-      "gzip": 246
+      "raw": 3124,
+      "gzip": 260
     },
     "server/server-reference-manifest.js": {
       "raw": 12821,
-      "gzip": 1465
+      "gzip": 1457
     },
     "server/server-reference-manifest.json": {
       "raw": 11720,
-      "gzip": 1421
+      "gzip": 1412
     },
-    "static/SVRFL5ubHjjjkHRjRRPm8/_buildManifest.js": {
+    "static/KtS1R6y-s8OkaVgJPyOR0/_buildManifest.js": {
       "raw": 976,
       "gzip": 282
     },
-    "static/SVRFL5ubHjjjkHRjRRPm8/_clientMiddlewareManifest.js": {
+    "static/KtS1R6y-s8OkaVgJPyOR0/_clientMiddlewareManifest.js": {
       "raw": 457,
       "gzip": 273
     },
-    "static/SVRFL5ubHjjjkHRjRRPm8/_ssgManifest.js": {
+    "static/KtS1R6y-s8OkaVgJPyOR0/_ssgManifest.js": {
       "raw": 80,
       "gzip": 64
     },
     "static/chunks/0--om85mw3uia.js": {
       "raw": 6532,
       "gzip": 2971
+    },
+    "static/chunks/0064qhkzs91oe.js": {
+      "raw": 438247,
+      "gzip": 137244
     },
     "static/chunks/00yqkvn86ays9.js": {
       "raw": 23226,
@@ -3535,25 +3675,21 @@
       "raw": 1565,
       "gzip": 872
     },
-    "static/chunks/07ql327m7e86r.js": {
-      "raw": 390097,
-      "gzip": 111687
-    },
-    "static/chunks/0_0qwurbvn_c5.js": {
-      "raw": 46435,
-      "gzip": 15316
+    "static/chunks/01iz7p-d6agth.js": {
+      "raw": 4019,
+      "gzip": 1868
     },
     "static/chunks/0cz1d0mv5g_q7.js": {
       "raw": 112594,
       "gzip": 39961
     },
-    "static/chunks/0fp4j-qe99oqk.js": {
-      "raw": 4910,
-      "gzip": 2422
+    "static/chunks/0eikbnz5pew16.js": {
+      "raw": 40640,
+      "gzip": 12722
     },
-    "static/chunks/0ne5cgtrinvdl.js": {
-      "raw": 11288,
-      "gzip": 4482
+    "static/chunks/0qua_kegkp3ub.js": {
+      "raw": 36573,
+      "gzip": 12563
     },
     "static/chunks/0s-dsgm8su1sx.js": {
       "raw": 17428,
@@ -3571,9 +3707,17 @@
       "raw": 28086,
       "gzip": 9525
     },
+    "static/chunks/0zp-opok05p09.css": {
+      "raw": 3712,
+      "gzip": 971
+    },
     "static/chunks/11-1tqf1shae6.js": {
       "raw": 34237,
       "gzip": 12984
+    },
+    "static/chunks/12nzh22nqfjsh.js": {
+      "raw": 46463,
+      "gzip": 15319
     },
     "static/chunks/14j13ot828os3.js": {
       "raw": 127664,
@@ -3583,6 +3727,10 @@
       "raw": 22786,
       "gzip": 7046
     },
+    "static/chunks/16v-qhgwedcnv.js": {
+      "raw": 27035,
+      "gzip": 9343
+    },
     "static/chunks/19x64n_b755ab.js": {
       "raw": 34467,
       "gzip": 11687
@@ -3591,9 +3739,9 @@
       "raw": 27110,
       "gzip": 8661
     },
-    "static/chunks/1d9ifw_aycfik.js": {
-      "raw": 40676,
-      "gzip": 11881
+    "static/chunks/1dsn60xfhky4p.js": {
+      "raw": 5260,
+      "gzip": 2000
     },
     "static/chunks/1gzgigwr52erh.js": {
       "raw": 18749,
@@ -3603,33 +3751,29 @@
       "raw": 250014,
       "gzip": 66100
     },
-    "static/chunks/1krbngpj4s8aa.js": {
-      "raw": 36536,
-      "gzip": 12556
-    },
     "static/chunks/1ozi2y2d6lhv9.js": {
       "raw": 33713,
       "gzip": 9145
-    },
-    "static/chunks/1qa4yniaei9w-.js": {
-      "raw": 40708,
-      "gzip": 12763
     },
     "static/chunks/1r197zpm8ieso.js": {
       "raw": 17860,
       "gzip": 6626
     },
+    "static/chunks/1w6nzkgbqf4ow.js": {
+      "raw": 148638,
+      "gzip": 48566
+    },
     "static/chunks/1ymnp98kye4oo.js": {
       "raw": 25822,
       "gzip": 9031
     },
-    "static/chunks/22gz6_8uolhyf.js": {
-      "raw": 26566,
-      "gzip": 9162
+    "static/chunks/25cd-zpmbow8y.js": {
+      "raw": 17718,
+      "gzip": 5465
     },
-    "static/chunks/28mvtg4vltf_7.css": {
-      "raw": 105117,
-      "gzip": 17274
+    "static/chunks/277wj735fiura.js": {
+      "raw": 40676,
+      "gzip": 11883
     },
     "static/chunks/2alciducaw3wa.js": {
       "raw": 8743,
@@ -3643,45 +3787,37 @@
       "raw": 26095,
       "gzip": 8719
     },
-    "static/chunks/2f74w6v1x1eb5.js": {
-      "raw": 585,
-      "gzip": 377
+    "static/chunks/2d9ajshxrjid4.js": {
+      "raw": 19374,
+      "gzip": 6345
     },
     "static/chunks/2f75_n2p8ijju.js": {
       "raw": 11556,
       "gzip": 4117
     },
-    "static/chunks/2g96e9p3awhaa.js": {
-      "raw": 17718,
-      "gzip": 5465
+    "static/chunks/2ii51l4ygpeu4.js": {
+      "raw": 389770,
+      "gzip": 111573
     },
-    "static/chunks/2nkwxl4ftn4df.js": {
-      "raw": 4019,
-      "gzip": 1869
+    "static/chunks/2koyi5ro2u5-c.js": {
+      "raw": 4692,
+      "gzip": 1829
     },
     "static/chunks/2prq70ig4fijp.js": {
       "raw": 13854,
       "gzip": 5511
     },
+    "static/chunks/2q2j-e53dbygz.js": {
+      "raw": 7175,
+      "gzip": 3353
+    },
     "static/chunks/2smie6-2fz2sz.js": {
       "raw": 27655,
       "gzip": 9166
     },
-    "static/chunks/2t2410x1e5g_7.js": {
-      "raw": 148137,
-      "gzip": 48654
-    },
-    "static/chunks/2ut1plggydhw_.js": {
-      "raw": 438142,
-      "gzip": 137257
-    },
-    "static/chunks/2vxpuu_pbxs-0.js": {
-      "raw": 4692,
-      "gzip": 1832
-    },
-    "static/chunks/2wmk2abvip41o.css": {
-      "raw": 3712,
-      "gzip": 970
+    "static/chunks/2vgb86kvlaf6r.js": {
+      "raw": 6965,
+      "gzip": 3231
     },
     "static/chunks/2yl_xg9r80fbf.js": {
       "raw": 14119,
@@ -3699,10 +3835,6 @@
       "raw": 9818,
       "gzip": 3918
     },
-    "static/chunks/34ajxlu22te2y.js": {
-      "raw": 19374,
-      "gzip": 6344
-    },
     "static/chunks/37obhs8yddhih.js": {
       "raw": 38969,
       "gzip": 11000
@@ -3711,21 +3843,33 @@
       "raw": 55496,
       "gzip": 19218
     },
-    "static/chunks/3h4ysq6p3963n.js": {
-      "raw": 3512,
-      "gzip": 1789
+    "static/chunks/3f0p1b0c1ga74.js": {
+      "raw": 11288,
+      "gzip": 4484
     },
-    "static/chunks/3jfhcy0n_ggey.js": {
-      "raw": 20053,
-      "gzip": 7597
+    "static/chunks/3fda8mn0h-eac.js": {
+      "raw": 4187,
+      "gzip": 2100
+    },
+    "static/chunks/3i5irqsmv5aqe.js": {
+      "raw": 585,
+      "gzip": 371
     },
     "static/chunks/3lf00og-dm_zl.js": {
       "raw": 22535,
       "gzip": 6286
     },
-    "static/chunks/turbopack-2z-gk4z5mx4lc.js": {
+    "static/chunks/3llmmdp0orjii.css": {
+      "raw": 105062,
+      "gzip": 17314
+    },
+    "static/chunks/3yw6cu6a4xfvn.js": {
+      "raw": 20053,
+      "gzip": 7596
+    },
+    "static/chunks/turbopack-1i2_ltt7m9ivm.js": {
       "raw": 10123,
-      "gzip": 4044
+      "gzip": 4047
     },
     "static/media/4fa387ec64143e14-s.2tuy5pz7dlieh.woff2": {
       "raw": 12872,
@@ -3776,12 +3920,12 @@
       "gzip": 7275
     },
     "trace": {
-      "raw": 19080,
-      "gzip": 2827
+      "raw": 19384,
+      "gzip": 2999
     },
     "trace-build": {
-      "raw": 1519,
-      "gzip": 540
+      "raw": 1682,
+      "gzip": 572
     },
     "turbopack": {
       "raw": 0,
@@ -3796,12 +3940,12 @@
       "gzip": 101
     },
     "types/routes.d.ts": {
-      "raw": 4113,
-      "gzip": 1109
+      "raw": 4199,
+      "gzip": 1132
     },
     "types/validator.ts": {
-      "raw": 16091,
-      "gzip": 1343
+      "raw": 16684,
+      "gzip": 1377
     }
   }
 }

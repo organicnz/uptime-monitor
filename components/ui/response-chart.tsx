@@ -13,7 +13,7 @@ export function ResponseChart({
     return (
       <div
         role="status"
-        className="h-[80px] flex items-center justify-center text-neutral-500 text-sm"
+        className="flex h-[80px] items-center justify-center text-sm text-neutral-500"
       >
         Not enough data for chart
       </div>
@@ -26,9 +26,9 @@ export function ResponseChart({
 
   return (
     <div className="h-[80px]">
-      <div className="h-full relative">
+      <div className="relative h-full">
         {/* Y-axis */}
-        <div className="absolute left-0 top-0 h-[40px] w-8 flex flex-col justify-between text-[10px] text-neutral-600 pr-1 text-right">
+        <div className="absolute top-0 left-0 flex h-[40px] w-8 flex-col justify-between pr-1 text-right text-[10px] text-neutral-600">
           <span>{Math.round(chartMax)}</span>
           <span>0</span>
         </div>
@@ -37,7 +37,7 @@ export function ResponseChart({
         <div className="ml-10 h-[56px]">
           <svg
             role="img"
-            className="w-full h-[40px]"
+            className="h-[40px] w-full"
             preserveAspectRatio="none"
             viewBox="0 0 100 100"
             aria-label={chartAriaLabel}
@@ -105,7 +105,7 @@ export function ResponseChart({
           </svg>
 
           {/* X-axis labels */}
-          <div className="flex justify-between text-xs text-neutral-600 mt-1">
+          <div className="mt-1 flex justify-between text-xs text-neutral-600">
             <span>
               {new Date(points[0]?.time).toLocaleTimeString([], {
                 hour: "2-digit",

@@ -1,0 +1,25 @@
+# Keep the build context small: node_modules and .next are 1.6 GB together,
+# and the image rebuilds them from scratch anyway.
+node_modules
+.next
+out
+build
+.bundle
+test-results
+playwright-report
+
+# Local build artefacts of the Rust audit tool and the Rust probe.
+tools/audit/target
+tools/probe/target
+
+# Secrets never belong in an image layer.
+.env
+.env.*
+!.env.local.example
+
+# Version control and editor noise.
+.git
+.github
+.DS_Store
+*.log
+*.tsbuildinfo

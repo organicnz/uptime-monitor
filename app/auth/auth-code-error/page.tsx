@@ -1,12 +1,13 @@
-import Link from "next/link";
-import { Button } from "@/components/ui/button";
 import { AlertCircle } from "lucide-react";
+import Link from "next/link";
+
+import { Button } from "@/components/ui/button";
 
 export default function AuthCodeErrorPage() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-white dark:bg-neutral-950 p-8">
+    <div className="flex min-h-screen items-center justify-center bg-white p-8 dark:bg-neutral-950">
       <div className="w-full max-w-sm space-y-6 text-center">
-        <div className="mx-auto w-12 h-12 bg-red-100 dark:bg-red-900/20 rounded-full flex items-center justify-center">
+        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-red-100 dark:bg-red-900/20">
           <AlertCircle className="h-6 w-6 text-red-600 dark:text-red-400" />
         </div>
         <div className="space-y-2">

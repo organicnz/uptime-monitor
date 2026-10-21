@@ -1,9 +1,11 @@
 "use client";
 
+import { Loader2, TestTube } from "lucide-react";
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { TestTube, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+
+import { Button } from "@/components/ui/button";
+import { fetchJson, NotificationTestResponseSchema } from "@/lib/api-client";
 
 interface TestNotificationButtonProps {
   channelId: string;
@@ -17,19 +19,20 @@ export function TestNotificationButton({
   const handleTest = async () => {
     setTesting(true);
     try {
-      const res = await fetch("/api/notifications/test", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ channelId }),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        toast.success("Test notification sent!");
-      } else {
-        toast.error(data.error || "Failed to send test notification");
-      }
-    } catch {
-      toast.error("Failed to send test notification");
+      await fetchJson(
+        "/api/notifications/test",
+        NotificationTestResponseSchema,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ channelId }),
+        },
+      );
+      toast.success("Test notification sent!");
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Failed to send test notification",
+      );
     } finally {
       setTesting(false);
     }

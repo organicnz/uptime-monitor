@@ -1,14 +1,15 @@
 "use client";
 
-import { useState, Suspense } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { Activity, ArrowLeft, Info, Loader2 } from "lucide-react";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/client";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useState } from "react";
+
+import { OAuthButtons } from "@/components/oauth-buttons";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Activity, ArrowLeft, Loader2, Info } from "lucide-react";
-import { OAuthButtons } from "@/components/oauth-buttons";
+import { createClient } from "@/lib/supabase/client";
 
 function LoginForm() {
   const router = useRouter();
@@ -42,11 +43,11 @@ function LoginForm() {
   return (
     <div className="w-full max-w-sm space-y-8">
       {/* Mobile Logo */}
-      <div className="lg:hidden flex items-center justify-center gap-2.5 mb-8">
+      <div className="mb-8 flex items-center justify-center gap-2.5 lg:hidden">
         <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-green-600">
           <Activity className="h-5 w-5 text-white" />
         </div>
-        <span className="font-bold text-xl tracking-tight">
+        <span className="text-xl font-bold tracking-tight">
           Uptime<span className="text-primary">Monitor</span>
         </span>
       </div>
@@ -54,7 +55,7 @@ function LoginForm() {
       <div className="space-y-2">
         <Link
           href="/"
-          className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground transition-colors"
+          className="inline-flex items-center text-sm text-muted-foreground transition-colors hover:text-foreground"
         >
           <ArrowLeft className="mr-2 h-4 w-4" />
           Back to website
@@ -80,15 +81,15 @@ function LoginForm() {
 
       <form onSubmit={handleLogin} className="space-y-6">
         {signupsDisabled && (
-          <div className="bg-blue-500/10 border border-blue-500/30 text-blue-400 px-4 py-3 rounded-xl text-sm flex items-start gap-2">
-            <Info className="h-4 w-4 mt-0.5 shrink-0" />
+          <div className="flex items-start gap-2 rounded-xl border border-blue-500/30 bg-blue-500/10 px-4 py-3 text-sm text-blue-400">
+            <Info className="mt-0.5 h-4 w-4 shrink-0" />
             <span>
               New signups are currently disabled. This is a private instance.
             </span>
           </div>
         )}
         {error && (
-          <div className="bg-destructive/10 border border-destructive/30 text-destructive px-4 py-3 rounded-xl text-sm">
+          <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
             {error}
           </div>
         )}
@@ -112,7 +113,7 @@ function LoginForm() {
             <Label htmlFor="password">Password</Label>
             <Link
               href="/forgot-password"
-              className="text-sm font-medium text-primary hover:text-primary/80 transition-colors"
+              className="text-sm font-medium text-primary transition-colors hover:text-primary/80"
             >
               Forgot password?
             </Link>
@@ -131,7 +132,7 @@ function LoginForm() {
 
         <Button
           type="submit"
-          className="w-full h-11 shadow-lg shadow-primary/20"
+          className="h-11 w-full shadow-lg shadow-primary/20"
           size="lg"
           disabled={loading}
         >
@@ -155,7 +156,7 @@ function LoginForm() {
 
 function LoadingFallback() {
   return (
-    <div className="w-full max-w-sm space-y-8 flex flex-col items-center justify-center">
+    <div className="flex w-full max-w-sm flex-col items-center justify-center space-y-8">
       <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
       <p className="text-muted-foreground">Loading...</p>
     </div>
@@ -164,13 +165,13 @@ function LoadingFallback() {
 
 export default function LoginPage() {
   return (
-    <div className="min-h-screen grid lg:grid-cols-2">
+    <div className="grid min-h-screen lg:grid-cols-2">
       {/* Left: Branding Panel */}
-      <div className="hidden lg:flex flex-col justify-between bg-card p-12 relative overflow-hidden">
+      <div className="relative hidden flex-col justify-between overflow-hidden bg-card p-12 lg:flex">
         {/* Background Effects */}
         <div className="absolute inset-0 -z-10">
-          <div className="absolute top-[-20%] left-[-10%] w-[600px] h-[600px] bg-primary/20 rounded-full blur-[120px]" />
-          <div className="absolute bottom-[-20%] right-[-10%] w-[500px] h-[500px] bg-chart-5/20 rounded-full blur-[120px]" />
+          <div className="absolute top-[-20%] left-[-10%] h-[600px] w-[600px] rounded-full bg-primary/20 blur-[120px]" />
+          <div className="absolute right-[-10%] bottom-[-20%] h-[500px] w-[500px] rounded-full bg-chart-5/20 blur-[120px]" />
         </div>
 
         {/* Logo */}
@@ -178,7 +179,7 @@ export default function LoginPage() {
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-green-600 shadow-lg shadow-emerald-500/20">
             <Activity className="h-5 w-5 text-white" />
           </div>
-          <span className="font-bold text-xl tracking-tight">
+          <span className="text-xl font-bold tracking-tight">
             Uptime<span className="text-primary">Monitor</span>
           </span>
         </div>
@@ -186,7 +187,7 @@ export default function LoginPage() {
         {/* Testimonial */}
         <div className="relative z-10 space-y-6">
           <blockquote className="space-y-4">
-            <p className="text-2xl font-medium leading-relaxed text-foreground/90">
+            <p className="text-2xl leading-relaxed font-medium text-foreground/90">
               &ldquo;This platform has completely transformed how we monitor our
               infrastructure. The instant alerts and status pages are a game
               changer.&rdquo;
@@ -208,7 +209,7 @@ export default function LoginPage() {
       </div>
 
       {/* Right: Login Form */}
-      <div className="flex items-center justify-center p-8 bg-background">
+      <div className="flex items-center justify-center bg-background p-8">
         <Suspense fallback={<LoadingFallback />}>
           <LoginForm />
         </Suspense>

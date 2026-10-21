@@ -22,6 +22,26 @@ export type SslCheckResult = {
   error?: string;
 };
 
+/**
+ * The two network calls this module makes.
+ *
+ * They are different on purpose: crt.sh is a fixed endpoint that is part
+ * of the integration, and the fallback checks the user's own host, which
+ * has to go through the SSRF filter. A port keeps the difference visible,
+ * and keeps a test from having to replace a module.
+ */
+export type SslDependencies = {
+  /** The plain transport, for the fixed crt.sh endpoint. */
+  fetch: (url: string, init: RequestInit) => Promise<Response>;
+  /** The SSRF-protected transport, for the user's own host. */
+  ssrfFetch: typeof fetchWithSsrfProtection;
+};
+
+export const defaultSslDependencies: SslDependencies = {
+  fetch: (url, init) => fetch(url, init),
+  ssrfFetch: fetchWithSsrfProtection,
+};
+
 // Warning thresholds (in days)
 export const SSL_WARNING_DAYS = 30;
 export const SSL_CRITICAL_DAYS = 7;
@@ -33,6 +53,7 @@ export const SSL_DAYS_REMAINING_UNKNOWN = -999;
  */
 export async function checkSslCertificate(
   url: string,
+  dependencies: SslDependencies = defaultSslDependencies,
 ): Promise<SslCheckResult> {
   try {
     const urlObj = new URL(url);
@@ -50,7 +71,7 @@ export async function checkSslCertificate(
 
     // Use a public SSL checking service (no API key needed)
     // This is a lightweight check using crt.sh API for certificate transparency logs
-    const certInfo = await fetchCertificateInfo(hostname);
+    const certInfo = await fetchCertificateInfo(hostname, dependencies);
 
     if (certInfo) {
       return {
@@ -60,7 +81,7 @@ export async function checkSslCertificate(
     }
 
     // Fallback: Just verify HTTPS works and estimate expiry
-    return await fallbackSslCheck(url);
+    return await fallbackSslCheck(url, dependencies);
   } catch (error) {
     return {
       success: false,
@@ -73,10 +94,13 @@ export async function checkSslCertificate(
 /**
  * Fetch certificate info from crt.sh (Certificate Transparency logs)
  */
-async function fetchCertificateInfo(hostname: string): Promise<SslInfo | null> {
+async function fetchCertificateInfo(
+  hostname: string,
+  dependencies: SslDependencies,
+): Promise<SslInfo | null> {
   try {
     // Use crt.sh API to get certificate info
-    const response = await fetch(
+    const response = await dependencies.fetch(
       `https://crt.sh/?q=${encodeURIComponent(hostname)}&output=json`,
       {
         headers: { Accept: "application/json" },
@@ -138,9 +162,12 @@ async function fetchCertificateInfo(hostname: string): Promise<SslInfo | null> {
 /**
  * Fallback SSL check - just verify HTTPS connection works
  */
-async function fallbackSslCheck(url: string): Promise<SslCheckResult> {
+async function fallbackSslCheck(
+  url: string,
+  dependencies: SslDependencies,
+): Promise<SslCheckResult> {
   try {
-    const response = await fetchWithSsrfProtection(url, {
+    const response = await dependencies.ssrfFetch(url, {
       method: "HEAD",
       signal: AbortSignal.timeout(10000),
     });

@@ -1,10 +1,12 @@
+import { describe, expect, it } from "bun:test";
+
 import {
-  HEARTBEAT_STATUS,
-  MAX_CONSECUTIVE_UPTIME,
   classifyErrorType,
   classifyStatusTransition,
   determineEffectiveStatus,
   getCheckInterval,
+  HEARTBEAT_STATUS,
+  MAX_CONSECUTIVE_UPTIME,
   nextConsecutiveUptime,
 } from "@/lib/monitor-status";
 

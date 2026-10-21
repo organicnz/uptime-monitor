@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+
 import { GPUResponseChart } from "@/components/gpu-response-chart-client";
 import { GPUStatusBackground } from "@/components/gpu-status-background-client";
 
@@ -10,9 +11,12 @@ import { GPUStatusBackground } from "@/components/gpu-status-background-client";
  *
  * Gated on an env var that only the Playwright web server sets, so this route
  * 404s in a real deployment rather than shipping a demo page to production.
+ *
+ * This is a server component, so the environment is read from the live Bun
+ * process rather than inlined into the browser bundle.
  */
 function enabled(): boolean {
-  return process.env.E2E_GPU_FIXTURE === "1";
+  return Bun.env.E2E_GPU_FIXTURE === "1";
 }
 
 function buildSamples() {

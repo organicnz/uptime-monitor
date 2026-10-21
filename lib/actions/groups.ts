@@ -1,9 +1,10 @@
 "use server";
 
-import { createClient } from "@/lib/supabase/server";
-import { getMfaVerificationError } from "@/lib/mfa";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+
+import { getMfaVerificationError } from "@/lib/mfa";
+import { createClient } from "@/lib/supabase/server";
 
 const groupSchema = z.object({
   name: z.string().min(1, "Name is required").max(100),
@@ -58,7 +59,7 @@ export async function createGroup(formData: FormData): Promise<GroupFormState> {
     .limit(1);
 
   const nextSortOrder = existingGroups?.[0]
-    ? (existingGroups[0] as { sort_order: number }).sort_order + 1
+    ? existingGroups[0].sort_order + 1
     : 0;
 
   const { data: group, error } = await supabase
@@ -69,7 +70,7 @@ export async function createGroup(formData: FormData): Promise<GroupFormState> {
       description: parsed.data.description || null,
       color: parsed.data.color,
       sort_order: nextSortOrder,
-    } as unknown as never)
+    })
     .select()
     .single();
 
@@ -123,7 +124,7 @@ export async function updateGroup(
       name: parsed.data.name,
       description: parsed.data.description || null,
       color: parsed.data.color,
-    } as unknown as never)
+    })
     .eq("id", id)
     .eq("user_id", user.id);
 
@@ -218,7 +219,7 @@ export async function assignMonitorToGroup(
 
   const { error } = await supabase
     .from("monitors")
-    .update({ group_id: groupId } as unknown as never)
+    .update({ group_id: groupId })
     .eq("id", monitorId)
     .eq("user_id", user.id);
 
@@ -266,8 +267,8 @@ export async function toggleGroupCollapsed(
   const { error } = await supabase
     .from("monitor_groups")
     .update({
-      collapsed: !(group as { collapsed: boolean }).collapsed,
-    } as unknown as never)
+      collapsed: !group.collapsed,
+    })
     .eq("id", id);
 
   if (error) {

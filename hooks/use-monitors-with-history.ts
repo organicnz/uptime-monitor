@@ -1,9 +1,13 @@
 "use client";
 
-import { useEffect, useState, useCallback, useId } from "react";
-import { createClient } from "@/lib/supabase/client";
-import type { RealtimeChannel } from "@supabase/supabase-js";
+import {
+  REALTIME_SUBSCRIBE_STATES,
+  type RealtimeChannel,
+} from "@supabase/supabase-js";
+import { useCallback, useEffect, useId, useState } from "react";
+
 import { mapHeartbeatStatus } from "@/hooks/use-realtime-monitors";
+import { createClient } from "@/lib/supabase/client";
 
 export type Heartbeat = {
   id: string;
@@ -136,14 +140,14 @@ export function useMonitorsWithHistory(monitorIds: string[]) {
         )
         .subscribe((status) => {
           if (!cancelled) {
-            setIsConnected(status === "SUBSCRIBED");
+            setIsConnected(status === REALTIME_SUBSCRIBE_STATES.SUBSCRIBED);
           }
         });
 
       if (cancelled && channel) {
         const stale = channel;
         channel = null;
-        supabase.removeChannel(stale);
+        void supabase.removeChannel(stale);
       }
     };
 
@@ -153,12 +157,12 @@ export function useMonitorsWithHistory(monitorIds: string[]) {
       cancelled = true;
       setIsConnected(false);
       if (channel) {
-        supabase.removeChannel(channel);
+        void supabase.removeChannel(channel);
       } else {
         // Subscription setup may still be in flight; remove by name once it
         // resolves. Best-effort cleanup to avoid leaked channels.
         const pending = supabase.channel(channelName);
-        supabase.removeChannel(pending);
+        void supabase.removeChannel(pending);
       }
     };
   }, [idsKey, instanceId, updateMonitor]);

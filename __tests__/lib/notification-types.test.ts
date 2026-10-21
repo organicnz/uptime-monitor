@@ -1,10 +1,11 @@
 import { describe, expect, it } from "bun:test";
+
 import {
   ALL_SENSITIVE_CONFIG_KEYS,
-  SENSITIVE_CONFIG_KEYS,
   isSensitiveConfigKey,
   mergeChannelConfig,
   notificationTypes,
+  SENSITIVE_CONFIG_KEYS,
   splitChannelConfig,
 } from "@/lib/notification-types";
 

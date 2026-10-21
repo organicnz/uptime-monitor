@@ -1,13 +1,14 @@
-import { NextRequest, NextResponse } from "next/server";
 import { Receiver } from "@upstash/qstash";
-import { createServiceClient } from "@/lib/supabase/service";
-import { processMonitorCheck } from "@/lib/monitor-checker";
-import { getCheckInterval } from "@/lib/monitor-status";
-import { secureCompare } from "@/lib/security";
-import { getCronSecret, getQstashConfig } from "@/lib/env";
-import type { Monitor } from "@/types/application";
+import { NextRequest, NextResponse } from "next/server";
 
-export const runtime = "nodejs";
+import { getCronSecret, getQstashConfig } from "@/lib/env";
+import { planMonitorChecks, processMonitorCheck } from "@/lib/monitor-checker";
+import type { CheckResult as MonitorCheckResult } from "@/lib/monitor-checker";
+import { getCheckInterval } from "@/lib/monitor-status";
+import { isProbeAvailable } from "@/lib/probe";
+import { secureCompare } from "@/lib/security";
+import { createServiceClient } from "@/lib/supabase/service";
+import type { Monitor } from "@/types/application";
 
 const CONCURRENCY_LIMIT = 10;
 const MAX_EXECUTION_TIME_MS = 55_000; // Leave buffer before Vercel's 60s timeout
@@ -314,9 +315,23 @@ async function runMonitorChecks(
     const batch = monitorsToCheck.slice(i, i + CONCURRENCY_LIMIT);
     const remainingTime = MAX_EXECUTION_TIME_MS - (Date.now() - startTime);
     const deadlineAt = startTime + MAX_EXECUTION_TIME_MS;
+
+    // The policy phase and the probe are batched: the whole batch is
+    // resolved, validated and sent to one probe process. A monitor that is
+    // missing from the result — because the probe is not installed, or
+    // because it could not be used — falls back to the in-process check.
+    const precomputed = isProbeAvailable()
+      ? await planMonitorChecks(batch, deadlineAt)
+      : new Map<string, MonitorCheckResult>();
+
     const batchResults = await Promise.allSettled(
       batch.map((monitor) =>
-        withDeadline(processMonitorCheck(monitor, deadlineAt), remainingTime),
+        withDeadline(
+          processMonitorCheck(monitor, deadlineAt, {
+            precomputed: precomputed.get(monitor.id),
+          }),
+          remainingTime,
+        ),
       ),
     );
 

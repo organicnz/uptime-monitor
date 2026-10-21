@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+
 import { withAuth } from "@/lib/api-utils/with-auth";
 
 // UUID validation regex
@@ -46,7 +47,7 @@ export async function PUT(
       }
 
       // Parse and validate input
-      let body;
+      let body: unknown;
       try {
         body = await request.json();
       } catch {

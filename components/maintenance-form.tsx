@@ -1,9 +1,11 @@
 "use client";
 
+import { Calendar, Loader2, Wrench } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useState, useTransition } from "react";
+import { toast } from "sonner";
+
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import {
   Card,
   CardContent,
@@ -11,10 +13,9 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
-import { toast } from "sonner";
-import { Loader2, Calendar, Wrench } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 
 type Monitor = {
@@ -157,7 +158,7 @@ export function MaintenanceForm({
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="start_date">Start Date & Time *</Label>
               <Input
@@ -204,14 +205,14 @@ export function MaintenanceForm({
         </CardHeader>
         <CardContent>
           {monitors.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
               {monitors.map((monitor) => (
                 <button
                   key={monitor.id}
                   type="button"
                   onClick={() => toggleMonitor(monitor.id)}
                   className={cn(
-                    "flex items-center gap-3 p-3 rounded-lg border text-left transition-colors",
+                    "flex items-center gap-3 rounded-lg border p-3 text-left transition-colors",
                     selectedMonitors.includes(monitor.id)
                       ? "border-primary bg-primary/10"
                       : "border-border bg-muted/30 hover:bg-muted/50",
@@ -219,7 +220,7 @@ export function MaintenanceForm({
                 >
                   <div
                     className={cn(
-                      "h-4 w-4 rounded border flex items-center justify-center",
+                      "flex h-4 w-4 items-center justify-center rounded border",
                       selectedMonitors.includes(monitor.id)
                         ? "border-primary bg-primary"
                         : "border-muted-foreground",
@@ -241,8 +242,8 @@ export function MaintenanceForm({
                       </svg>
                     )}
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-sm truncate">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium">
                       {monitor.name}
                     </p>
                     <p className="text-xs text-muted-foreground uppercase">
@@ -253,7 +254,7 @@ export function MaintenanceForm({
               ))}
             </div>
           ) : (
-            <p className="text-sm text-muted-foreground text-center py-8">
+            <p className="py-8 text-center text-sm text-muted-foreground">
               No monitors available. Create some monitors first.
             </p>
           )}

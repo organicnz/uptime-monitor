@@ -1,8 +1,10 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { FolderPlus, Loader2, Plus } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useState, useTransition } from "react";
+import { toast } from "sonner";
+
 import {
   AlertDialog,
   AlertDialogAction,
@@ -14,11 +16,10 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { useState, useTransition } from "react";
-import { toast } from "sonner";
-import { Loader2, Plus, FolderPlus } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { createGroup, updateGroup } from "@/lib/actions/groups";
-import { useRouter } from "next/navigation";
 
 const colorOptions = [
   { value: "#6366f1", label: "Indigo" },
@@ -125,10 +126,11 @@ export function GroupDialog({ group, trigger, onSuccess }: GroupDialogProps) {
                 <button
                   key={color.value}
                   type="button"
+                  aria-label={color.label}
                   onClick={() => setSelectedColor(color.value)}
                   className={`h-8 w-8 rounded-full transition-all ${
                     selectedColor === color.value
-                      ? "ring-2 ring-offset-2 ring-offset-background ring-primary"
+                      ? "ring-2 ring-primary ring-offset-2 ring-offset-background"
                       : "hover:ring-1 hover:ring-muted-foreground"
                   }`}
                   style={{ backgroundColor: color.value }}
@@ -146,14 +148,14 @@ export function GroupDialog({ group, trigger, onSuccess }: GroupDialogProps) {
           >
             {isPending ? (
               <>
-                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 {group ? "Updating..." : "Creating..."}
               </>
             ) : group ? (
               "Update Group"
             ) : (
               <>
-                <Plus className="h-4 w-4 mr-2" />
+                <Plus className="mr-2 h-4 w-4" />
                 Create Group
               </>
             )}

@@ -1,10 +1,10 @@
 import { createClient } from "@supabase/supabase-js";
 
-const email = process.env.E2E_EMAIL ?? "e2e@uptime-monitor.test";
-const password = process.env.E2E_PASSWORD ?? "E2ePassword123";
-const statusSlug = process.env.E2E_PUBLIC_STATUS_SLUG ?? "e2e-status";
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const email = Bun.env.E2E_EMAIL ?? "e2e@uptime-monitor.test";
+const password = Bun.env.E2E_PASSWORD ?? "E2ePassword123";
+const statusSlug = Bun.env.E2E_PUBLIC_STATUS_SLUG ?? "e2e-status";
+const supabaseUrl = Bun.env.NEXT_PUBLIC_SUPABASE_URL;
+const serviceRoleKey = Bun.env.SUPABASE_SERVICE_ROLE_KEY;
 
 if (!supabaseUrl || !serviceRoleKey) {
   throw new Error("Local Supabase URL and service role key are required");

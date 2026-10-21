@@ -24,24 +24,24 @@ export function StatBox({
     <div
       role="group"
       className={cn(
-        "py-3 sm:py-5 px-2 sm:px-4 text-center border-b border-white/5 sm:border-r last:border-r-0",
+        "border-b border-white/5 px-2 py-3 text-center last:border-r-0 sm:border-r sm:px-4 sm:py-5",
         className,
       )}
       aria-label={ariaLabelValue}
     >
-      <div className="text-xs sm:text-sm text-neutral-400 mb-0.5 sm:mb-1">
+      <div className="mb-0.5 text-xs text-neutral-400 sm:mb-1 sm:text-sm">
         {label}
         {sublabel && (
-          <span className="block text-[10px] sm:text-xs text-neutral-500">
+          <span className="block text-[10px] text-neutral-500 sm:text-xs">
             {sublabel}
           </span>
         )}
       </div>
       <div
         className={cn(
-          "text-base sm:text-lg font-semibold truncate",
+          "truncate text-base font-semibold sm:text-lg",
           highlight &&
-            "text-green-400 underline decoration-green-400/30 underline-offset-2 cursor-pointer hover:text-green-300",
+            "cursor-pointer text-green-400 underline decoration-green-400/30 underline-offset-2 hover:text-green-300",
           muted && "text-neutral-600",
         )}
       >

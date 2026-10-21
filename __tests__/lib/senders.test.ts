@@ -1,11 +1,12 @@
 import { describe, expect, it } from "bun:test";
+
 import {
   MAX_ATTEMPTS,
+  type NotificationPayload,
+  type NotificationTransport,
   REQUEST_TIMEOUT_MS,
   sendNotification,
   withRetry,
-  type NotificationPayload,
-  type NotificationTransport,
 } from "../../supabase/functions/_shared/senders";
 
 const payload: NotificationPayload = {
@@ -49,9 +50,11 @@ function recorder(): {
       status: 200,
     });
   };
-  const body = () => {
+  // The body is JSON the test does not know the shape of; every caller
+  // narrows it to the one it is checking.
+  const body = (): unknown => {
     const raw = calls[0]?.init.body;
-    return typeof raw === "string" ? JSON.parse(raw) : raw;
+    return typeof raw === "string" ? (JSON.parse(raw) as unknown) : raw;
   };
   return { send, calls, body };
 }
@@ -124,9 +127,16 @@ describe("withRetry", () => {
   it("aborts a request that exceeds the timeout", async () => {
     const hanging: NotificationTransport = (_url, init) =>
       new Promise<Response>((_resolve, reject) => {
-        init.signal?.addEventListener("abort", () =>
-          reject(init.signal?.reason),
-        );
+        init.signal?.addEventListener("abort", () => {
+          // `AbortSignal.reason` is typed `any` in the DOM lib; taking it
+          // as `unknown` is what lets the check below be a real one.
+          const reason: unknown = init.signal?.reason;
+          reject(
+            reason instanceof Error
+              ? reason
+              : new Error("The request was aborted"),
+          );
+        });
       });
     const wrapped = withRetry(hanging, { maxAttempts: 1, timeoutMs: 30 });
     await expect(wrapped("https://example.com", {})).rejects.toThrow();

@@ -20,10 +20,10 @@
  */
 
 import {
-  SSRF_MAX_REDIRECTS,
   isBlockedHostname,
   isPublicAddress,
   planRedirect,
+  SSRF_MAX_REDIRECTS,
 } from "./egress-policy.ts";
 
 export class BlockedUrlError extends Error {

@@ -1,10 +1,11 @@
 "use server";
 
-import { createClient } from "@/lib/supabase/server";
-import { getMfaVerificationError } from "@/lib/mfa";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
+
+import { getMfaVerificationError } from "@/lib/mfa";
+import { createClient } from "@/lib/supabase/server";
 
 const maintenanceSchema = z.object({
   title: z.string().min(1, "Title is required").max(100),
@@ -78,7 +79,7 @@ export async function createMaintenance(
       end_date: maintenanceData.end_date,
       active: maintenanceData.active,
       strategy: maintenanceData.strategy,
-    } as unknown as never)
+    })
     .select()
     .single();
 
@@ -100,7 +101,7 @@ export async function createMaintenance(
 
     const { error: assignError } = await supabase
       .from("maintenance_monitors")
-      .insert(monitorAssignments as unknown as never);
+      .insert(monitorAssignments);
 
     if (assignError) {
       console.error("Failed to assign monitors:", assignError);
@@ -167,7 +168,7 @@ export async function updateMaintenance(
       end_date: maintenanceData.end_date,
       active: maintenanceData.active,
       strategy: maintenanceData.strategy,
-    } as unknown as never)
+    })
     .eq("id", id)
     .eq("user_id", user.id);
 
@@ -186,9 +187,7 @@ export async function updateMaintenance(
       monitor_id,
     }));
 
-    await supabase
-      .from("maintenance_monitors")
-      .insert(monitorAssignments as unknown as never);
+    await supabase.from("maintenance_monitors").insert(monitorAssignments);
   }
 
   revalidatePath("/dashboard/maintenance");

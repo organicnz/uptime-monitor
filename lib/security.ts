@@ -1,6 +1,6 @@
-import { timingSafeEqual } from "crypto";
-import { Agent } from "undici";
-import type { LookupFunction } from "node:net";
+import ipaddr from "ipaddr.js";
+
+import { BLOCKED_HOSTNAME_SUFFIXES } from "../supabase/functions/_shared/egress-policy";
 
 /**
  * Constant-time string comparison to prevent timing attacks
@@ -10,31 +10,30 @@ export function secureCompare(a: string, b: string): boolean {
     return false;
   }
 
-  const bufA = Buffer.from(a, "utf8");
-  const bufB = Buffer.from(b, "utf8");
+  const bufA = new TextEncoder().encode(a);
+  const bufB = new TextEncoder().encode(b);
 
   if (bufA.length !== bufB.length) {
     return false;
   }
 
-  return timingSafeEqual(bufA, bufB);
+  return crypto.timingSafeEqual(bufA, bufB);
 }
 
 /**
- * Sanitize user input to prevent XSS
+ * Sanitize user input to prevent XSS.
+ *
+ * `Bun.escapeHTML` is the runtime's own HTML escaper: it applies the HTML
+ * serialization algorithm, so `&`, `<`, `>`, `"` and `'` come out as
+ * `&amp;`, `&lt;`, `&gt;`, `&quot;` and `&#x27;` — byte for byte what the
+ * hand-rolled chain of replacements produced, without the five passes over
+ * the string and the two places a hand-written escaper can get the entity
+ * order wrong (an `&` escaped after its neighbours, for instance, would
+ * double-escape them).
  */
 export function sanitizeHtml(input: string): string {
-  return input
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#x27;");
+  return Bun.escapeHTML(input);
 }
-
-import * as dns from "dns/promises";
-import ipaddr from "ipaddr.js";
-import { BLOCKED_HOSTNAME_SUFFIXES } from "../supabase/functions/_shared/egress-policy";
 
 /**
  * Hostnames that are never a legitimate destination. One list, shared with the
@@ -111,6 +110,36 @@ export function formatHostForUrl(host: string): string {
 }
 
 /**
+ * Every address a hostname resolves to, IPv4 first.
+ *
+ * Both families are queried because a host can answer with a public A record
+ * and a private AAAA record, and a host that does either is not a legitimate
+ * destination. Bun's resolver reports "no records of this family" as
+ * `DNS_ENOTFOUND`, so a missing AAAA record is not an error — the IPv4
+ * answers still stand.
+ */
+async function resolveAllAddresses(hostname: string): Promise<string[]> {
+  const addresses: string[] = [];
+
+  for (const family of [4, 6] as const) {
+    try {
+      const results = await Bun.dns.lookup(hostname, { family });
+      for (const result of results) {
+        addresses.push(result.address);
+      }
+    } catch (error) {
+      const code = (error as { code?: string }).code;
+      if (family === 6 && code === "DNS_ENOTFOUND") {
+        continue;
+      }
+      throw error;
+    }
+  }
+
+  return addresses;
+}
+
+/**
  * Pre-flight resolve and validate a hostname to prevent DNS rebinding attacks.
  * It resolves the domain to an IP and validates the IP.
  * @returns {Promise<string>} The resolved, safe IP address. Throws if unsafe.
@@ -140,22 +169,24 @@ export async function resolveAndValidateHost(
   // If it's a domain name, resolve it first to prevent DNS rebinding.
   // We prefer IPv4 but will accept IPv6.
   try {
-    const lookupResults = await dns.lookup(hostname, { all: true });
+    const lookupResults = await resolveAllAddresses(hostname);
     if (lookupResults.length === 0) {
       throw new Error("DNS Resolution returned no addresses");
     }
 
-    for (const result of lookupResults) {
-      if (!isSafeIp(result.address)) {
+    for (const address of lookupResults) {
+      if (!isSafeIp(address)) {
         throw new Error(
-          `Resolved IP (${result.address}) is blocked (private/loopback range)`,
+          `Resolved IP (${address}) is blocked (private/loopback range)`,
         );
       }
     }
 
-    return lookupResults[0].address;
+    return lookupResults[0];
   } catch (error: unknown) {
-    throw new Error(`DNS Resolution failed: ${(error as Error).message}`);
+    throw new Error(`DNS Resolution failed: ${(error as Error).message}`, {
+      cause: error,
+    });
   }
 }
 
@@ -165,7 +196,7 @@ export async function resolveAndValidateHost(
  */
 export async function resolveAndValidateUrl(
   url: string,
-): Promise<{ safeUrl: string; resolvedIp: string }> {
+): Promise<{ safeUrl: string; resolvedIp: string; hostname: string }> {
   try {
     const parsed = new URL(url);
 
@@ -178,59 +209,46 @@ export async function resolveAndValidateUrl(
 
     const resolvedIp = await resolveAndValidateHost(parsed.hostname);
 
-    return { safeUrl: url, resolvedIp };
+    return { safeUrl: url, resolvedIp, hostname: parsed.hostname };
   } catch (error: unknown) {
-    throw new Error(`URL Validation failed: ${(error as Error).message}`);
+    throw new Error(`URL Validation failed: ${(error as Error).message}`, {
+      cause: error,
+    });
   }
 }
 
-const pinnedAgents = new Map<string, Agent>();
-
-function getPinnedAgent(
+/**
+ * Build a request target that is pinned to the already-validated IP.
+ *
+ * Connecting to the IP rather than the hostname is what defeats DNS
+ * rebinding: a second DNS answer cannot change where the socket goes. The
+ * original hostname survives in the two places the far end needs it — the
+ * `Host` header, and the TLS server name (SNI), which is also the name the
+ * certificate is validated against.
+ */
+function buildPinnedRequest(
+  url: string,
   hostname: string,
   resolvedIp: string,
-): Agent | undefined {
-  if (typeof process === "undefined") {
-    throw new Error("DNS pinning is unavailable in this runtime");
-  }
-  if ("bun" in process.versions) {
-    if (process.env.NODE_ENV === "production") {
-      throw new Error("DNS pinning requires the Node.js runtime");
-    }
-    return undefined;
-  }
+  headers: Headers,
+): { url: string; headers: Headers; tls?: { servername: string } } {
+  // The hostname is already the literal target, so there is nothing to pin.
   if (ipaddr.isValid(hostname)) {
-    return undefined;
+    return { url, headers };
   }
 
-  const key = `${hostname}:${resolvedIp}`;
-  const existing = pinnedAgents.get(key);
-  if (existing) return existing;
+  const pinned = new URL(url);
+  pinned.hostname = resolvedIp.includes(":") ? `[${resolvedIp}]` : resolvedIp;
 
-  const family = resolvedIp.includes(":") ? 6 : 4;
-  const lookup: LookupFunction = (_host, options, callback) => {
-    if (options.all) {
-      callback(null, [{ address: resolvedIp, family }]);
-      return;
-    }
-    callback(null, resolvedIp, family);
+  const pinnedHeaders = new Headers(headers);
+  // The port stays in the Host header exactly as the caller wrote it.
+  pinnedHeaders.set("host", new URL(url).host);
+
+  return {
+    url: pinned.toString(),
+    headers: pinnedHeaders,
+    tls: { servername: hostname },
   };
-  const agent = new Agent({
-    connect: {
-      lookup,
-      servername: hostname,
-    },
-  });
-  if (pinnedAgents.size >= 100) {
-    const oldestKey = pinnedAgents.keys().next().value;
-    if (oldestKey) {
-      const oldestAgent = pinnedAgents.get(oldestKey);
-      pinnedAgents.delete(oldestKey);
-      void oldestAgent?.close();
-    }
-  }
-  pinnedAgents.set(key, agent);
-  return agent;
 }
 
 export async function fetchWithSsrfProtection(
@@ -245,17 +263,26 @@ export async function fetchWithSsrfProtection(
   let headers = new Headers(init.headers);
 
   for (let redirectCount = 0; redirectCount <= maxRedirects; redirectCount++) {
-    const { resolvedIp } = await resolveAndValidateUrl(currentUrl);
-    const dispatcher = getPinnedAgent(new URL(currentUrl).hostname, resolvedIp);
-
-    const response = await fetch(currentUrl, {
-      ...init,
+    const { resolvedIp, hostname } = await resolveAndValidateUrl(currentUrl);
+    const pinned = buildPinnedRequest(
+      currentUrl,
+      hostname,
+      resolvedIp,
       headers,
+    );
+
+    // Bun's `fetch` accepts a `tls` option that overrides the TLS server
+    // name (SNI) — and with it, the name the server certificate is
+    // validated against. `bun-types` declares it on `RequestInit`, so it
+    // needs no cast and no local declaration.
+    const response = await fetch(pinned.url, {
+      ...init,
+      headers: pinned.headers,
       method,
       body,
       redirect: "manual",
-      ...(dispatcher ? { dispatcher } : {}),
-    } as RequestInit);
+      ...(pinned.tls && { tls: pinned.tls }),
+    });
 
     if (![301, 302, 303, 307, 308].includes(response.status)) {
       return response;
@@ -290,12 +317,32 @@ export async function fetchWithSsrfProtection(
 }
 
 /**
- * Generate a cryptographically secure random string
+ * Generate a cryptographically secure random string.
+ *
+ * The alphabet has 62 characters, which does not divide 256, so a plain
+ * `byte % 62` would make the first eight characters of the alphabet about
+ * 25% more likely than the rest. Rejection sampling removes that: a byte
+ * that falls in the incomplete final block is discarded and redrawn, so
+ * every character is drawn with the same probability.
  */
 export function generateSecureToken(length: number = 32): string {
   const chars =
     "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-  const array = new Uint8Array(length);
-  crypto.getRandomValues(array);
-  return Array.from(array, (byte) => chars[byte % chars.length]).join("");
+  // The largest multiple of the alphabet size that fits in a byte. Bytes at
+  // or above this are the biased tail and are thrown away.
+  const limit = 256 - (256 % chars.length);
+
+  const out: string[] = [];
+  while (out.length < length) {
+    // One oversized draw: the surplus is what the rejection loop consumes.
+    const bytes = new Uint8Array(length - out.length + 8);
+    crypto.getRandomValues(bytes);
+    for (const byte of bytes) {
+      if (byte >= limit) continue;
+      out.push(chars[byte % chars.length]);
+      if (out.length === length) break;
+    }
+  }
+
+  return out.join("");
 }

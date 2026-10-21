@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+
 import { withAuth } from "@/lib/api-utils/with-auth";
 import {
   channelIdSchema,
@@ -133,7 +134,7 @@ export async function GET(request: NextRequest) {
           config: view.config,
           active: view.active,
           is_default: view.is_default,
-          has_secret: (view.secret_id as string | null) !== null,
+          has_secret: view.secret_id !== null,
         },
       });
     }

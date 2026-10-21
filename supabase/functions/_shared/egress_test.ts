@@ -15,6 +15,7 @@ import {
   assertRejects,
   assertStringIncludes,
 } from "jsr:@std/assert@1";
+
 import { BlockedUrlError, createSsrfProtectedTransport } from "./egress.ts";
 
 const send = createSsrfProtectedTransport();

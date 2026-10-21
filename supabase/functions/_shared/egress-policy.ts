@@ -120,7 +120,7 @@ function v6ToGroups(address: string): number[] | null {
   const zeros = 8 - head.length - tail.length;
   if (zeros < 0) return null;
 
-  const groups = [...head, ...new Array<number>(zeros).fill(0), ...tail];
+  const groups = [...head, ...Array.from({ length: zeros }, () => 0), ...tail];
   return groups.length === 8 ? groups : null;
 }
 

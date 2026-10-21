@@ -1,15 +1,9 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { createClient } from "@/lib/supabase/client";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Loader2, Shield, ShieldCheck, ShieldOff, Trash2 } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { toast } from "sonner";
+
 import {
   AlertDialog,
   AlertDialogAction,
@@ -21,8 +15,16 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Shield, ShieldCheck, ShieldOff, Loader2, Trash2 } from "lucide-react";
-import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { createClient } from "@/lib/supabase/client";
+
 import { MFAEnroll } from "./mfa-enroll";
 
 type Factor = {
@@ -119,7 +121,7 @@ export function MFASettings() {
       <CardContent className="space-y-4">
         {hasMFA ? (
           <>
-            <div className="flex items-center gap-3 p-4 bg-green-500/10 border border-green-500/20 rounded-lg">
+            <div className="flex items-center gap-3 rounded-lg border border-green-500/20 bg-green-500/10 p-4">
               <ShieldCheck className="h-5 w-5 text-green-500" />
               <div className="flex-1">
                 <p className="font-medium text-green-500">2FA is enabled</p>
@@ -134,7 +136,7 @@ export function MFASettings() {
               {factors.map((factor) => (
                 <div
                   key={factor.id}
-                  className="flex items-center justify-between p-3 bg-muted/50 rounded-lg"
+                  className="flex items-center justify-between rounded-lg bg-muted/50 p-3"
                 >
                   <div className="flex items-center gap-3">
                     <Shield className="h-4 w-4 text-muted-foreground" />
@@ -152,7 +154,7 @@ export function MFASettings() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                        className="text-destructive hover:bg-destructive/10 hover:text-destructive"
                         disabled={removing === factor.id}
                       >
                         {removing === factor.id ? (
@@ -187,7 +189,7 @@ export function MFASettings() {
           </>
         ) : (
           <>
-            <div className="flex items-center gap-3 p-4 bg-amber-500/10 border border-amber-500/20 rounded-lg">
+            <div className="flex items-center gap-3 rounded-lg border border-amber-500/20 bg-amber-500/10 p-4">
               <ShieldOff className="h-5 w-5 text-amber-500" />
               <div className="flex-1">
                 <p className="font-medium text-amber-500">2FA is not enabled</p>
