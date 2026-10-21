@@ -54,7 +54,7 @@ async function mgmtQuery(
   return (await response.json()) as MgmtRow[];
 }
 
-async function main(): Promise<number> {
+export async function main(): Promise<number> {
   const token = Bun.env.SUPABASE_ACCESS_TOKEN ?? "";
   const ref = Bun.env.SUPABASE_PROJECT_REF ?? "";
 
@@ -136,4 +136,10 @@ async function main(): Promise<number> {
 // `process.exitCode` rather than `process.exit()`: Bun flushes pending writes
 // before the process ends, so the migration log is never truncated when the
 // output is piped into a CI log.
-process.exitCode = await main();
+// `import.meta.main` so that a test can import `main` and drive it with a
+// stubbed transport: this script changes the production database, and its
+// failure modes — a bad token, a project the token cannot see, a migration
+// that fails half way — deserve to be tested rather than discovered.
+if (import.meta.main) {
+  process.exitCode = await main();
+}

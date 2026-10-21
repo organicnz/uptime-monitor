@@ -476,6 +476,17 @@ rather than a convention somebody has to remember.
   subdomain of `https://<ref>.supabase.co` and is already public
 - `migrate` and `edge-functions` declare `environment: production`; add
   required reviewers under Settings -> Environments
+- **The scripts that touch the live database are tested.**
+  `scripts/supabase-migrate.ts` applies migrations to production and
+  `scripts/supabase-verify-schema.ts` decides whether the live schema has
+  drifted; both were untested, which meant the paths that matter most —
+  a token that stopped working, a project the token cannot see, a
+  migration that fails half way — were the ones nobody had ever run.
+  They export `main` and are guarded by `import.meta.main`, so a test can
+  drive them against a stubbed transport. The drift gate now tells an
+  unreadable database (exit 3) apart from a drifted one (exit 2): the
+  first is a network blip, and reporting it as drift would send an
+  operator hunting a migration that was applied perfectly well.
 - **A page that reads the environment is rendered per request.**
   `app/gpu-fixture/page.tsx` gates itself on `E2E_GPU_FIXTURE`, which the
   e2e server only sets when it starts — and it declared

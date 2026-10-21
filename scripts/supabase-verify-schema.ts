@@ -15,6 +15,7 @@
  *   0 - live schema matches expectations
  *   1 - missing env
  *   2 - drift detected
+ *   3 - the live database could not be read
  */
 import {
   EXPECTED_COLUMNS,
@@ -51,7 +52,7 @@ async function mgmtQuery(
   return (await response.json()) as MgmtRow[];
 }
 
-async function main(): Promise<number> {
+export async function main(): Promise<number> {
   const token = Bun.env.SUPABASE_ACCESS_TOKEN ?? "";
   const ref = Bun.env.SUPABASE_PROJECT_REF ?? "";
 
@@ -64,70 +65,85 @@ async function main(): Promise<number> {
 
   let ok = true;
 
-  for (const [table, cols] of Object.entries(EXPECTED_COLUMNS)) {
-    const rows = await mgmtQuery(
+  // An unreadable database is not a drifted one. Letting the query error
+  // escape as an exception would report a network blip as a stack trace
+  // and send an operator hunting a migration that was applied perfectly
+  // well, so the two are told apart.
+  try {
+    for (const [table, cols] of Object.entries(EXPECTED_COLUMNS)) {
+      const rows = await mgmtQuery(
+        token,
+        ref,
+        "SELECT column_name FROM information_schema.columns " +
+          `WHERE table_schema='public' AND table_name='${table}'`,
+      );
+      const present = new Set(rows.map((row) => String(row.column_name)));
+      const missing = cols.filter((col) => !present.has(col));
+      if (missing.length > 0) {
+        ok = false;
+        console.error(`FAIL ${table}: missing ${missing.join(", ")}`);
+      } else {
+        console.log(`OK ${table}: all ${cols.length} expected columns present`);
+      }
+    }
+
+    const functionRows = await mgmtQuery(
       token,
       ref,
-      "SELECT column_name FROM information_schema.columns " +
-        `WHERE table_schema='public' AND table_name='${table}'`,
+      "SELECT routine_name FROM information_schema.routines " +
+        "WHERE routine_schema='public'",
     );
-    const present = new Set(rows.map((row) => String(row.column_name)));
-    const missing = cols.filter((col) => !present.has(col));
-    if (missing.length > 0) {
+    const presentFunctions = new Set(
+      functionRows.map((row) => String(row.routine_name)),
+    );
+    const missingFunctions = EXPECTED_FUNCTIONS.filter(
+      (name) => !presentFunctions.has(name),
+    );
+    if (missingFunctions.length > 0) {
       ok = false;
-      console.error(`FAIL ${table}: missing ${missing.join(", ")}`);
+      console.error(`FAIL functions: missing ${missingFunctions.join(", ")}`);
     } else {
-      console.log(`OK ${table}: all ${cols.length} expected columns present`);
+      console.log(
+        `OK functions: all ${EXPECTED_FUNCTIONS.length} expected functions present`,
+      );
     }
-  }
 
-  const functionRows = await mgmtQuery(
-    token,
-    ref,
-    "SELECT routine_name FROM information_schema.routines " +
-      "WHERE routine_schema='public'",
-  );
-  const presentFunctions = new Set(
-    functionRows.map((row) => String(row.routine_name)),
-  );
-  const missingFunctions = EXPECTED_FUNCTIONS.filter(
-    (name) => !presentFunctions.has(name),
-  );
-  if (missingFunctions.length > 0) {
-    ok = false;
-    console.error(`FAIL functions: missing ${missingFunctions.join(", ")}`);
-  } else {
-    console.log(
-      `OK functions: all ${EXPECTED_FUNCTIONS.length} expected functions present`,
+    const policyRows = await mgmtQuery(
+      token,
+      ref,
+      "SELECT policyname FROM pg_policies WHERE schemaname='public'",
     );
-  }
-
-  const policyRows = await mgmtQuery(
-    token,
-    ref,
-    "SELECT policyname FROM pg_policies WHERE schemaname='public'",
-  );
-  const presentPolicies = new Set(
-    policyRows.map((row) => String(row.policyname)),
-  );
-  const missingPolicies = EXPECTED_POLICIES.filter(
-    (name) => !presentPolicies.has(name),
-  );
-  const forbiddenPolicies = FORBIDDEN_POLICIES.filter((name) =>
-    presentPolicies.has(name),
-  );
-  if (missingPolicies.length > 0 || forbiddenPolicies.length > 0) {
-    ok = false;
-    if (missingPolicies.length > 0) {
-      console.error(`FAIL policies: missing ${missingPolicies.join(", ")}`);
-    }
-    if (forbiddenPolicies.length > 0) {
-      console.error(`FAIL policies: forbidden ${forbiddenPolicies.join(", ")}`);
-    }
-  } else {
-    console.log(
-      `OK policies: all ${EXPECTED_POLICIES.length} expected policies present`,
+    const presentPolicies = new Set(
+      policyRows.map((row) => String(row.policyname)),
     );
+    const missingPolicies = EXPECTED_POLICIES.filter(
+      (name) => !presentPolicies.has(name),
+    );
+    const forbiddenPolicies = FORBIDDEN_POLICIES.filter((name) =>
+      presentPolicies.has(name),
+    );
+    if (missingPolicies.length > 0 || forbiddenPolicies.length > 0) {
+      ok = false;
+      if (missingPolicies.length > 0) {
+        console.error(`FAIL policies: missing ${missingPolicies.join(", ")}`);
+      }
+      if (forbiddenPolicies.length > 0) {
+        console.error(
+          `FAIL policies: forbidden ${forbiddenPolicies.join(", ")}`,
+        );
+      }
+    } else {
+      console.log(
+        `OK policies: all ${EXPECTED_POLICIES.length} expected policies present`,
+      );
+    }
+  } catch (error) {
+    console.error(
+      "Could not read the live database: " +
+        `${error instanceof Error ? error.message : String(error)}. ` +
+        "This is not drift: the schema was not checked.",
+    );
+    return 3;
   }
 
   console.log(ok ? "Schema verification passed" : "Schema verification FAILED");
@@ -137,4 +153,10 @@ async function main(): Promise<number> {
 // `process.exitCode` rather than `process.exit()`: Bun flushes pending writes
 // before the process ends, so the verification report is never truncated when
 // the output is piped into a CI log.
-process.exitCode = await main();
+// `import.meta.main` so that a test can import `main` and drive it with a
+// stubbed transport: this script decides whether the live database has
+// drifted, and a gate that has never been run against a drifted database
+// is a gate that has never been tested.
+if (import.meta.main) {
+  process.exitCode = await main();
+}
