@@ -198,6 +198,67 @@ describe("batched monitor checks", () => {
     expect(results.get("a")?.status).toBe(0);
   });
 
+  it("reports a redirect it cannot follow", async () => {
+    // A location the URL parser rejects is not a redirect to follow, and
+    // trying anyway would send the request somewhere unvetted.
+    batches = [];
+    canned = new Map([
+      ["a", [httpResult("a", { statusCode: 302, location: "http://" })]],
+    ]);
+
+    const results = await planMonitorChecks(
+      [monitor("a")],
+      undefined,
+      fakeRunner,
+    );
+
+    expect(results.get("a")?.msg).toBe("Invalid redirect location");
+    expect(results.get("a")?.status).toBe(0);
+  });
+
+  it("follows a 303 as a GET without the body", async () => {
+    // A 303 says the next request is a GET, whatever the first one was.
+    // The follow-up has to be sent the same way the fetch path sends it,
+    // or the two paths disagree about what the monitor saw.
+    batches = [];
+    canned = new Map([
+      [
+        "a",
+        [
+          httpResult("a", { statusCode: 303, location: "/next" }),
+          httpResult("a", { statusCode: 200, statusText: "OK" }),
+        ],
+      ],
+    ]);
+
+    const results = await planMonitorChecks(
+      [monitor("a", { method: "POST", body: "payload" })],
+      undefined,
+      fakeRunner,
+    );
+
+    expect(results.get("a")?.status).toBe(1);
+    const second = batches[1]?.[0];
+    expect(second).toMatchObject({ method: "GET" });
+    expect(second && "body" in second ? second.body : null).toBeNull();
+  });
+
+  it("hands the work back when the probe cannot be used", async () => {
+    // The probe is an accelerator. When it is not there, the result is
+    // simply absent, and the caller does the work in-process instead.
+    batches = [];
+    canned = new Map();
+    const unavailable = async () => null;
+
+    const results = await planMonitorChecks(
+      [monitor("a")],
+      undefined,
+      unavailable,
+    );
+
+    expect(results.get("a")).toBeUndefined();
+  });
+
   it("reports a connection failure with the probe's own message", async () => {
     batches = [];
     canned = new Map([
@@ -221,6 +282,94 @@ describe("batched monitor checks", () => {
       fakeRunner,
     );
     expect(results.get("a")?.msg).toBe("connection refused");
+  });
+
+  it("plans a TCP check as a job for the probe", async () => {
+    batches = [];
+    canned = new Map();
+
+    const results = await planMonitorChecks(
+      [monitor("a", { type: "tcp", hostname: PUBLIC_IP, port: 8443 })],
+      undefined,
+      fakeRunner,
+    );
+
+    // The probe is asked to open the port, and the address it is given is
+    // the one the policy layer resolved.
+    expect(batches[0]?.[0]).toMatchObject({
+      kind: "tcp",
+      id: "a",
+      host: PUBLIC_IP,
+      port: 8443,
+    });
+    expect(results.get("a")?.status).toBe(0);
+  });
+
+  it("reports a TCP monitor with no hostname", async () => {
+    batches = [];
+    canned = new Map();
+
+    const results = await planMonitorChecks(
+      [monitor("a", { type: "tcp" })],
+      undefined,
+      fakeRunner,
+    );
+
+    expect(results.get("a")?.msg).toBe("Missing hostname");
+  });
+
+  it("reports a blocked TCP host as blocked", async () => {
+    batches = [];
+    canned = new Map();
+    const blocked = {
+      resolveHost: async () => {
+        throw new Error("Target is a private address");
+      },
+      resolveUrl: async (url: string) => ({
+        safeUrl: url,
+        resolvedIp: PUBLIC_IP,
+        hostname: new URL(url).hostname,
+      }),
+      fetch: async () => new Response("", { status: 200 }),
+    };
+
+    const results = await planMonitorChecks(
+      [monitor("a", { type: "tcp", hostname: "10.0.0.1" })],
+      undefined,
+      fakeRunner,
+      blocked,
+    );
+
+    expect(results.get("a")?.msg).toContain("SSRF Blocked");
+    expect(batches).toHaveLength(0);
+  });
+
+  it("runs a ping check in process rather than in the probe", async () => {
+    // A ping is a resolver call the policy layer already makes, and a
+    // separate process would not make it any faster.
+    batches = [];
+    canned = new Map();
+
+    await planMonitorChecks(
+      [monitor("a", { type: "ping", hostname: PUBLIC_IP })],
+      undefined,
+      fakeRunner,
+    );
+
+    expect(batches).toHaveLength(0);
+  });
+
+  it("runs a DNS check in process rather than in the probe", async () => {
+    batches = [];
+    canned = new Map();
+
+    await planMonitorChecks(
+      [monitor("a", { type: "dns", hostname: "example.com" })],
+      undefined,
+      fakeRunner,
+    );
+
+    expect(batches).toHaveLength(0);
   });
 
   it("interprets the response exactly as the in-process path does", async () => {

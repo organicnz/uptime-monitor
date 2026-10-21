@@ -22,12 +22,15 @@ let responses: Map<
   {
     status: number;
     statusText: string;
-    body: string;
+    /** `null` is a response with no body at all. */
+    body: string | null;
     headers?: Record<string, string>;
   }
 > = new Map();
 /** The error the injected transport should throw, if any. */
 let fetchError: Error | null = null;
+/** The error the injected resolver should throw, if any. */
+let resolveError: Error | null = null;
 
 const dependencies: CheckDependencies = {
   fetch: async (url: string) => {
@@ -40,7 +43,10 @@ const dependencies: CheckDependencies = {
       headers: answer.headers,
     });
   },
-  resolveHost: async () => "127.0.0.1",
+  resolveHost: async () => {
+    if (resolveError) throw resolveError;
+    return "127.0.0.1";
+  },
   resolveUrl: async (url: string) => ({
     safeUrl: url,
     resolvedIp: "203.0.113.10",
@@ -104,6 +110,154 @@ describe("in-process HTTP check", () => {
 
     const result = await checkMonitor(monitor({}), undefined, dependencies);
     expect(result.msg).toContain("Cloudflare detected");
+  });
+
+  it("names Vercel protection in the message", async () => {
+    // A 403 from Vercel's protection is a configuration problem, not an
+    // outage, and the message has to say which.
+    responses = new Map([
+      [
+        "/",
+        {
+          status: 429,
+          statusText: "Too Many Requests",
+          body: "",
+          headers: { server: "vercel" },
+        },
+      ],
+    ]);
+    fetchError = null;
+
+    const result = await checkMonitor(monitor({}), undefined, dependencies);
+    expect(result.msg).toContain("Vercel Protection detected");
+  });
+
+  it("refuses a response whose declared length is over the limit", async () => {
+    // A response that claims to be enormous is refused on the claim: the
+    // body is never read.
+    responses = new Map([
+      [
+        "/",
+        {
+          status: 200,
+          statusText: "OK",
+          body: "",
+          headers: { "content-length": String(2 * 1024 * 1024) },
+        },
+      ],
+    ]);
+    fetchError = null;
+
+    const result = await checkMonitor(
+      monitor({ type: "keyword", keyword: "ok" }),
+      undefined,
+      dependencies,
+    );
+    expect(result.msg).toContain("Response body exceeds the 1 MiB limit");
+  });
+
+  it("refuses a response that turns out to be over the limit", async () => {
+    // The header is absent or wrong, so the body is read — and stopped as
+    // soon as it is too big.
+    responses = new Map([
+      [
+        "/",
+        {
+          status: 200,
+          statusText: "OK",
+          body: "x".repeat(1024 * 1024 + 64),
+        },
+      ],
+    ]);
+    fetchError = null;
+
+    const result = await checkMonitor(
+      monitor({ type: "keyword", keyword: "ok" }),
+      undefined,
+      dependencies,
+    );
+    expect(result.msg).toContain("Response body exceeds the 1 MiB limit");
+  });
+
+  it("copes with a response that has no body at all", async () => {
+    responses = new Map([
+      ["/", { status: 204, statusText: "No Content", body: null }],
+    ]);
+    fetchError = null;
+
+    const result = await checkMonitor(
+      monitor({ type: "keyword", keyword: "ok" }),
+      undefined,
+      dependencies,
+    );
+    expect(result.msg).toContain("not found");
+  });
+
+  it("refuses to start once the deadline has passed", async () => {
+    // The deadline is the cron slot's budget. A check that starts after it
+    // has run out of time has to say so rather than spend more.
+    responses = new Map();
+    fetchError = null;
+
+    await expect(
+      checkMonitor(monitor({}), Date.now() - 1, dependencies),
+    ).rejects.toThrow("Execution deadline exceeded");
+  });
+
+  it("reports a blocked host as blocked, not as a connection failure", async () => {
+    // The SSRF filter refusing the host is a different thing from the
+    // port being closed, and the message has to say which happened.
+    responses = new Map();
+    fetchError = null;
+    resolveError = new Error("Target is a private address");
+
+    try {
+      const result = await checkMonitor(
+        monitor({ type: "tcp", hostname: "10.0.0.1", port: 80 }),
+        undefined,
+        dependencies,
+      );
+      expect(result.msg).toContain("SSRF Blocked");
+      expect(result.msg).toContain("private address");
+    } finally {
+      resolveError = null;
+    }
+  });
+
+  it("reports a blocked ping host as blocked", async () => {
+    responses = new Map();
+    fetchError = null;
+    resolveError = new Error("Target is a private address");
+
+    try {
+      const result = await checkMonitor(
+        monitor({ type: "ping", hostname: "10.0.0.1" }),
+        undefined,
+        dependencies,
+      );
+      expect(result.msg).toContain("SSRF Blocked");
+    } finally {
+      resolveError = null;
+    }
+  });
+
+  it("takes the hostname out of a URL in a ping monitor", async () => {
+    // The UI can put a URL in the hostname field for a ping monitor. The
+    // name is what gets resolved, and the request goes to the resolved
+    // address with the path it had.
+    responses = new Map([
+      ["/health", { status: 200, statusText: "OK", body: "" }],
+    ]);
+    fetchError = null;
+    resolveError = null;
+
+    const result = await checkMonitor(
+      monitor({ type: "ping", hostname: "https://example.com/health" }),
+      undefined,
+      dependencies,
+    );
+
+    expect(result.status).toBe(1);
   });
 
   it("reports a missing URL", async () => {

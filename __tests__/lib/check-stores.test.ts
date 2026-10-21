@@ -79,6 +79,76 @@ describe("the check store", () => {
     ]);
   });
 
+  it("finds a monitor inside an active window", async () => {
+    const service = fakeClient({
+      maintenance_monitors: {
+        data: [
+          {
+            maintenance: {
+              active: true,
+              start_date: "2020-01-01T00:00:00.000Z",
+              end_date: "2999-01-01T00:00:00.000Z",
+            },
+          },
+        ],
+      },
+    });
+    const store = createCheckStore(() => service.client);
+
+    expect(await store.underMaintenance(MONITOR_ID)).toBe(true);
+  });
+
+  it("ignores a window that is not active", async () => {
+    const service = fakeClient({
+      maintenance_monitors: {
+        data: [
+          {
+            maintenance: {
+              active: false,
+              start_date: "2020-01-01T00:00:00.000Z",
+              end_date: "2999-01-01T00:00:00.000Z",
+            },
+          },
+        ],
+      },
+    });
+    const store = createCheckStore(() => service.client);
+
+    expect(await store.underMaintenance(MONITOR_ID)).toBe(false);
+  });
+
+  it("ignores a window that has already ended", async () => {
+    const service = fakeClient({
+      maintenance_monitors: {
+        data: [
+          {
+            maintenance: {
+              active: true,
+              start_date: "2020-01-01T00:00:00.000Z",
+              end_date: "2020-02-01T00:00:00.000Z",
+            },
+          },
+        ],
+      },
+    });
+    const store = createCheckStore(() => service.client);
+
+    expect(await store.underMaintenance(MONITOR_ID)).toBe(false);
+  });
+
+  it("fails loudly when the maintenance state cannot be read", async () => {
+    // Silently treating an unreadable window as "not in maintenance"
+    // would run checks against a monitor the operator suspended.
+    const service = fakeClient({
+      maintenance_monitors: { error: { message: "connection reset" } },
+    });
+    const store = createCheckStore(() => service.client);
+
+    await expect(store.underMaintenance(MONITOR_ID)).rejects.toThrow(
+      "Failed to read maintenance state",
+    );
+  });
+
   it("reads the most recent heartbeat of a monitor", async () => {
     const service = fakeClient({
       heartbeats: { data: { status: 0, down_count: 2 } },
@@ -183,4 +253,119 @@ describe("the check store", () => {
       ["status", 0],
     ]);
   });
+
+  it("writes every field of a monitor update", async () => {
+    // The update is built field by field, so a field that is never
+    // carried across is a field the monitor silently stops tracking.
+    const service = fakeClient();
+    const store = createCheckStore(() => service.client);
+
+    await store.updateMonitor(MONITOR_ID, {
+      status: 1,
+      down_count: 2,
+      consecutive_uptime: 3,
+      last_check_at: "2026-01-01T00:00:00.000Z",
+      last_status_change_at: "2026-01-02T00:00:00.000Z",
+      ssl_expiry: "2026-04-01T00:00:00.000Z",
+      ssl_issuer: "Let's Encrypt",
+    });
+
+    expect(service.one("update")?.payload).toEqual({
+      status: 1,
+      down_count: 2,
+      consecutive_uptime: 3,
+      last_check_at: "2026-01-01T00:00:00.000Z",
+      last_status_change_at: "2026-01-02T00:00:00.000Z",
+      ssl_expiry: "2026-04-01T00:00:00.000Z",
+      ssl_issuer: "Let's Encrypt",
+    });
+  });
+});
+
+/**
+ * The adapter fails loudly.
+ *
+ * Every method here throws on a database error rather than carrying on.
+ * That is the whole point: a store that swallowed the error would leave
+ * the monitor's state wrong, and a state that is quietly wrong is worse
+ * than a check that failed loudly.
+ */
+describe("the check store fails loudly", () => {
+  const cases: Array<{
+    what: string;
+    table: string;
+    run: (store: ReturnType<typeof createCheckStore>) => Promise<unknown>;
+    message: string;
+  }> = [
+    {
+      what: "reads the previous heartbeat",
+      table: "heartbeats",
+      run: (store) => store.previousHeartbeat(MONITOR_ID),
+      message: "Failed to read previous heartbeat",
+    },
+    {
+      what: "records a heartbeat",
+      table: "heartbeats",
+      run: (store) =>
+        store.recordHeartbeat({
+          monitor_id: MONITOR_ID,
+          status: 1,
+          msg: "",
+          ping: null,
+          duration: 0,
+          down_count: 0,
+          time: "2026-01-01T00:00:00.000Z",
+          error_type: null,
+        }),
+      message: "Failed to record heartbeat",
+    },
+    {
+      what: "updates the monitor",
+      table: "monitors",
+      run: (store) => store.updateMonitor(MONITOR_ID, { status: 1 }),
+      message: "Failed to update monitor state",
+    },
+    {
+      what: "reads the certificate expiry",
+      table: "monitors",
+      run: (store) => store.sslExpiry(MONITOR_ID),
+      message: "Failed to read SSL state",
+    },
+    {
+      what: "looks for an open incident",
+      table: "incidents",
+      run: (store) => store.openIncident(MONITOR_ID),
+      message: "Failed to check existing incidents",
+    },
+    {
+      what: "opens an incident",
+      table: "incidents",
+      run: (store) =>
+        store.createIncident({
+          monitor_id: MONITOR_ID,
+          title: "t",
+          content: "c",
+          status: 0,
+          started_at: "2026-01-01T00:00:00.000Z",
+        }),
+      message: "Failed to create incident",
+    },
+    {
+      what: "resolves the open incidents",
+      table: "incidents",
+      run: (store) => store.resolveIncidents(MONITOR_ID),
+      message: "Failed to resolve incidents",
+    },
+  ];
+
+  for (const { what, table, run, message } of cases) {
+    it(`fails when it ${what}`, async () => {
+      const service = fakeClient({
+        [table]: { error: { message: "connection reset" } },
+      });
+      const store = createCheckStore(() => service.client);
+
+      await expect(run(store)).rejects.toThrow(message);
+    });
+  }
 });

@@ -47,12 +47,14 @@ function store(
     underMaintenance: boolean;
     previous: { status: number; down_count: number } | null;
     openIncident: { id: string } | null;
+    sslExpiry: string | null;
   }> = {},
 ): FakeStore {
   const heartbeats: HeartbeatRow[] = [];
   const updates: Array<{ id: string; patch: MonitorPatch }> = [];
   const incidents: Array<{ monitor_id: string; title: string }> = [];
   const resolved: string[] = [];
+  const sslExpiry = overrides.sslExpiry ?? null;
 
   return {
     heartbeats,
@@ -78,7 +80,7 @@ function store(
       updates.push({ id, patch });
     },
     async sslExpiry() {
-      return null;
+      return sslExpiry;
     },
     async openIncident() {
       return overrides.openIncident ?? null;
@@ -377,5 +379,258 @@ describe("the monitor state machine", () => {
     );
 
     expect(checkStore.heartbeats).toHaveLength(1);
+  });
+
+  it("does not let a notification that fails take the check down", async () => {
+    // The alert is the last thing that happens, and it is wrapped: a
+    // notification service that is down must not undo the heartbeat, the
+    // incident, or the monitor's state.
+    const notification = { attempted: false };
+    const checkStore = store({
+      previous: { status: HEARTBEAT_STATUS.PENDING, down_count: 2 },
+    });
+    const deps = dependencies({ store: checkStore, notification });
+    // The monitor has no linked channel, so the delivery looks for the
+    // default one — and that is where the failure happens.
+    deps.notifications.store.defaultChannels = async () => {
+      throw new Error("the notification service is down");
+    };
+
+    await processMonitorCheck(
+      monitor({ max_retries: 2 }),
+      undefined,
+      { precomputed: { status: HEARTBEAT_STATUS.DOWN, ping: null, msg: "no" } },
+      deps,
+    );
+
+    expect(checkStore.heartbeats[0]?.status).toBe(HEARTBEAT_STATUS.DOWN);
+    expect(checkStore.incidents).toHaveLength(1);
+    expect(checkStore.updates.length).toBeGreaterThan(0);
+  });
+
+  it("does not let a failed recovery notification undo the incident", async () => {
+    // The incident is closed before the notification is sent, so a
+    // notification service that is down cannot leave the incident open.
+    const checkStore = store({
+      previous: { status: HEARTBEAT_STATUS.DOWN, down_count: 1 },
+    });
+    const deps = dependencies({ store: checkStore });
+    deps.notifications.store.defaultChannels = async () => {
+      throw new Error("the notification service is down");
+    };
+
+    await processMonitorCheck(
+      monitor(),
+      undefined,
+      { precomputed: { status: HEARTBEAT_STATUS.UP, ping: 30, msg: "30ms" } },
+      deps,
+    );
+
+    expect(checkStore.resolved).toEqual([MONITOR_ID]);
+    expect(checkStore.updates.length).toBeGreaterThan(0);
+  });
+
+  it("does not let a failed degraded notification undo the state", async () => {
+    const checkStore = store({
+      previous: { status: HEARTBEAT_STATUS.UP, down_count: 0 },
+    });
+    const deps = dependencies({ store: checkStore });
+    deps.notifications.store.defaultChannels = async () => {
+      throw new Error("the notification service is down");
+    };
+
+    await processMonitorCheck(
+      monitor(),
+      undefined,
+      {
+        precomputed: {
+          status: HEARTBEAT_STATUS.DEGRADED,
+          ping: 900,
+          msg: "slow",
+        },
+      },
+      deps,
+    );
+
+    expect(checkStore.heartbeats[0]?.status).toBe(HEARTBEAT_STATUS.DEGRADED);
+    expect(checkStore.incidents).toHaveLength(0);
+  });
+
+  it("records the certificate on the monitor", async () => {
+    // The SSL check runs for an HTTPS monitor with time to spare, and
+    // what it learns is written back onto the monitor.
+    const checkStore = store();
+    const deps = dependencies({ store: checkStore });
+    deps.ssl.fetch = async () =>
+      new Response(
+        JSON.stringify([
+          {
+            issuer_name: "Let's Encrypt",
+            not_before: "2026-01-01T00:00:00.000Z",
+            not_after: "2026-04-01T00:00:00.000Z",
+            common_name: "api.example.com",
+          },
+        ]),
+        { status: 200 },
+      );
+
+    await processMonitorCheck(
+      monitor({ url: "https://api.example.com/" }),
+      undefined,
+      { precomputed: { status: HEARTBEAT_STATUS.UP, ping: 42, msg: "42ms" } },
+      deps,
+    );
+
+    const sslWrite = checkStore.updates.find(
+      (update) => update.patch.ssl_expiry !== undefined,
+    );
+    expect(sslWrite?.patch.ssl_issuer).toBe("Let's Encrypt");
+    expect(sslWrite?.patch.ssl_expiry).toBe("2026-04-01T00:00:00.000Z");
+  });
+
+  it("warns again when a certificate that was valid has expired", async () => {
+    // The warning is for the crossing. The last check saw a certificate
+    // that was still valid, so this one is the crossing and it is worth
+    // telling somebody about.
+    const notification = { attempted: false };
+    const checkStore = store({
+      sslExpiry: new Date(Date.now() + 5 * 86_400_000).toISOString(),
+    });
+    const deps = dependencies({ store: checkStore, notification });
+    deps.ssl.fetch = async () =>
+      new Response(
+        JSON.stringify([
+          {
+            issuer_name: "Let's Encrypt",
+            not_before: "2025-01-01T00:00:00.000Z",
+            not_after: "2025-04-01T00:00:00.000Z",
+            common_name: "api.example.com",
+          },
+        ]),
+        { status: 200 },
+      );
+
+    await processMonitorCheck(
+      monitor({ url: "https://api.example.com/" }),
+      undefined,
+      { precomputed: { status: HEARTBEAT_STATUS.UP, ping: 42, msg: "42ms" } },
+      deps,
+    );
+
+    expect(notification.attempted).toBe(true);
+  });
+
+  it("does not let a failed certificate warning undo the check", async () => {
+    const checkStore = store();
+    const deps = dependencies({ store: checkStore });
+    deps.ssl.fetch = async () =>
+      new Response(
+        JSON.stringify([
+          {
+            issuer_name: "Let's Encrypt",
+            not_before: "2025-01-01T00:00:00.000Z",
+            not_after: "2025-04-01T00:00:00.000Z",
+            common_name: "api.example.com",
+          },
+        ]),
+        { status: 200 },
+      );
+    deps.notifications.store.defaultChannels = async () => {
+      throw new Error("the notification service is down");
+    };
+
+    await processMonitorCheck(
+      monitor({ url: "https://api.example.com/" }),
+      undefined,
+      { precomputed: { status: HEARTBEAT_STATUS.UP, ping: 42, msg: "42ms" } },
+      deps,
+    );
+
+    expect(checkStore.heartbeats[0]?.status).toBe(HEARTBEAT_STATUS.UP);
+  });
+
+  it("does not let a certificate check that fails undo the check", async () => {
+    // The certificate is a side concern. A resolver that is down must not
+    // turn a healthy monitor into a failed one.
+    const checkStore = store();
+    const deps = dependencies({ store: checkStore });
+    deps.ssl.fetch = async () => {
+      throw new Error("crt.sh is down");
+    };
+
+    await processMonitorCheck(
+      monitor({ url: "https://api.example.com/" }),
+      undefined,
+      { precomputed: { status: HEARTBEAT_STATUS.UP, ping: 42, msg: "42ms" } },
+      deps,
+    );
+
+    expect(checkStore.heartbeats[0]?.status).toBe(HEARTBEAT_STATUS.UP);
+    expect(checkStore.updates.length).toBeGreaterThan(0);
+  });
+
+  it("marks a slow but answering check as degraded", async () => {
+    // The service is answering, only slowly. That is not an outage, but
+    // it is worth knowing about, so the status says so and the message
+    // says how slow.
+    const checkStore = store();
+    const deps = dependencies({ store: checkStore });
+
+    await processMonitorCheck(
+      monitor({ timeout: 1 }),
+      undefined,
+      {
+        precomputed: {
+          status: HEARTBEAT_STATUS.UP,
+          ping: 5_000,
+          msg: "5000ms",
+        },
+      },
+      deps,
+    );
+
+    expect(checkStore.heartbeats[0]?.status).toBe(HEARTBEAT_STATUS.DEGRADED);
+    expect(checkStore.heartbeats[0]?.msg).toContain("slow");
+  });
+
+  it("leaves a fast check alone", async () => {
+    const checkStore = store();
+    const deps = dependencies({ store: checkStore });
+
+    await processMonitorCheck(
+      monitor({ timeout: 30 }),
+      undefined,
+      { precomputed: { status: HEARTBEAT_STATUS.UP, ping: 50, msg: "50ms" } },
+      deps,
+    );
+
+    expect(checkStore.heartbeats[0]?.status).toBe(HEARTBEAT_STATUS.UP);
+  });
+
+  it("warns when the certificate has expired", async () => {
+    const notification = { attempted: false };
+    const checkStore = store();
+    const deps = dependencies({ store: checkStore, notification });
+    deps.ssl.fetch = async () =>
+      new Response(
+        JSON.stringify([
+          {
+            issuer_name: "Let's Encrypt",
+            not_before: "2025-01-01T00:00:00.000Z",
+            not_after: "2025-04-01T00:00:00.000Z",
+            common_name: "api.example.com",
+          },
+        ]),
+        { status: 200 },
+      );
+
+    await processMonitorCheck(
+      monitor({ url: "https://api.example.com/" }),
+      undefined,
+      { precomputed: { status: HEARTBEAT_STATUS.UP, ping: 42, msg: "42ms" } },
+      deps,
+    );
+
+    expect(notification.attempted).toBe(true);
   });
 });
