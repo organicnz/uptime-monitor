@@ -485,6 +485,14 @@ rather than a convention somebody has to remember.
   HTML, so the flag could never turn the route on and the spec that checks
   it could never pass. `__tests__/app/dynamic-pages.test.ts` now fails the
   build for any page that reads the environment without saying so.
+- **The production image is built in CI, and proved to have no Node.js
+  in it.** `.github/workflows/container.yml` builds the image the app is
+  deployed from and then checks the _artefact_ — `command -v node` in the
+  built image must find nothing. Asserting that in a file is weaker than
+  proving it on the thing that ships. A `COPY` of a path that no longer
+  exists fails the build rather than the app, so
+  `__tests__/app/containerfile.test.ts` also checks that every path the
+  image copies out of the build stage still exists.
 - **`AGENTS.md` is managed by Next.js; `CLAUDE.md` is generated from it.**
   Next.js writes its own blocks into `AGENTS.md` — the `nextjs-agent-rules`
   block, and since 16.5 the `nextjs-agent-upgrade` block — and rewrites them

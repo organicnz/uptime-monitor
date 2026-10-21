@@ -1,0 +1,78 @@
+name: Container
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  image:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Ensure a container runtime
+        shell: bash
+        # Podman, because that is what the deployment uses and what the
+        # image is written for. It is preinstalled on the current runner
+        # image; the install is a fallback for the one that is not, and it
+        # is the runner's own sudo, not a local escalation.
+        run: |
+          if ! command -v podman >/dev/null; then
+            sudo apt-get update
+            sudo apt-get install -y podman
+          fi
+          podman --version
+
+      - name: Build the production image
+        # The image is what the app is deployed from, and a `COPY` of a path
+        # that no longer exists fails the *build* rather than the app — so
+        # without this gate the breakage surfaces as a failed deploy.
+        #
+        # The Supabase coordinates are build arguments because Next.js inlines
+        # the public ones into the browser bundle. They are placeholders: the
+        # build only has to be representative, not pointed at anything real.
+        run: |
+          podman build \
+            --build-arg NEXT_PUBLIC_SUPABASE_URL="https://placeholder.supabase.co" \
+            --build-arg NEXT_PUBLIC_SUPABASE_ANON_KEY="placeholder-anon-key" \
+            -t uptime-monitor:ci \
+            -f Containerfile .
+
+      - name: The image contains no Node.js
+        shell: bash
+        # The whole point of the stack: the image that ships has no Node.js
+        # in it. Proving it on the artefact is stronger than asserting it
+        # in a file.
+        run: |
+          if podman run --rm --entrypoint sh uptime-monitor:ci -c 'command -v node'; then
+            echo "::error::the production image contains a Node.js binary"
+            exit 1
+          fi
+          echo "no Node.js in the image"
+
+      - name: The image has what the server needs
+        shell: bash
+        run: |
+          podman run --rm --entrypoint sh uptime-monitor:ci -c '
+            set -e
+            test -d /app/.next || { echo "::error::no build output"; exit 1; }
+            test -x /app/probe || { echo "::error::no probe binary"; exit 1; }
+            test -f /app/package.json || { echo "::error::no package.json"; exit 1; }
+            command -v bun >/dev/null || { echo "::error::no bun"; exit 1; }
+            echo "the image has the build, the probe and bun"
+          '
+
+      - name: Report the image size
+        shell: bash
+        run: podman images --format "{{.Repository}}:{{.Tag}} {{.Size}}" uptime-monitor:ci
