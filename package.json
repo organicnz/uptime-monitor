@@ -29,7 +29,7 @@
     "e2e:install": "bun --bun playwright install chromium",
     "e2e:install:ci": "bun --bun playwright install --with-deps chromium",
     "e2e:seed": "bun scripts/e2e-seed.ts",
-    "verify:delivery": "bun run typecheck && bun run lint && bun run format:check && bun run coverage-check && bun run build && bun run bundle-size && bun run e2e:ci",
+    "verify:delivery": "bun run doctor && bun run typecheck && bun run lint && bun run format:check && bun run coverage-check && bun run build && bun run bundle-size && bun run e2e:ci",
     "test:coverage": "bun scripts/coverage-check.ts",
     "audit": "bun scripts/audit.ts",
     "audit:report": "bun audit",
