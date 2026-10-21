@@ -162,6 +162,15 @@ jobs:
           E2E_EMAIL: e2e@uptime-monitor.test
           E2E_PASSWORD: E2ePassword123
           E2E_PUBLIC_STATUS_SLUG: e2e-status
+      # The WebGPU specs, in their own step so they reuse the build above.
+      #
+      # They are the only check that can see a chart which never
+      # initialises: the unit tests, the type checker, the linter and the
+      # production build all pass on a blank canvas. The specs skip
+      # themselves on a runner with no WebGPU adapter, so this step cannot
+      # fail for a reason that is not the product.
+      - name: WebGPU specs
+        run: E2E_PRODUCTION=1 bun run verify:gpu
       - uses: actions/upload-artifact@v4
         if: always()
         with:

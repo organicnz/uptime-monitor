@@ -476,6 +476,15 @@ rather than a convention somebody has to remember.
   subdomain of `https://<ref>.supabase.co` and is already public
 - `migrate` and `edge-functions` declare `environment: production`; add
   required reviewers under Settings -> Environments
+- **A page that reads the environment is rendered per request.**
+  `app/gpu-fixture/page.tsx` gates itself on `E2E_GPU_FIXTURE`, which the
+  e2e server only sets when it starts — and it declared
+  `export const dynamic = "force-dynamic"` because a page that reads
+  nothing dynamic is _prerendered_, and a prerender evaluates the gate at
+  build time. The built page had its "not found" response baked into the
+  HTML, so the flag could never turn the route on and the spec that checks
+  it could never pass. `__tests__/app/dynamic-pages.test.ts` now fails the
+  build for any page that reads the environment without saying so.
 - **`AGENTS.md` is managed by Next.js; `CLAUDE.md` is generated from it.**
   Next.js writes its own blocks into `AGENTS.md` — the `nextjs-agent-rules`
   block, and since 16.5 the `nextjs-agent-upgrade` block — and rewrites them

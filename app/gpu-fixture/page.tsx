@@ -12,9 +12,15 @@ import { GPUStatusBackground } from "@/components/gpu-status-background-client";
  * Gated on an env var that only the Playwright web server sets, so this route
  * 404s in a real deployment rather than shipping a demo page to production.
  *
- * This is a server component, so the environment is read from the live Bun
- * process rather than inlined into the browser bundle.
+ * The page is forced dynamic, and it has to be. It reads the environment and
+ * nothing else, which is exactly what makes Next.js prerender it — and a
+ * prerender evaluates the gate at *build* time, before the Playwright
+ * server has set the flag. The result was a 404 baked into the HTML, so the
+ * flag could never turn the route on. Reading the environment at request
+ * time is the whole point of the gate.
  */
+export const dynamic = "force-dynamic";
+
 function enabled(): boolean {
   return Bun.env.E2E_GPU_FIXTURE === "1";
 }
