@@ -60,6 +60,14 @@ declare module "bun:fs" {
    * `prefix` is normally `join(tmpdir(), "some-prefix-")`.
    */
   export function mkdtempSync(prefix: string): string;
+
+  /**
+   * Change a file's mode.
+   *
+   * `bun:fs` re-exports it at runtime; it is declared here because the
+   * type definitions do not carry it over.
+   */
+  export function chmodSync(path: string | URL, mode: number): void;
 }
 
 declare module "bun:fs/promises" {

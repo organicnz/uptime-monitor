@@ -111,7 +111,7 @@ ever evaluated, and the same commit could pass the coverage gate or fail it.
 **Every file has a floor, not just the aggregate.** An aggregate can hide
 a file that nothing imports any more: it drops out of the report and the
 average barely moves. The gate holds each file to 80% of its functions and
-70% of its lines, on top of the 85% / 85% aggregate.
+80% of its lines, on top of the 85% / 85% aggregate.
 
 That floor is not decoration. It is what the coverage report exposed: the
 aggregate read 86% while `lib/notifications.ts` and

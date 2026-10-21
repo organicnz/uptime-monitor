@@ -155,7 +155,7 @@ describe("the coverage gate measures a stable set", () => {
     // drops out of the report and the average barely moves. The floor is
     // what stops that.
     expect(MIN_FILE_FUNCS).toBe(80);
-    expect(MIN_FILE_LINES).toBe(70);
+    expect(MIN_FILE_LINES).toBe(80);
     expect(MIN_FUNCS).toBe(85);
     expect(MIN_LINES).toBe(85);
   });

@@ -93,4 +93,52 @@ describe("retention cleanup", () => {
     expect(response.status).toBe(401);
     expect(rpc.calls).toHaveLength(0);
   });
+
+  it("answers a health check without a credential", async () => {
+    // The health check is what a monitor polls; it must not need the
+    // secret, and it must not touch the database.
+    const response = await GET(request("/api/cron/cleanup?health=true", "GET"));
+
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as unknown;
+    expect(body).toMatchObject({ status: "healthy" });
+    expect(rpc.calls).toHaveLength(0);
+  });
+
+  it("refuses a health check that asks for a cleanup", async () => {
+    // `?health=true` answers a health check. Anything else on the GET is
+    // a cleanup request, and a cleanup request needs the credential.
+    const response = await GET(
+      new Request("http://localhost/api/cron/cleanup", {
+        method: "GET",
+      }) as never,
+    );
+
+    expect(response.status).toBe(401);
+    expect(rpc.calls).toHaveLength(0);
+  });
+
+  it("refuses a QStash request whose signature does not verify", async () => {
+    // A request that carries a QStash signature is authenticated by the
+    // signature rather than by the bearer token, and a signature that
+    // does not verify is a refusal.
+    process.env.QSTASH_TOKEN = "test-token";
+    process.env.QSTASH_CURRENT_SIGNING_KEY = "current-signing-key";
+    process.env.QSTASH_NEXT_SIGNING_KEY = "next-signing-key";
+    try {
+      const response = await POST(
+        new Request("http://localhost/api/cron/cleanup", {
+          method: "POST",
+          headers: { "upstash-signature": "not-a-real-signature" },
+        }) as never,
+      );
+
+      expect(response.status).toBe(401);
+      expect(rpc.calls).toHaveLength(0);
+    } finally {
+      delete process.env.QSTASH_TOKEN;
+      delete process.env.QSTASH_CURRENT_SIGNING_KEY;
+      delete process.env.QSTASH_NEXT_SIGNING_KEY;
+    }
+  });
 });

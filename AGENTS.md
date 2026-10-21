@@ -306,7 +306,7 @@ rather than a convention somebody has to remember.
 - **Every file has a floor, not just the aggregate.** The aggregate can
   hide a file that nothing imports any more: it drops out of the report
   and the average barely moves. `scripts/coverage-check.ts` therefore
-  holds each file to 80% of its functions and 70% of its lines, on top of
+  holds each file to 80% of its functions and 80% of its lines, on top of
   the 85% / 85% aggregate. `COVERAGE_MIN_FILE_FUNCS` and
   `COVERAGE_MIN_FILE_LINES` raise or lower it; zero turns it off. The
   floor is what caught the two files that hold the notification

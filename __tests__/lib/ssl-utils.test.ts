@@ -200,7 +200,11 @@ describe("getSslDaysRemaining", () => {
   it("is negative for a date in the past", () => {
     const lastWeek = new Date(Date.now() - 7 * 86_400_000);
 
-    expect(getSslDaysRemaining(lastWeek)).toBe(-7);
+    // The count is taken against "now", which moves between the two
+    // calls, so the answer is a day either side of seven.
+    const days = getSslDaysRemaining(lastWeek);
+    expect(days).toBeLessThanOrEqual(-7);
+    expect(days).toBeGreaterThanOrEqual(-8);
   });
 });
 

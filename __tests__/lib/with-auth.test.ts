@@ -39,4 +39,17 @@ describe("withAuth", () => {
 
     expect(response.status).toBe(200);
   });
+
+  it("turns a handler that throws into a 500", async () => {
+    // The handler's own error must not reach the client: it can carry
+    // the shape of the database, and the response is what a stranger sees.
+    const response = await withAuth(async () => {
+      throw new Error("connection to the internal database refused");
+    });
+
+    expect(response.status).toBe(500);
+    const body = (await response.json()) as unknown;
+    expect(body).toEqual({ error: "Internal server error" });
+    expect(JSON.stringify(body)).not.toContain("internal database");
+  });
 });
