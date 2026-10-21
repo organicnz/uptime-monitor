@@ -373,6 +373,29 @@ Tests that need a seeded account (`E2E_EMAIL` / `E2E_PASSWORD`) or a published
 status page (`E2E_PUBLIC_STATUS_SLUG`) skip when those are unset; CI sets them
 and fails loudly if they are missing.
 
+### Running the e2e suite without a database
+
+Most of the e2e suite needs no database at all: it asserts the **auth
+boundaries** and the **security headers** of a running instance, and those
+assertions are exactly the ones that must hold on every deployment. The
+specs that need a seeded account skip when their variables are unset.
+
+That makes the suite runnable against any instance, including a production
+build on a machine with no local Supabase:
+
+```bash
+# Terminal 1 — a real build, served by Bun.
+bun run build
+NEXT_PUBLIC_SUPABASE_URL=... CRON_SECRET=... bun --bun next start -p 3101
+
+# Terminal 2 — the suite, against the instance that is already running.
+E2E_BASE_URL=http://127.0.0.1:3101 E2E_PRODUCTION=1 bun run e2e
+```
+
+`E2E_BASE_URL` makes Playwright reuse a server that is already up instead of
+starting its own. The result is a full end-to-end pass — real browser, real
+routes, real middleware — with the two seeded specs skipped.
+
 The e2e specs are named `*.e2e.mts` on purpose. Playwright transforms
 TypeScript for CommonJS files by hooking `require.extensions`, which Bun does
 not implement; the ESM loader path it uses for `.mts` works on Bun. A `.ts`

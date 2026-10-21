@@ -398,6 +398,13 @@ rather than a convention somebody has to remember.
   testing a recorder. That is not hypothetical: it was exactly what
   happened, and it showed up as a test that passed on its own and failed
   in the suite.
+- **The e2e suite runs without a database.** Most of it asserts the auth
+  boundaries and the security headers of a running instance, which is
+  exactly what has to hold on every deployment, and the specs that need a
+  seeded account skip when their variables are unset. `E2E_BASE_URL` makes
+  Playwright reuse a server that is already up, so the suite is runnable
+  against a production build on a machine with no local Supabase. That is
+  the check to reach for before assuming a change is safe.
 - **A process-wide mock belongs in the preload.** The Supabase server
   client reads cookies from `next/headers`, which needs a request context
   a unit test does not have, so the suite replaces it. Doing that in
