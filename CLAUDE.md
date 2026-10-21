@@ -306,12 +306,19 @@ rather than a convention somebody has to remember.
 - **Every file has a floor, not just the aggregate.** The aggregate can
   hide a file that nothing imports any more: it drops out of the report
   and the average barely moves. `scripts/coverage-check.ts` therefore
-  holds each file to 60% of its functions and 40% of its lines, on top of
-  the 70% / 80% aggregate. `COVERAGE_MIN_FILE_FUNCS` and
+  holds each file to 80% of its functions and 70% of its lines, on top of
+  the 85% / 85% aggregate. `COVERAGE_MIN_FILE_FUNCS` and
   `COVERAGE_MIN_FILE_LINES` raise or lower it; zero turns it off. The
-  floor is what would have caught the two files that hold the
-  notification credentials and had no test at all: the aggregate read 86%
-  while `lib/notifications.ts` sat at 0% of its functions.
+  floor is what caught the two files that hold the notification
+  credentials and had no test at all: the aggregate read 86% while
+  `lib/notifications.ts` sat at 0% of its functions.
+- **The Supabase adapter is behind a seam too.** The store factories take
+  the clients they use — `createSupabaseStore(clients)` for the channel
+  store, `createSupabaseStore(service)` for the rest — so the queries can
+  be asserted without a database. What that buys is the part that is easy
+  to get wrong and impossible to see: that a read filters by the owner, and
+  that a _batch_ credential read goes through the service-role client while
+  a single one goes through the caller's.
 - **The audit gate reads `bun audit --json`.** The advisories come back as
   data — a package key and a record per advisory — so the gate can decide
   per advisory instead of testing the tool's output for a sentence. The

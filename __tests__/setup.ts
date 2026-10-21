@@ -26,8 +26,25 @@ mock.module("next/navigation", () => ({
   },
 }));
 
+/**
+ * The answers the mocked server actions give.
+ *
+ * A test that needs a different answer changes it here and puts it back
+ * when it is done. The mock is process-wide, so a test that replaced the
+ * module with its own would hand that replacement to every other test
+ * file — and the replacement would outlive the test that wanted it.
+ */
+export const mockedActions = {
+  duplicateMonitor: {
+    success: false,
+    error: "mocked",
+  } as
+    | { success: true; name: string; id: string }
+    | { success: false; error: string },
+};
+
 mock.module("@/lib/actions/monitors", () => ({
-  duplicateMonitor: async () => ({ success: false, error: "mocked" }),
+  duplicateMonitor: async () => mockedActions.duplicateMonitor,
 }));
 
 /**

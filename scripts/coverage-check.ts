@@ -19,10 +19,10 @@
  * source instead of from a table.
  *
  * Thresholds:
- *   MIN_COVERAGE_FUNCS       aggregate function coverage, default 70
- *   MIN_COVERAGE_LINES       aggregate line coverage, default 80
- *   COVERAGE_MIN_FILE_FUNCS  per-file function floor, default 60 (0 disables)
- *   COVERAGE_MIN_FILE_LINES  per-file line floor, default 40 (0 disables)
+ *   MIN_COVERAGE_FUNCS       aggregate function coverage, default 85
+ *   MIN_COVERAGE_LINES       aggregate line coverage, default 85
+ *   COVERAGE_MIN_FILE_FUNCS  per-file function floor, default 80 (0 disables)
+ *   COVERAGE_MIN_FILE_LINES  per-file line floor, default 70 (0 disables)
  *
  * The per-file floor is the stricter of the two, and it is the one that
  * catches the failure the aggregate hides: a file that nothing imports any
@@ -31,10 +31,10 @@
  */
 import { join } from "bun:path";
 
-export const MIN_FUNCS = Number(Bun.env.MIN_COVERAGE_FUNCS ?? 70);
-export const MIN_LINES = Number(Bun.env.MIN_COVERAGE_LINES ?? 80);
-export const MIN_FILE_FUNCS = Number(Bun.env.COVERAGE_MIN_FILE_FUNCS ?? 60);
-export const MIN_FILE_LINES = Number(Bun.env.COVERAGE_MIN_FILE_LINES ?? 40);
+export const MIN_FUNCS = Number(Bun.env.MIN_COVERAGE_FUNCS ?? 85);
+export const MIN_LINES = Number(Bun.env.MIN_COVERAGE_LINES ?? 85);
+export const MIN_FILE_FUNCS = Number(Bun.env.COVERAGE_MIN_FILE_FUNCS ?? 80);
+export const MIN_FILE_LINES = Number(Bun.env.COVERAGE_MIN_FILE_LINES ?? 70);
 
 /**
  * Where the lcov report is written.

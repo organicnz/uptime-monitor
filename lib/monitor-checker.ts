@@ -29,7 +29,10 @@ import {
   SSL_DAYS_REMAINING_UNKNOWN,
   type SslDependencies,
 } from "@/lib/ssl-utils";
-import { createServiceClient } from "@/lib/supabase/service";
+import {
+  createServiceClient,
+  type ServiceClient,
+} from "@/lib/supabase/service";
 import type { Heartbeat, Monitor } from "@/types/application";
 
 export { determineEffectiveStatus, HEARTBEAT_STATUS };
@@ -126,10 +129,12 @@ export type CheckStore = {
   resolveIncidents(monitorId: string): Promise<void>;
 };
 
-function createSupabaseStore(): CheckStore {
+export function createSupabaseStore(
+  service: () => ServiceClient = () => createServiceClient(),
+): CheckStore {
   return {
     async underMaintenance(monitorId) {
-      const supabase = createServiceClient();
+      const supabase = service();
       const now = new Date().toISOString();
 
       const { data, error } = await supabase
@@ -166,7 +171,7 @@ function createSupabaseStore(): CheckStore {
     },
 
     async previousHeartbeat(monitorId) {
-      const supabase = createServiceClient();
+      const supabase = service();
       const { data, error } = await supabase
         .from("heartbeats")
         .select("status, down_count")
@@ -183,7 +188,7 @@ function createSupabaseStore(): CheckStore {
     },
 
     async recordHeartbeat(heartbeat) {
-      const supabase = createServiceClient();
+      const supabase = service();
       const { error } = await supabase.from("heartbeats").insert(heartbeat);
       if (error) {
         throw new Error(`Failed to record heartbeat: ${error.message}`);
@@ -191,7 +196,7 @@ function createSupabaseStore(): CheckStore {
     },
 
     async updateMonitor(id, patch) {
-      const supabase = createServiceClient();
+      const supabase = service();
       // Built field by field rather than spread: the spread would widen a
       // field past the column's type.
       const update: {
@@ -228,7 +233,7 @@ function createSupabaseStore(): CheckStore {
     },
 
     async sslExpiry(monitorId) {
-      const supabase = createServiceClient();
+      const supabase = service();
       const { data, error } = await supabase
         .from("monitors")
         .select("ssl_expiry")
@@ -243,7 +248,7 @@ function createSupabaseStore(): CheckStore {
     },
 
     async openIncident(monitorId) {
-      const supabase = createServiceClient();
+      const supabase = service();
       const { data, error } = await supabase
         .from("incidents")
         .select("id")
@@ -260,7 +265,7 @@ function createSupabaseStore(): CheckStore {
     },
 
     async createIncident(incident) {
-      const supabase = createServiceClient();
+      const supabase = service();
       const { error } = await supabase.from("incidents").insert(incident);
 
       if (error) {
@@ -269,7 +274,7 @@ function createSupabaseStore(): CheckStore {
     },
 
     async resolveIncidents(monitorId) {
-      const supabase = createServiceClient();
+      const supabase = service();
       const { error } = await supabase
         .from("incidents")
         .update({

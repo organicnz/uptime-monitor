@@ -1,3 +1,4 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
 import {
@@ -9,7 +10,27 @@ import {
 } from "@/lib/notification-types";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
-import type { Json } from "@/types/database";
+import type { Database, Json } from "@/types/database";
+
+/**
+ * The clients the store reaches for.
+ *
+ * Two, and the difference matters: the user's client reads and writes the
+ * channel row, and the service-role client reads a *batch* of credentials
+ * for delivery. A credential is only ever read by a process that is
+ * allowed to send the notification.
+ *
+ * The seam is here so that the adapter can be tested without a live
+ * database and without replacing a module — `mock.module` in Bun is
+ * process-wide, so a test that replaced one would silently change what
+ * every other test file sees.
+ */
+export type ChannelClients = {
+  /** The user's own client. */
+  user: () => Promise<SupabaseClient<Database>>;
+  /** The service-role client. */
+  service: () => SupabaseClient<Database>;
+};
 
 /**
  * Server-side access to notification channels.
@@ -114,10 +135,15 @@ export type ChannelStore = {
  * client for the credentials — a credential is only ever read by a process
  * that is allowed to send the notification.
  */
-function createSupabaseStore(): ChannelStore {
+export function createSupabaseStore(
+  clients: ChannelClients = {
+    user: () => createClient(),
+    service: () => createServiceClient(),
+  },
+): ChannelStore {
   return {
     async insert(input) {
-      const supabase = await createClient();
+      const supabase = await clients.user();
       const { data, error } = await supabase
         .from("notification_channels")
         .insert({
@@ -141,7 +167,7 @@ function createSupabaseStore(): ChannelStore {
     },
 
     async read(id, userId) {
-      const supabase = await createClient();
+      const supabase = await clients.user();
       const { data, error } = await supabase
         .from("notification_channels")
         .select("id, type, config, secret_id")
@@ -159,7 +185,7 @@ function createSupabaseStore(): ChannelStore {
     },
 
     async update(id, userId, patch) {
-      const supabase = await createClient();
+      const supabase = await clients.user();
       // Built field by field rather than spread: the spread would widen
       // `config` past the column's JSON type.
       const update: {
@@ -183,7 +209,7 @@ function createSupabaseStore(): ChannelStore {
     },
 
     async remove(id, userId) {
-      const supabase = await createClient();
+      const supabase = await clients.user();
       const { error } = await supabase
         .from("notification_channels")
         .delete()
@@ -194,7 +220,7 @@ function createSupabaseStore(): ChannelStore {
     },
 
     async setSecret(channelId, secret) {
-      const supabase = await createClient();
+      const supabase = await clients.user();
       const { error } = await supabase.rpc("notification_channel_set_secret", {
         p_channel_id: channelId,
         p_secret: secret as Json,
@@ -206,7 +232,7 @@ function createSupabaseStore(): ChannelStore {
     async readSecret(channelId) {
       // The user-scoped client, because the RPC is `SECURITY DEFINER` with
       // an owner check: it is the caller's own channel that is readable.
-      const supabase = await createClient();
+      const supabase = await clients.user();
       const { data, error } = await supabase.rpc(
         "notification_channel_secret",
         {
@@ -225,7 +251,7 @@ function createSupabaseStore(): ChannelStore {
 
     async readSecrets(channelIds) {
       // The service-role client is synchronous: it has no session to read.
-      const supabase = createServiceClient();
+      const supabase = clients.service();
       const { data, error } = await supabase.rpc(
         "notification_channel_secrets",
         {

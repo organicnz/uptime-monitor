@@ -6,6 +6,8 @@ import { Toaster } from "sonner";
 
 import { MonitorCard } from "@/components/ui/monitor-card";
 
+import { mockedActions } from "../../setup";
+
 afterEach(() => {
   cleanup();
 });
@@ -114,5 +116,42 @@ describe("MonitorCard", () => {
     expect(titles).toHaveLength(1);
     const descriptions = await screen.findAllByText("mocked");
     expect(descriptions).toHaveLength(1);
+  });
+
+  it("shows a success toast when duplicating works", async () => {
+    // The mocked action is steered rather than replaced: the mock is
+    // process-wide, so a test that registered its own would hand it to
+    // every other test file.
+    mockedActions.duplicateMonitor = {
+      success: true,
+      name: "HTTP Monitor copy",
+      id: "mon-2",
+    };
+    try {
+      const user = userEvent.setup();
+      render(
+        <>
+          <Toaster />
+          <MonitorCard monitor={mockMonitor} onViewDetail={mockOnViewDetail} />
+        </>,
+      );
+      await user.click(screen.getByRole("button"));
+      await user.click(await screen.findByText("Duplicate"));
+      const titles = await screen.findAllByText(/Created "HTTP Monitor copy"/);
+      expect(titles.length).toBeGreaterThan(0);
+    } finally {
+      mockedActions.duplicateMonitor = { success: false, error: "mocked" };
+    }
+  });
+
+  it("renders the monitor's tags", () => {
+    render(
+      <MonitorCard
+        monitor={{ ...mockMonitor, tags: ["production", "eu"] }}
+        onViewDetail={mockOnViewDetail}
+      />,
+    );
+    expect(screen.getByText("production")).toBeDefined();
+    expect(screen.getByText("eu")).toBeDefined();
   });
 });

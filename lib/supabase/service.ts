@@ -6,6 +6,14 @@ import { Database } from "@/types/database";
 let serviceClient: SupabaseClient<Database> | null = null;
 
 /**
+ * The service-role client: no session, and row level security does not
+ * apply.
+ *
+ * Named so that a port can say which client it means.
+ */
+export type ServiceClient = SupabaseClient<Database>;
+
+/**
  * Service role client for server-side operations that bypass RLS: cron jobs
  * and notification delivery.
  *
@@ -16,7 +24,7 @@ let serviceClient: SupabaseClient<Database> | null = null;
  *
  * @throws MissingEnvError naming the variable that is absent
  */
-export function createServiceClient(): SupabaseClient<Database> {
+export function createServiceClient(): ServiceClient {
   if (serviceClient) return serviceClient;
 
   const { url } = getSupabaseEnv();

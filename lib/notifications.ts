@@ -6,7 +6,10 @@ import type {
   NotificationType,
 } from "@/lib/notification-types";
 import { fetchWithSsrfProtection, resolveAndValidateUrl } from "@/lib/security";
-import { createServiceClient } from "@/lib/supabase/service";
+import {
+  createServiceClient,
+  type ServiceClient,
+} from "@/lib/supabase/service";
 
 import {
   type NotificationPayload,
@@ -75,10 +78,12 @@ export type NotificationStore = {
 
 const CHANNEL_COLUMNS = "id, user_id, name, type, config, active";
 
-function createSupabaseStore(): NotificationStore {
+export function createSupabaseStore(
+  service: () => ServiceClient = () => createServiceClient(),
+): NotificationStore {
   return {
     async monitorOwner(monitorId) {
-      const supabase = createServiceClient();
+      const supabase = service();
       const { data, error } = await supabase
         .from("monitors")
         .select("user_id")
@@ -90,7 +95,7 @@ function createSupabaseStore(): NotificationStore {
     },
 
     async linkedChannelIds(monitorId) {
-      const supabase = createServiceClient();
+      const supabase = service();
       const { data, error } = await supabase
         .from("monitor_notifications")
         .select("channel_id")
@@ -104,7 +109,7 @@ function createSupabaseStore(): NotificationStore {
     },
 
     async channelsByIds(userId, ids) {
-      const supabase = createServiceClient();
+      const supabase = service();
       const { data, error } = await supabase
         .from("notification_channels")
         .select(CHANNEL_COLUMNS)
@@ -120,7 +125,7 @@ function createSupabaseStore(): NotificationStore {
     },
 
     async defaultChannels(userId) {
-      const supabase = createServiceClient();
+      const supabase = service();
       const { data, error } = await supabase
         .from("notification_channels")
         .select(CHANNEL_COLUMNS)
@@ -136,7 +141,7 @@ function createSupabaseStore(): NotificationStore {
     },
 
     async allActiveChannels(userId) {
-      const supabase = createServiceClient();
+      const supabase = service();
       const { data, error } = await supabase
         .from("notification_channels")
         .select(CHANNEL_COLUMNS)

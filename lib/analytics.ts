@@ -1,5 +1,8 @@
 import { HEARTBEAT_STATUS } from "@/lib/monitor-status";
-import { createServiceClient } from "@/lib/supabase/service";
+import {
+  createServiceClient,
+  type ServiceClient,
+} from "@/lib/supabase/service";
 import type { Monitor } from "@/types/application";
 
 export type RollingStats = {
@@ -44,10 +47,12 @@ export type AnalyticsStore = {
   ): Promise<{ error: string | null }>;
 };
 
-function createSupabaseStore(): AnalyticsStore {
+export function createSupabaseStore(
+  service: () => ServiceClient = () => createServiceClient(),
+): AnalyticsStore {
   return {
     async recentHeartbeats(monitorId, since) {
-      const supabase = createServiceClient();
+      const supabase = service();
       const { data, error } = await supabase
         .from("heartbeats")
         .select("status, ping, duration")
@@ -63,7 +68,7 @@ function createSupabaseStore(): AnalyticsStore {
     },
 
     async writeStats(monitorId, stats) {
-      const supabase = createServiceClient();
+      const supabase = service();
       const { error } = await supabase
         .from("monitors")
         .update({

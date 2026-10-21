@@ -229,7 +229,7 @@ typeAware = true
 # method returns a promise, so the mock returns a promise — but it has
 # nothing to wait for, because the value is already in hand. The rule
 # would ask the mock to await a promise it just created.
-files = ["**/*.test.ts", "**/*.test.tsx", "**/setup.ts"]
+files = ["**/__tests__/**", "**/*.test.ts", "**/*.test.tsx", "**/setup.ts"]
 rules = {
   "@typescript-eslint/await-thenable" = "off",
   "@typescript-eslint/no-floating-promises" = "off",
