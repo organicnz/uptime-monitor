@@ -174,9 +174,19 @@ maxWarnings = 0
 # assertion that does not change anything — the compiler is silent about
 # all three, and a linter with the types in hand is not.
 #
-# It costs about a second on this repository, and it runs in CI as part of
-# the same `bun lint` the local run uses.
-typeAware = true
+# It is OFF here, because Bun's linter gets its types from Bun's own
+# checker, and this repository has one type checker: `tsrs`. The rules
+# themselves are in `lib/type-aware-lint/`, they ask `tsrs` for the types
+# through its API, and they run as part of `bun run lint`. Turning this on
+# would put a second type checker in the chain, checking every file
+# twice, with two answers.
+#
+# The rules that need no types — the syntax, the AST and the promise
+# rules — are unaffected: they are the ones this linter runs.
+#
+# The linter says "Skipped 15 rules that need type information" and means
+# it: those fifteen are the ones `bun run lint:types` runs, with `tsrs`.
+typeAware = false
 
 [lint.rules]
 # Bun's own rules, off by default, that only a Bun-aware linter can check.
@@ -214,6 +224,15 @@ typeAware = true
 # (which is an entry point, not a library), and of the shadcn/ui `displayName`
 # assignments that Radix's own components ship with.
 "bun/no-side-effects-on-import" = "off"
+
+[[lint.overrides]]
+# The type-aware fixture. It needs `any` on purpose — an `any` is what the
+# `no-unsafe-*` rules are about — and the rules that need types are the
+# ones the fixture is for.
+files = ["fixtures/**"]
+rules = {
+  "@typescript-eslint/no-explicit-any" = "off",
+}
 
 [[lint.overrides]]
 # The test suite. `expect(...).resolves` returns a thenable that no type

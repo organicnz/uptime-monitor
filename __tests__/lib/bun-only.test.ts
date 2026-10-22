@@ -351,7 +351,8 @@ describe("bun-only toolchain: Bun is configured as the whole toolchain", () => {
 
     expect(pkg.scripts?.format).toBe("bun fmt");
     expect(pkg.scripts?.["format:check"]).toBe("bun fmt --check");
-    expect(pkg.scripts?.lint).toBe("bun lint");
+    // The linter is Bun's, and the rules that need types run with `tsrs`.
+    expect(pkg.scripts?.lint).toBe("bun lint && bun run lint:types");
     expect(pkg.scripts?.["lint:fix"]).toBe("bun lint --fix");
   });
 
@@ -642,16 +643,25 @@ describe("bun-only toolchain: Bun's own APIs carry the load", () => {
     expect(bunfig.fmt?.sortTailwindcss).toBeDefined();
   });
 
-  it("lints with the types in hand", () => {
+  it("lints with the types in hand, from one type checker", () => {
     // The type-aware rules are the ones that need the type checker: an
     // `any` that came off the network, a promise nobody awaited, a type
     // assertion that changes nothing. The compiler is silent about all
     // three, and a linter without the types cannot see them either.
+    //
+    // They run with `tsrs`, through its API, and the linter's own
+    // type-aware mode is off. The linter gets its types from Bun's own
+    // checker, and this repository has one type checker: `tsrs`.
     const bunfig = Bun.TOML.parse(read("bunfig.toml")) as {
       lint?: { typeAware?: boolean; maxWarnings?: number };
     };
+    const pkg = JSON.parse(read("package.json")) as {
+      scripts?: Record<string, string>;
+    };
 
-    expect(bunfig.lint?.typeAware).toBe(true);
+    expect(bunfig.lint?.typeAware).toBe(false);
     expect(bunfig.lint?.maxWarnings).toBe(0);
+    expect(pkg.scripts?.["lint:types"]).toBe("bun scripts/type-aware-lint.ts");
+    expect(pkg.scripts?.lint).toContain("bun run lint:types");
   });
 });

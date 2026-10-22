@@ -9,6 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- **The type-aware lint runs with `tsrs`.** The rules that need the type
+  checker — an `any` that came off the network, a promise nobody awaited, a
+  type assertion that changes nothing — used to run through the linter's
+  own type checker, because that is where the linter gets its types from.
+  They run through `tsrs` now, through its API, and the same program the
+  `tsrs --noEmit` gate checks with. `bunfig.toml` sets
+  `[lint] typeAware = false`; the rules are in `lib/type-aware-lint/` and
+  `bun run lint` runs them.
+  - The repository has one type checker. Leaving the linter's own one on
+    would check every file twice, with two answers.
+  - The types come back in one batch per file, and the requests that
+    cannot be batched are fired together, because the API pipelines them.
+    The whole repository is about a second.
+  - The rules read `bunfig.toml`'s overrides and its `eslint-disable`
+    comments, so a rule that is off for the test tree is off here too.
+  - `__tests__/lib/type-aware-lint.test.ts` runs both implementations
+    against a fixture that breaks one rule of each kind, and compares them
+    rule by rule and place by place.
 - **Bun-only runtime**: Node.js is gone from the stack — package manager
   (`bun.lock`), task runner, unit tests, scripts, CI, and the production
   server all run on Bun.

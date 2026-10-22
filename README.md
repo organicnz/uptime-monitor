@@ -68,7 +68,7 @@ interface that Bun already implements:
 | Tables          | `Bun.inspect.table`                                   | `scripts/bundle-size.ts` prints the largest files |
 | Coverage        | `bun test --coverage` + Bun's lcov report             | `scripts/coverage-check.ts` reads `lcov.info`     |
 | Formatting      | `bun fmt` with `sortImports` and `sortTailwindcss`    | `bunfig.toml` `[fmt]`                             |
-| Type-aware lint | `bun lint` with `[lint] typeAware = true`             | `bunfig.toml` `[lint]`                            |
+| Type-aware lint | `bun run lint:types`, with the types from `tsrs`      | `lib/type-aware-lint/`                            |
 | Package policy  | `install.auto = "disable"`, `trustedDependencies: []` | `bunfig.toml` and `package.json`                  |
 
 Three of these are worth the extra words.
@@ -80,13 +80,34 @@ tell `bun = true` from a line of prose that mentions it; a parse can only
 see a value Bun itself will act on. An unparseable `bunfig.toml` is a
 failure too, because Bun ignores the whole file when it cannot read it.
 
-**The linter sees the types.** `bunfig.toml` sets `[lint] typeAware = true`,
-which turns on the rules that need the type checker: an `any` that came
-off the network, a promise nobody awaited, a type assertion that changes
-nothing, a comparison against an enum member written as a string literal.
-The compiler is silent about all of them. Turning it on meant fixing 244
-findings, and the biggest cluster had one root cause: `response.json()` is
-typed `any`, and every field read off it was too.
+**The type-aware rules run with `tsrs`.** The rules that need the type
+checker — an `any` that came off the network, a promise nobody awaited, a
+type assertion that changes nothing, a comparison against an enum member
+written as a string literal — live in `lib/type-aware-lint/` and ask `tsrs`
+for the types through its API. `bun run lint` runs them after Bun's own
+rules.
+
+Bun's linter gets its types from Bun's own checker, so `bunfig.toml` sets
+`[lint] typeAware = false`. Leaving it on would check every file twice,
+with two answers, and the repository has one type checker: `tsrs`. The
+linter's message — _"Skipped 15 rules that need type information"_ — is true
+of Bun's linter and false of the repository: those fifteen are the ones
+`bun run lint:types` runs.
+
+The rules ask the same program the gate checks with, so a rule cannot
+disagree with the type check about what the code is. The types come back in
+one batch per file, because a type query on its own costs a tenth of a
+millisecond and a file has thousands of nodes the rules ask about. The
+configuration applies too: `bunfig.toml`'s overrides and its
+`eslint-disable` comments turn rules off here exactly as they do there.
+
+`__tests__/lib/type-aware-lint.test.ts` runs both implementations against a
+fixture that breaks one rule of each kind and compares them rule by rule
+and place by place.
+
+Turning the rules on meant fixing 244 findings, and the biggest cluster had
+one root cause: `response.json()` is typed `any`, and every field read off
+it was too.
 
 `lib/api-client.ts` is the fix. `fetchJson` validates a response against a
 Zod schema, so the shape of every API response the browser reads is written

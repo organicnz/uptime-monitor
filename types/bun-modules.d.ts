@@ -92,6 +92,9 @@ declare module "bun:path" {
 
   /** Final path segment, optionally without a trailing extension. */
   export function basename(path: string, ext?: string): string;
+
+  /** The platform's path separator. */
+  export const sep: string;
 }
 
 declare module "bun:os" {

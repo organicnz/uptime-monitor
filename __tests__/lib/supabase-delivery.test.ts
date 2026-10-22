@@ -230,9 +230,12 @@ describe("bun-only toolchain", () => {
     // Bun's own formatter replaced Prettier.
     expect(pkg.scripts.format).toBe("bun fmt");
     expect(pkg.scripts["format:check"]).toBe("bun fmt --check");
-    // Bun's own linter replaced ESLint and `eslint-config-next`.
-    expect(pkg.scripts.lint).toBe("bun lint");
+    // Bun's own linter replaced ESLint and `eslint-config-next`. The
+    // rules that need types run separately, with `tsrs`, so that the
+    // repository has one type checker rather than two.
+    expect(pkg.scripts.lint).toBe("bun lint && bun run lint:types");
     expect(pkg.scripts["lint:fix"]).toBe("bun lint --fix");
+    expect(pkg.scripts["lint:types"]).toBe("bun scripts/type-aware-lint.ts");
     // The type checker is `tsrs`, the Rust port of the TypeScript 7
     // compiler, and it is the only gate. The `tsc` that ships with the
     // TypeScript 7 beta is a Node.js program, so it cannot run here at all.

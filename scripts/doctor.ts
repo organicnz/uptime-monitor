@@ -330,12 +330,17 @@ export async function collectChecks(): Promise<Check[]> {
   // The type-aware rules are the ones that need the type checker: an `any`
   // that came off the network, a promise nobody awaited, a type assertion
   // that changes nothing. The compiler is silent about all three.
+  //
+  // They run with `tsrs`, through the API, and the linter's own type-aware
+  // mode is off: the linter gets its types from Bun's own checker, and
+  // this repository has one type checker.
+  const typeAwareScript = pkg.scripts?.["lint:types"];
   record(
     "type-aware lint",
-    bunfig.lint?.typeAware === true,
-    bunfig.lint?.typeAware === true
-      ? "bunfig.toml sets [lint] typeAware = true — the linter sees the types"
-      : "bunfig.toml does not set [lint] typeAware = true — the linter is blind to what the types say",
+    bunfig.lint?.typeAware === false && typeAwareScript !== undefined,
+    bunfig.lint?.typeAware === false
+      ? `bunfig.toml sets [lint] typeAware = false and \`bun run lint:types\` runs the rules with \`tsrs\` — one type checker`
+      : "bunfig.toml does not set [lint] typeAware = false — the linter is checking the project a second time, with its own checker",
   );
 
   // -------------------------------------------------------------------------

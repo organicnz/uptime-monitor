@@ -205,12 +205,44 @@ rather than a convention somebody has to remember.
   react-hooks, jsx-a11y, @next/next, @typescript-eslint) plus oxc, unicorn,
   promise, jest, vitest and bun:test. `maxWarnings = 0` makes a warning a
   failure, so the local run and the CI gate are the same gate.
-- **The linter sees the types.** `bunfig.toml` sets `[lint] typeAware = true`,
-  which turns on the rules that need the type checker: an `any`
-  that came off the network, a promise nobody awaited, a type assertion
-  that changes nothing, a comparison against an enum member written as a
-  string literal. The compiler is silent about all of them. Enabling it
-  meant fixing 244 findings, and most of them were real:
+- **The type-aware rules run with `tsrs`.** The rules that need the type
+  checker — an `any` that came off the network, a promise nobody awaited,
+  a type assertion that changes nothing, a comparison against an enum
+  member written as a string literal — live in `lib/type-aware-lint/`, and
+  they ask `tsrs` for the types through its API. `bun run lint` runs them
+  after Bun's own rules.
+  - **Bun's linter gets its types from Bun's own checker**, so
+    `bunfig.toml` sets `[lint] typeAware = false`. Leaving it on would
+    check every file twice, with two answers, and the repository has one
+    type checker: `tsrs`. The linter's message — "Skipped 15 rules that
+    need type information" — is true of Bun's linter and false of the
+    repository: those fifteen are the ones `bun run lint:types` runs.
+  - **The API is the same program the gate checks with.** `tsrs --noEmit`
+    and the rules ask the same compiler the same questions, so a rule
+    cannot disagree with the type check about what the code is.
+  - **The types come back in one batch.** A type query on its own costs a
+    tenth of a millisecond, and a file has thousands of nodes the rules ask
+    about, so the driver collects the nodes first and asks the checker for
+    every type at once. The requests that cannot be batched — a property
+    lookup, a signature — are fired together, because the API pipelines
+    them and that is worth nine times the speed.
+  - **The rules read the configuration.** `bunfig.toml`'s overrides and
+    its `eslint-disable` comments apply here too, so a rule that is off for
+    the test tree is off here, and a comment that silences a rule silences
+    it.
+  - **`__tests__/lib/type-aware-lint.test.ts` runs both.** The fixture in
+    `fixtures/type-aware-violations.ts` breaks one rule of each kind, and
+    the test compares this implementation against the linter it replaces,
+    rule by rule and place by place. The fixture has its own
+    `tsconfig.json`, because some of the rules it breaks can only be
+    broken by code that does not type check, and the compiler is the gate.
+    The one difference is
+    `no-unnecessary-type-assertion`, which the other one also reports for
+    an assertion between two _different_ types that happen to be
+    interchangeable; that one is left out rather than guessed at, because
+    the answer depends on the context the assertion sits in.
+  - Enabling the rules meant fixing 244 findings, and most of them were
+    real:
   - **`response.json()` is `any`, and it was the root of most of them.**
     `lib/api-client.ts` is now the way the browser talks to the app's own
     API: `fetchJson` validates the body against a Zod schema, so the
@@ -375,6 +407,9 @@ rather than a convention somebody has to remember.
   second opinion. The pre-commit hook runs `bun run typecheck` — the whole
   project, the same check CI gates on. `__tests__/lib/bun-only.test.ts` fails
   the build if a second checker appears.
+  - **The linter's type-aware rules count.** Bun's linter has its own
+    checker behind `[lint] typeAware`, and it is off: the rules are in
+    `lib/type-aware-lint/` and they ask `tsrs`.
 - **The build does not type check.** `next.config.ts` sets
   `typescript.ignoreBuildErrors`, so `next build` does not repeat the work
   with the slowest of the checkers. The dedicated typecheck workflow is the
