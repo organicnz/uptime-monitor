@@ -54,12 +54,19 @@ jobs:
         # The whole point of the stack: the image that ships has no Node.js
         # in it. Proving it on the artefact is stronger than asserting it
         # in a file.
+        #
+        # Bun's own images ship a `node` on the PATH — a symlink to Bun
+        # itself, so a script whose shebang says `node` still runs. The
+        # claim is therefore not "there is no file called node" but "the
+        # `node` in here is Bun". A real Node.js has no
+        # `process.versions.bun`, so this is the difference.
         run: |
-          if podman run --rm --entrypoint sh uptime-monitor:ci -c 'command -v node'; then
-            echo "::error::the production image contains a Node.js binary"
+          if ! podman run --rm --entrypoint sh uptime-monitor:ci \
+            -c 'node -p process.versions.bun' | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+'; then
+            echo "::error::the production image has a node that is not Bun"
             exit 1
           fi
-          echo "no Node.js in the image"
+          echo "the node in the image is Bun itself"
 
       - name: The image has what the server needs
         shell: bash

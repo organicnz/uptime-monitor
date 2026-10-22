@@ -535,6 +535,13 @@ rather than a convention somebody has to remember.
   of scraping the console output, that file discovery goes through
   `Bun.Glob`, that the dependency trust list is declared, and that
   auto-install is off.
+- **The container image's `node` is Bun.** Bun's own images ship a `node`
+  on the PATH: a symlink to Bun itself, so a script whose shebang says
+  `node` still runs. The gate in `.github/workflows/container.yml` proves
+  the claim on the artefact rather than asserting it in a file, and it
+  proves the claim that matters — that the `node` in the image is Bun —
+  by asking it for `process.versions.bun`, which a real Node.js does not
+  have.
 
 ## Patterns
 

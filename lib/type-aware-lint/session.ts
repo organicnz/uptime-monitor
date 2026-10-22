@@ -26,8 +26,6 @@ export type Session = {
   files(): Promise<readonly string[]>;
   /** The AST of one file. */
   sourceFile(path: string): Promise<SourceFile | undefined>;
-  /** The text of one file, for the message. */
-  text(path: string): Promise<string>;
   /** The type of every node, in one round trip. */
   typesOf(nodes: readonly Node[]): Promise<(Type | undefined)[]>;
   /** The checker, for the questions a batch cannot answer. */
@@ -50,10 +48,7 @@ export async function openSession(
   const snapshot = await api.createSnapshot({ openProject: tsconfigPath });
   const project = snapshot.getConfiguredProject(tsconfigPath);
   if (!project) {
-    await api.close?.();
-    throw new Error(
-      `tsrs did not configure a project for ${tsconfigPath}. Is the path right?`,
-    );
+    throw new Error(`tsrs did not configure a project for ${tsconfigPath}`);
   }
 
   const program = project.program;
@@ -62,10 +57,6 @@ export async function openSession(
   return {
     files: () => program.getSourceFileNames(),
     sourceFile: (path) => program.getSourceFile(path),
-    text: async (path) => {
-      const sourceFile = await program.getSourceFile(path);
-      return sourceFile ? sourceFile.text : "";
-    },
     typesOf: async (nodes) => {
       if (nodes.length === 0) return [];
       const types = await checker.getTypeAtLocation(nodes);
