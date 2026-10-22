@@ -552,6 +552,12 @@ rather than a convention somebody has to remember.
 - Cron runs via GitHub Actions or QStash
 - `SUPABASE_PROJECT_REF` is a GitHub **Variable**, not a Secret: it is the
   subdomain of `https://<ref>.supabase.co` and is already public
+- `SITE_URL` is a GitHub **Variable**, not a Secret: the app's public URL —
+  where the retention-cleanup workflow posts the daily rollup job
+- `SENTRY_ORG` and `SENTRY_PROJECT` are GitHub **Variables**: the public
+  half of a Sentry project, needed for the source-map upload. The upload
+  is skipped when they are missing, and the stack traces in Sentry are then
+  not mapped to the source.
 - `migrate` and `edge-functions` declare `environment: production`; add
   required reviewers under Settings -> Environments
 - **The scripts that touch the live database are tested.**

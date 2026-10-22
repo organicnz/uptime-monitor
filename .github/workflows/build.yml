@@ -1,5 +1,16 @@
 name: Build
 
+# The source-map upload needs three things, and only one of them is a
+# secret:
+#
+#   SENTRY_AUTH_TOKEN   a secret: the Sentry auth token
+#   SENTRY_ORG          a variable: the organisation id
+#   SENTRY_PROJECT      a variable: the project id
+#
+# The variables are the public half of a Sentry project, so they are
+# variables rather than secrets, and the upload is skipped when they are
+# missing — the build still succeeds, and the stack traces in Sentry are
+# simply not mapped to the source.
 on:
   push:
     branches: ["main"]

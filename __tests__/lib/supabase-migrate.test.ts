@@ -13,7 +13,7 @@ import { main } from "../../scripts/supabase-migrate";
  * The transport is stubbed, so nothing here touches a real project.
  */
 
-type Call = { url: string; sql: string | null };
+type Call = { url: string; sql: string | null; auth: string | null };
 
 let calls: Call[] = [];
 let originalFetch: typeof globalThis.fetch;
@@ -36,7 +36,12 @@ function stub(
       typeof init?.body === "string"
         ? (JSON.parse(init.body) as { query: string })
         : null;
-    calls.push({ url, sql: body?.query ?? null });
+    const headers = init?.headers as Record<string, string> | undefined;
+    calls.push({
+      url,
+      sql: body?.query ?? null,
+      auth: headers?.Authorization ?? null,
+    });
 
     if (url.endsWith("/projects")) {
       if (options.projectsStatus && options.projectsStatus !== 200) {
@@ -64,7 +69,9 @@ beforeEach(() => {
   originalFetch = globalThis.fetch;
   originalToken = Bun.env.SUPABASE_ACCESS_TOKEN;
   originalRef = Bun.env.SUPABASE_PROJECT_REF;
-  Bun.env.SUPABASE_ACCESS_TOKEN = "sbp_test-token";
+  // A placeholder, not a credential: the secrets check reads an
+  // assignment to an access token as one, and it should.
+  Bun.env.SUPABASE_ACCESS_TOKEN = "<test-token>";
   Bun.env.SUPABASE_PROJECT_REF = "test-project-ref";
 });
 
@@ -91,6 +98,25 @@ describe("the migration script", () => {
     stub({ projectsStatus: 401 });
 
     expect(await main()).toBe(1);
+  });
+
+  it("sends the token without the whitespace around it", async () => {
+    // A secret pasted with a trailing newline is a 401 that reads exactly
+    // like an invalid token, and the difference is invisible in a log.
+    Bun.env.SUPABASE_ACCESS_TOKEN = "  <test-token>\n";
+    Bun.env.SUPABASE_PROJECT_REF = " test-project-ref ";
+    stub({ projects: [{ id: "test-project-ref" }] });
+
+    expect(await main()).toBe(0);
+    // Every call carries the trimmed token, and the project path carries
+    // the trimmed reference.
+    expect(calls.length).toBeGreaterThan(0);
+    for (const call of calls) {
+      expect(call.auth).toBe("Bearer <test-token>");
+    }
+    expect(
+      calls.some((call) => call.url.includes("/projects/test-project-ref/")),
+    ).toBe(true);
   });
 
   it("fails when the project is not visible to the token", async () => {

@@ -8,6 +8,7 @@ import type {
   ForInStatement,
   Identifier,
   Node,
+  ParenthesizedExpression,
   PrefixUnaryExpression,
   PropertyAccessExpression,
   TemplateSpan,
@@ -103,7 +104,11 @@ const restrictPlusOperands: Rule = {
 
           context.report(
             this.name,
-            operand,
+            // The operand, without the parentheses around it: the
+            // parentheses are not part of the value.
+            operand.kind === SyntaxKind.ParenthesizedExpression
+              ? (operand as ParenthesizedExpression).expression
+              : operand,
             `Invalid operand for a '+' operation. Operands must each be a number or string, allowing a string + any of: \`any\`, \`boolean\`, \`null\`, \`RegExp\`, \`undefined\`. Got \`${await typeName(context.checker, type)}\`.`,
           );
         }

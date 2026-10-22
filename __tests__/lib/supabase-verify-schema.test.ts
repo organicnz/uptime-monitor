@@ -96,7 +96,9 @@ beforeEach(() => {
   originalFetch = globalThis.fetch;
   originalToken = Bun.env.SUPABASE_ACCESS_TOKEN;
   originalRef = Bun.env.SUPABASE_PROJECT_REF;
-  Bun.env.SUPABASE_ACCESS_TOKEN = "sbp_test-token";
+  // A placeholder, not a credential: the secrets check reads an
+  // assignment to an access token as one, and it should.
+  Bun.env.SUPABASE_ACCESS_TOKEN = "<test-token>";
   Bun.env.SUPABASE_PROJECT_REF = "test-project-ref";
 });
 

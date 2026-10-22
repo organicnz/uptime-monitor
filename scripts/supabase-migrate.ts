@@ -55,8 +55,11 @@ async function mgmtQuery(
 }
 
 export async function main(): Promise<number> {
-  const token = Bun.env.SUPABASE_ACCESS_TOKEN ?? "";
-  const ref = Bun.env.SUPABASE_PROJECT_REF ?? "";
+  // Trimmed: a secret pasted with a trailing newline is a 401 that
+  // reads exactly like an invalid token, and the difference is invisible
+  // in a log.
+  const token = (Bun.env.SUPABASE_ACCESS_TOKEN ?? "").trim();
+  const ref = (Bun.env.SUPABASE_PROJECT_REF ?? "").trim();
 
   if (!token || !ref) {
     console.error(
