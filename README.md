@@ -399,11 +399,19 @@ E2E_BASE_URL=http://127.0.0.1:3101 E2E_PRODUCTION=1 bun run e2e
 starting its own. The result is a full end-to-end pass — real browser, real
 routes, real middleware — with the two seeded specs skipped.
 
-The e2e specs are named `*.e2e.mts` on purpose. Playwright transforms
-TypeScript for CommonJS files by hooking `require.extensions`, which Bun does
-not implement; the ESM loader path it uses for `.mts` works on Bun. A `.ts`
-spec fails to build with `Unexpected !` — the TypeScript is parsed as
-JavaScript.
+The e2e specs are named `*.e2e.mts` on purpose, and the Playwright config is
+`playwright.config.mts` for the same reason. Playwright transforms TypeScript
+for CommonJS files by hooking `require.extensions`, which Bun does not
+implement; the ESM loader path it uses for `.mts` works on Bun. A `.ts` spec
+fails to build with `Unexpected !` — the TypeScript is parsed as JavaScript.
+
+The config is the sharper edge. Playwright loads a `.ts` config through
+`require`, and the hook it installs points `require.extensions` for `.ts` at
+the `.js` handler — which is what Bun's own `require` sees under Bun, so Bun
+reads the file as JavaScript. A type annotation in a `.ts` config is then a
+parse error, and the suite fails to start with a message that points at the
+annotation rather than at the loader. Playwright looks for `.ts` before
+`.mts`, so a `.ts` config left behind would win over the one that works.
 
 | Test File                                               | Component            | Coverage                                           |
 | ------------------------------------------------------- | -------------------- | -------------------------------------------------- |

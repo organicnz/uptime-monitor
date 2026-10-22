@@ -25,7 +25,7 @@ const ROOT_SOURCE_FILES = [
   "instrumentation.ts",
   "instrumentation-client.ts",
   "next.config.ts",
-  "playwright.config.ts",
+  "playwright.config.mts",
   "proxy.ts",
   "sentry.edge.config.ts",
   "sentry.server.config.ts",

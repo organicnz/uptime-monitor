@@ -10,6 +10,7 @@
     "target": "es2020",
     "incremental": true,
     "allowJs": true,
+    "allowImportingTsExtensions": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
     "paths": {

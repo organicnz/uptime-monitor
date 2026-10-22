@@ -98,6 +98,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **An empty `E2E_BASE_URL` broke the whole e2e suite**: the Playwright
+  config read it with `??`, and an empty string is not nullish, so the
+  fallback never ran. Playwright was left with no base URL, and every
+  relative request failed with "Invalid URL" — fifteen tests, all of them
+  reporting a broken product rather than a broken environment variable. An
+  empty environment variable is how a shell usually spells "unset", so both
+  it and `E2E_SERVER_COMMAND` are read with `||` now.
+- **The Playwright config could not hold a type annotation**: it was a `.ts`
+  file, and Playwright loads a `.ts` config through `require`, installing a
+  hook that points `require.extensions` for `.ts` at the `.js` handler. Bun
+  has no such hook, so that aliasing is what Bun's own `require` sees — and
+  Bun reads the file as JavaScript. The config is `playwright.config.mts`
+  now, which takes the ESM path, where Bun loads it as TypeScript. The
+  e2e specs were already `.mts` for the same reason.
+  - Playwright looks for `.ts` before `.mts`, so a `.ts` config left behind
+    would win over the one that works. A unit test fails the build if one
+    reappears.
 - **The container image could not sign a browser in**: Next.js inlines a
   `NEXT_PUBLIC_*` member access into the client bundle, and only inlines what
   is present when it builds. The image build had neither the Supabase URL nor

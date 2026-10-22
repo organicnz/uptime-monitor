@@ -4,12 +4,42 @@ import { defineConfig, devices } from "@playwright/test";
 // is the accessor for the environment that drives the suite.
 const isCI = Boolean(Bun.env.CI);
 const port = Number(Bun.env.E2E_PORT ?? 3101);
-const baseURL = Bun.env.E2E_BASE_URL ?? `http://localhost:${port}`;
-const serverCommand =
-  Bun.env.E2E_SERVER_COMMAND ??
-  (Bun.env.E2E_PRODUCTION === "1"
-    ? `bun --bun next start -p ${port}`
-    : `bun --bun next dev -p ${port}`);
+
+/**
+ * The base URL the suite talks to.
+ *
+ * `||` and not `??`: an empty environment variable is how a shell usually
+ * spells "unset", and `??` would keep it — leaving Playwright with no
+ * base URL, where every relative request fails with "Invalid URL" and the
+ * whole suite looks broken.
+ */
+export function resolveBaseURL(
+  env: Record<string, string | undefined>,
+  port: number,
+): string {
+  return env.E2E_BASE_URL || `http://localhost:${port}`;
+}
+
+/**
+ * The command that starts the server the suite runs against.
+ *
+ * `||` for the same reason as the base URL: an empty `E2E_SERVER_COMMAND`
+ * is "unset", not "run nothing".
+ */
+export function resolveServerCommand(
+  env: Record<string, string | undefined>,
+  port: number,
+): string {
+  return (
+    env.E2E_SERVER_COMMAND ||
+    (env.E2E_PRODUCTION === "1"
+      ? `bun --bun next start -p ${port}`
+      : `bun --bun next dev -p ${port}`)
+  );
+}
+
+const baseURL = resolveBaseURL(Bun.env, port);
+const serverCommand = resolveServerCommand(Bun.env, port);
 
 export default defineConfig({
   testDir: "./e2e",

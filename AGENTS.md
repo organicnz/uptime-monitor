@@ -437,10 +437,22 @@ rather than a convention somebody has to remember.
   copies is owned by that user so the server can write its Next.js cache.
 - `Bun.dns.lookup` is the DNS resolver (it returns an array of addresses, and
   reports a family with no records as `DNS_ENOTFOUND`).
-- The e2e specs are `*.e2e.mts`, not `*.e2e.ts`. Playwright transforms
+- The e2e specs are `*.e2e.mts`, not `*.e2e.ts`, and the Playwright config
+  is `playwright.config.mts`, for the same reason. Playwright transforms
   TypeScript for CommonJS files by hooking `require.extensions`, which Bun
   does not implement; its ESM loader path works on Bun. A `.ts` spec fails to
   build with `Unexpected !`.
+  - The config is the sharper edge of the two. Playwright loads a `.ts` config
+    through `require`, and the hook it installs aliases `require.extensions`
+    for `.ts` to the `.js` handler — which is what Bun's own `require` sees
+    under Bun, so Bun reads the file as JavaScript. A type annotation in a
+    `.ts` config is then a parse error, and the suite fails to start with a
+    message that points at the annotation rather than at the loader. Playwright
+    looks for `.ts` before `.mts`, so a `.ts` config left behind wins over the
+    one that works; `__tests__/app/playwright-config.test.ts` fails the build
+    if one reappears.
+  - `tsconfig.json` sets `allowImportingTsExtensions` so the config can be
+    imported by its real name.
 - `@types/node` is not a direct dependency. It is still present in
   `node_modules` because `bun-types` depends on it (Bun implements the
   Node.js API surface, so its type definitions are built on those
