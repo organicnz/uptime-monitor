@@ -364,6 +364,57 @@ describe("bun-only toolchain: Bun is configured as the whole toolchain", () => {
     expect(existsSync(join(ROOT, ".eslintrc.json"))).toBe(false);
   });
 
+  it("does not ask the editor for ESLint or Prettier either", () => {
+    // The editor's configuration is configuration too. A workspace that
+    // recommends the ESLint and Prettier extensions, and formats on save
+    // with Prettier, is a workspace with two more tools in the loop — and
+    // two more opinions about what the code should look like.
+    //
+    // The formatter is Bun's, and it is a command: `bun fmt` is what the
+    // gate runs, and the pre-commit hook runs it on the staged files. So
+    // the editor does not format on save, and it has no code action to
+    // run.
+    const settings = readFileSync(join(ROOT, ".vscode/settings.json"), "utf-8");
+    const extensions = readFileSync(
+      join(ROOT, ".vscode/extensions.json"),
+      "utf-8",
+    );
+
+    for (const [name, source] of [
+      [".vscode/settings.json", settings],
+      [".vscode/extensions.json", extensions],
+    ] as const) {
+      expect({ name, source }).toEqual({
+        name,
+        source: expect.not.stringMatching(/eslint|prettier/i),
+      });
+    }
+
+    // And the settings say why the editor does not format.
+    const parsed = JSON.parse(settings) as Record<string, unknown>;
+    expect(parsed["editor.formatOnSave"]).toBe(false);
+    expect(parsed["editor.codeActionsOnSave"]).toEqual({});
+  });
+
+  it("points the editor's language server at tsrs", () => {
+    // Without this the editor starts the `typescript` package's server:
+    // a Node.js program, and a second opinion about the code. `tsrs` has
+    // its own language server, and the editor uses it when the directory
+    // it is pointed at holds an executable called `tsgo`.
+    const settings = JSON.parse(
+      readFileSync(join(ROOT, ".vscode/settings.json"), "utf-8"),
+    ) as Record<string, unknown>;
+
+    expect(settings["js/ts.tsdk.path"]).toBe(".tsrs-tsdk");
+    expect(settings["typescript.tsdk"]).toBe(".tsrs-tsdk");
+
+    // And the directory is made by a script, not by hand.
+    const pkg = JSON.parse(
+      readFileSync(join(ROOT, "package.json"), "utf-8"),
+    ) as { scripts?: Record<string, string> };
+    expect(pkg.scripts?.["tsrs:tsdk"]).toBe("bun scripts/tsrs-tsdk.ts");
+  });
+
   it("configures the linter in bunfig.toml instead", () => {
     const bunfig = readFileSync(join(ROOT, "bunfig.toml"), "utf-8");
 

@@ -217,6 +217,13 @@ project configuration — a subset check that is not checking the same project.
 hook costs a fraction of a second, and one conformant checker is worth more
 than a fast second opinion.
 
+The editor is part of the loop too. `bun run tsrs:tsdk` makes the directory
+VS Code loads its TypeScript language server from, and `.vscode/settings.json`
+points it there — otherwise the editor starts the `typescript` package's
+server, a Node.js program and a second opinion about the code. The editor does
+not format on save: the formatter is Bun's, and it is a command (`bun fmt` is
+what the gate runs, and the pre-commit hook runs it on the staged files).
+
 The `typescript` package is still present, pinned to the latest beta
 (`7.1.0-beta`), because Next.js needs it to parse `tsconfig.json` for the
 path aliases. It type checks nothing: `next.config.ts` sets

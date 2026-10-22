@@ -51,7 +51,8 @@
     "migrations:lint": "bun scripts/lint-migrations.ts",
     "supabase:migrate": "bun scripts/supabase-migrate.ts",
     "supabase:verify-schema": "bun scripts/supabase-verify-schema.ts",
-    "lint:types": "bun scripts/type-aware-lint.ts"
+    "lint:types": "bun scripts/type-aware-lint.ts",
+    "tsrs:tsdk": "bun scripts/tsrs-tsdk.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

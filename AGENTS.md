@@ -414,6 +414,14 @@ rather than a convention somebody has to remember.
   - **The linter's type-aware rules count.** Bun's linter has its own
     checker behind `[lint] typeAware`, and it is off: the rules are in
     `lib/type-aware-lint/` and they ask `tsrs`.
+  - **The editor's language server is `tsrs` too.** By default VS Code
+    starts the `typescript` package's server, which is a Node.js program
+    and a second opinion about the code. `bun run tsrs:tsdk` makes the
+    directory the editor is pointed at, and `.vscode/settings.json` names
+    it. The editor does not format on save either: the formatter is
+    Bun's, and it is a command — `bun fmt` is what the gate runs, and the
+    pre-commit hook runs it on the staged files. A workspace that asks for
+    ESLint and Prettier is a workspace with two more tools in the loop.
 - **The build does not type check.** `next.config.ts` sets
   `typescript.ignoreBuildErrors`, so `next build` does not repeat the work
   with the slowest of the checkers. The dedicated typecheck workflow is the

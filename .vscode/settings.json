@@ -1,8 +1,7 @@
 {
   "typescript.autoClosingTags": false,
-  "editor.formatOnSave": true,
-  "editor.defaultFormatter": "esbenp.prettier-vscode",
-  "editor.codeActionsOnSave": {
-    "source.fixAll.eslint": "explicit"
-  }
+  "editor.formatOnSave": false,
+  "editor.codeActionsOnSave": {},
+  "js/ts.tsdk.path": ".tsrs-tsdk",
+  "typescript.tsdk": ".tsrs-tsdk"
 }

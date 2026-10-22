@@ -19,6 +19,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   `bun run lint` runs them.
   - The repository has one type checker. Leaving the linter's own one on
     would check every file twice, with two answers.
+  - The editor is part of the loop too: `bun run tsrs:tsdk` makes the
+    directory VS Code loads its TypeScript language server from, so the
+    editor asks `tsrs` rather than the `typescript` package's server. The
+    editor configuration no longer recommends ESLint and Prettier, and does
+    not format on save — the formatter is Bun's, and it is a command.
   - The types come back in one batch per file, and the requests that
     cannot be batched are fired together, because the API pipelines them.
     The whole repository is about a second.

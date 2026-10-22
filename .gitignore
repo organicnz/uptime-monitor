@@ -12,6 +12,10 @@
 /.next/
 /out/
 
+# The directory the editor loads the TypeScript language server from. It is
+# a symlink to the tsrs binary, made by `bun run tsrs:tsdk`.
+/.tsrs-tsdk/
+
 # Regenerable CI artifacts (baseline.json stays tracked as the guard reference)
 .bundle/size.json
 .bundle/coverage-summary.json

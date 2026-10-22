@@ -49,6 +49,44 @@ declare module "bun:fs" {
   ): void;
 
   /**
+   * Create a directory, and every directory above it that is missing.
+   *
+   * `recursive: true` is the only mode, because the only call site asks
+   * for it.
+   */
+  export function mkdirSync(
+    path: string | URL,
+    options: { recursive: true },
+  ): void;
+
+  /**
+   * Remove a file or a directory.
+   *
+   * `force: true` is the only mode, because the only call site asks for
+   * it: a file that is not there is not an error.
+   */
+  export function rmSync(
+    path: string | URL,
+    options: { force: true; recursive?: boolean },
+  ): void;
+
+  /**
+   * Make a symbolic link at `linkPath` pointing at `target`.
+   *
+   * On a platform that needs a privilege to create one, this throws and
+   * the caller copies the file instead.
+   */
+  export function symlinkSync(
+    target: string | URL,
+    linkPath: string | URL,
+  ): void;
+
+  /**
+   * Copy a file.
+   */
+  export function copyFileSync(from: string | URL, to: string | URL): void;
+
+  /**
    * Resolve `path` to its canonical form, following every symbolic link.
    * Used to prove that a `node` on $PATH is Bun's alias rather than a real
    * Node.js installation.
