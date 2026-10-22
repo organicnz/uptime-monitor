@@ -141,6 +141,27 @@ export function getNotificationDispatchSecret(): string | undefined {
 }
 
 /**
+ * Whether this deployment is served by Vercel.
+ *
+ * Vercel sets `VERCEL=1` in every build and every runtime it owns, and
+ * nothing else does. The app also runs from its own container, and there
+ * are Vercel-shaped things — the analytics script, the deployment
+ * protection bypass — that only mean something on Vercel.
+ *
+ * The analytics script is the reason this accessor exists: the script
+ * is fetched from `/_vercel/insights/script.js`, which Vercel's own
+ * platform serves. Everywhere else the request is a 404, and a 404 for
+ * a script is a console error on every page load — an error a reader
+ * sees in the console and a test asserts against.
+ *
+ * Server-side only. `VERCEL` is not a public variable, so a browser
+ * bundle cannot see it; call this from a server component.
+ */
+export function isVercelDeployment(): boolean {
+  return optional("VERCEL") === "1";
+}
+
+/**
  * Users allowed to change the global check schedule. Empty means "fall back to
  * app_metadata.role === 'admin' in the route", so it is optional by design.
  */

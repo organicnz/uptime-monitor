@@ -22,8 +22,11 @@ type PublicRow = {
 
 const rpc = { data: [] as PublicRow[], error: null };
 
-mock.module("@/lib/supabase/server", () => ({
-  createClient: async () => ({
+// The public page reads through the anon client: it is a public page, so
+// it must not read a session, and a page that reads no session is a page
+// the framework can prerender.
+mock.module("@/lib/supabase/public", () => ({
+  createPublicClient: () => ({
     rpc: async () => rpc,
   }),
 }));

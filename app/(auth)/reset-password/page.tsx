@@ -8,6 +8,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { COPYRIGHT_YEAR } from "@/lib/constants";
 import { createClient } from "@/lib/supabase/client";
 
 export default function ResetPasswordPage() {
@@ -77,7 +78,7 @@ export default function ResetPasswordPage() {
         </div>
 
         <div className="relative z-10 text-sm text-neutral-500">
-          © {new Date().getFullYear()} Uptime Monitor Inc.
+          © {COPYRIGHT_YEAR} Uptime Monitor Inc.
         </div>
       </div>
 

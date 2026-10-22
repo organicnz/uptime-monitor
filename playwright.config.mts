@@ -83,6 +83,13 @@ export default defineConfig({
       NEXT_PUBLIC_SUPABASE_ANON_KEY:
         Bun.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "local-anon-key",
       CRON_SECRET: Bun.env.CRON_SECRET ?? "e2e-cron-secret",
+      // The suite runs against a local server, which is not Vercel — and
+      // the app asks the platform for the analytics script only when it
+      // is on Vercel, because the script is served by the platform. A
+      // local `.env.local` pulled from a Vercel project says `VERCEL=1`,
+      // and without this the suite would ask a local server for a script
+      // that only Vercel serves, and get a 404 the browser logs.
+      VERCEL: "",
       // Unlocks the self-contained WebGPU fixture route (app/gpu-fixture).
       // Left unset everywhere else, so the route 404s in a real deployment.
       E2E_GPU_FIXTURE: "1",

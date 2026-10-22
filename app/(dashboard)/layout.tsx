@@ -15,6 +15,28 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/server";
 
+/**
+ * The dashboard is a live, session-gated surface.
+ *
+ * The layout reads the session to decide whether to send the reader to
+ * the login page, and every page below it reads the session again to
+ * scope its own queries. A request read cannot be part of a prerendered
+ * shell, so the framework asks for a Suspense boundary around each of
+ * them.
+ *
+ * There is nothing to put behind those boundaries here. The dashboard
+ * has no static half: the navigation lists this user's own status pages,
+ * the header shows this user's email, and the content is this user's
+ * monitors. A shell that streamed in front of them would be a shell with
+ * nothing in it.
+ *
+ * So the route says so: `instant = false` marks it as allowed to block
+ * on the server, and the framework stops asking for a shell it cannot
+ * build. The alternative — a boundary per read — would buy a loading
+ * state and cost every page on the way to it.
+ */
+export const instant = false;
+
 export default async function DashboardLayout({
   children,
 }: {

@@ -12,6 +12,7 @@ import {
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
+import { COPYRIGHT_YEAR } from "@/lib/constants";
 
 export default function Home() {
   return (
@@ -210,7 +211,7 @@ export default function Home() {
             <span className="font-semibold">Uptime Monitor</span>
           </div>
           <p className="text-sm text-muted-foreground">
-            © {new Date().getFullYear()} Uptime Monitor. All rights reserved.
+            © {COPYRIGHT_YEAR} Uptime Monitor. All rights reserved.
           </p>
           <div className="flex gap-6 text-sm text-muted-foreground">
             <Link href="#" className="transition-colors hover:text-foreground">

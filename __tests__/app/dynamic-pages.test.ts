@@ -33,6 +33,18 @@ function pages(): string[] {
 /** A runtime environment read — one that is not inlined at build time. */
 const RUNTIME_ENV_READ = /\b(Bun|process)\.env\.(?!NEXT_PUBLIC)/;
 
+/**
+ * The two ways a page says "render me per request".
+ *
+ * `dynamic = "force-dynamic"` is the explicit form. `connection()` is
+ * the Next.js 16 form: it says the render waits for a real request, and
+ * it does it at the point where the page needs the request rather than
+ * at the top of the file, so the part of the page above it can still be
+ * prerendered.
+ */
+const PER_REQUEST =
+  /export const dynamic\s*=\s*"force-dynamic"|await connection\(\)/;
+
 describe("pages that read the environment are rendered per request", () => {
   const all = pages();
 
@@ -46,10 +58,10 @@ describe("pages that read the environment are rendered per request", () => {
     for (const page of all) {
       const source = readFileSync(join(ROOT, page), "utf-8");
       if (!RUNTIME_ENV_READ.test(source)) continue;
-      // `force-dynamic` is the explicit form. Anything that opts out of
-      // prerendering is equally correct, but `dynamic` with a value is the
-      // one that says "per request" without a second thing to check.
-      if (!/export const dynamic\s*=\s*"force-dynamic"/.test(source)) {
+      // `force-dynamic` is the explicit form, and `connection()` is the
+      // Next.js 16 one. Either says "per request" without a second thing
+      // to check.
+      if (!PER_REQUEST.test(source)) {
         offenders.push(page);
       }
     }

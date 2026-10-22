@@ -9,12 +9,58 @@ import {
   XCircle,
   Zap,
 } from "lucide-react";
+import { cacheLife } from "next/cache";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { GPUStatusBackground } from "@/components/gpu-status-background-client";
-import { createClient } from "@/lib/supabase/server";
+import { createPublicClient } from "@/lib/supabase/public";
 import { Monitor, StatusPage } from "@/types/application";
+
+/**
+ * The public page's data, cached for thirty seconds.
+ *
+ * The page is public, it changes when a monitor's status does, and the
+ * CDN is already told to hold it for thirty seconds — so the origin
+ * should not be asking the database on every request either.
+ *
+ * The read goes through the anon client, which reads no cookies, so the
+ * page has no user-specific part: the same rendering serves everybody,
+ * and that is what makes it cacheable at all. The function is what
+ * carries the cache, because the framework cannot cache the request
+ * underneath it — a PostgREST call is a POST, and the framework only
+ * caches GETs.
+ *
+ * A slug that does not exist is not an error here. `notFound()` throws,
+ * and a thrown error is not something to keep in a cache: the page
+ * decides what a missing slug means, once the data is in hand.
+ */
+async function readStatusPage(slug: string) {
+  "use cache";
+  cacheLife({ stale: 30, revalidate: 30, expire: 120 });
+
+  const supabase = createPublicClient();
+  const { data, error } = await supabase.rpc("get_public_status_page", {
+    p_slug: slug,
+  });
+
+  if (error) return { rows: [], failed: true };
+  return { rows: data ?? [], failed: false };
+}
+
+/**
+ * The slug is in the URL, so the page's content resolves per request.
+ *
+ * A route with a dynamic segment cannot prerender its content without
+ * knowing the segment, and the segment is the slug. What *can* be
+ * prerendered is the shell around it, and what *can* be cached is the
+ * data, and the data is cached above: the origin spends its time
+ * rendering a page, not waiting for the database.
+ *
+ * The CDN holds the rendered page for thirty seconds on top of that, so
+ * the origin sees this route once per window, not once per reader.
+ */
+export const instant = false;
 
 // Reusing types from dashboard
 const typeIcons: Record<string, typeof Globe> = {
@@ -33,14 +79,9 @@ export default async function PublicStatusPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const supabase = await createClient();
+  const { rows: pageRows, failed } = await readStatusPage(slug);
 
-  const { data: pageRows, error } = await supabase.rpc(
-    "get_public_status_page",
-    { p_slug: slug },
-  );
-
-  if (error || !pageRows || pageRows.length === 0) {
+  if (failed || pageRows.length === 0) {
     notFound();
   }
 

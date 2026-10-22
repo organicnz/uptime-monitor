@@ -7,6 +7,58 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **The web stack is Next.js 16's.** Cache Components and Partial Prefetching
+  are on, and every dynamic route in the app now has a prerendered shell
+  with its live content streamed in — the route table went from `ƒ` to `◐`
+  for the status page and the dashboard's per-monitor, per-incident and
+  per-status-page routes.
+  - The build is the check. A route that reads the cookies, the search
+    parameters or the URL has to do it inside a Suspense boundary, and
+    the framework fails the build when it does not.
+  - The public status page's data is cached for thirty seconds with
+    `"use cache"` and `cacheLife`, so the origin is not asked for it on
+    every request. The CDN already held the page for thirty seconds; now
+    the database is not asked either.
+  - The dashboard says `instant = false`, which is the framework's word
+    for "this route is allowed to block on the server". It is: the
+    navigation lists the reader's own status pages and the content is the
+    reader's own monitors, so there is no static half to stream in front
+    of them.
+- **The failures are contained.** `app/error.tsx` is the root error
+  boundary, so a query that fails no longer leaves the reader with the
+  browser's error page. The dashboard has its own, in
+  `app/(dashboard)/dashboard/error.tsx`, so a page that fails takes the
+  content down and not the navigation with it. `app/not-found.tsx` is the
+  404, and `app/(dashboard)/dashboard/loading.tsx` is the skeleton the
+  dashboard streams while it waits.
+
+### Fixed
+
+- **The public status page is cached.** It read through the user's own
+  client, so it read cookies, so it was rendered per request on every
+  origin. It reads through the anon client now — a public page that reads
+  no session is a page that can be prerendered — and its data is cached
+  for thirty seconds.
+- **The GPU fixture route is not prerendered.** It gates itself on an
+  environment variable that the e2e server only sets when it starts, and
+  the prerender evaluated that gate at build time and baked the "not
+  found" response into the HTML. It stops the prerender with
+  `await connection()` now, which is the Next.js 16 way of saying "render
+  me per request".
+- **The analytics script is not requested where it cannot be served.** The
+  script is fetched from `/_vercel/insights/script.js`, which Vercel's
+  platform serves and nothing else does. Everywhere else the request was a
+  404, and a 404 for a script is a console error on every page load. The
+  root layout only asks for the script when the environment says the
+  deployment is on Vercel.
+- **The footer no longer reads the clock during a render.** The year was
+  read with `new Date()` in the render, which is an unstable value: the
+  server's clock and the browser's clock can disagree, and the framework
+  refuses to prerender a page whose output changes from one render to the
+  next. The year is content, so it is a constant now.
+
 ### Changed
 
 - **The type-aware lint runs with `tsrs`.** The rules that need the type

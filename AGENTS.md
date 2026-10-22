@@ -42,11 +42,14 @@ tools/audit/target/release/audit --help  # Show help
 app/                    # Next.js App Router pages
 ├── (auth)/            # Auth pages (login, signup, mfa)
 ├── (dashboard)/       # Protected dashboard pages
+│   └── dashboard/     # error.tsx and loading.tsx bound the failures
 ├── api/               # API routes (cron, notifications, status-pages)
 ├── auth/              # Auth callbacks
 ├── status/            # Public status pages
+├── error.tsx          # The root error boundary
+├── not-found.tsx      # The 404
 lib/                   # Utilities and services
-├── supabase/          # Supabase clients (server, client, service, middleware)
+├── supabase/          # Supabase clients (server, client, service, public, middleware)
 ├── actions/           # Server actions
 ├── env.ts             # Required-env accessors; fail closed
 ├── client-env.ts      # Browser-side env (Next.js inlines it at build time)
@@ -542,6 +545,84 @@ rather than a convention somebody has to remember.
   proves the claim that matters — that the `node` in the image is Bun —
   by asking it for `process.versions.bun`, which a real Node.js does not
   have.
+
+## Web stack
+
+The application is Next.js 16 with Cache Components and Partial Prefetching
+enabled. Both are on, and the reasons are here, because both look like
+mistakes from a distance.
+
+- **Cache Components is on** (`next.config.ts`: `cacheComponents: true`).
+  The static shell of a route is prerendered, and the parts that depend on
+  the request stream in behind a Suspense boundary. A route that reads
+  something runtime — the cookies, the search parameters, the URL — has to
+  do it inside a boundary, and the framework says so at build time if it
+  does not. That is the whole value: the build is the check.
+  - The build prints the route table, and the letter next to a route is
+    the rendering model: `○` is static, `◐` is a prerendered shell with
+    streamed content, `ƒ` is rendered per request. Every dynamic route in
+    this app is `◐` or `ƒ`, and the ones that were `ƒ` before are `◐`
+    now.
+  - **`instant = false` is a deliberate answer, not a shrug.** It marks a
+    segment as allowed to block on the server. The dashboard is one: the
+    navigation lists this user's own status pages, the header shows this
+    user's email, and the content is this user's monitors. A shell that
+    streamed in front of them would be a shell with nothing in it. The
+    dashboard layout says so in `app/(dashboard)/layout.tsx`.
+  - The alternative to `instant = false` is a Suspense boundary around
+    every read, which buys a loading state and costs a boundary per page.
+    The dashboard has a `loading.tsx` instead, and one boundary.
+  - **`"use cache"` is the data cache.** `app/status/[slug]/page.tsx` uses
+    it with `cacheLife({ stale: 30, revalidate: 30, expire: 120 })`: the
+    public page's data is at most thirty seconds old, and the origin is
+    not asked for it on every request. The function carries the cache
+    because the framework cannot cache the request underneath it — a
+    PostgREST call is a POST, and the framework only caches GETs.
+  - **`export const revalidate` is not available** under Cache Components,
+    and the build says so: "Route segment config `revalidate` is not
+    compatible with `nextConfig.cacheComponents`". The equivalent is
+    `cacheLife`.
+- **Partial Prefetching is on** (`partialPrefetching: true`). A link
+  prefetches the shell rather than the whole page, so hovering a link
+  fetches the static part and nothing else.
+- **A page that reads the environment is rendered per request**, and
+  `await connection()` is how it says so. `connection()` stalls the
+  prerender by design: a prerender evaluates the page's own code at
+  _build_ time, and the answer it evaluates is the answer that gets baked
+  into the HTML. The GPU fixture route is the reason this is written down
+  — it gates itself on `E2E_GPU_FIXTURE`, which the e2e server only sets
+  when it starts, and the built page had the "not found" response baked
+  into it. `__tests__/app/dynamic-pages.test.ts` fails the build for a
+  page that reads the environment without saying so.
+- **A Suspense boundary has to be in a server component.** A boundary
+  that lives inside a client component is drawn after the shell has been
+  decided, so it cannot be the boundary that lets the shell be
+  prerendered. `app/auth/verify-email/page.tsx` is a server component that
+  owns the boundary, and the part that needs the URL — the email the
+  reader was sent a link for — is read on the server inside it and handed
+  to the client component as a prop.
+- **The analytics script is a platform feature.** The script is fetched
+  from `/_vercel/insights/script.js`, which Vercel's platform serves and
+  nothing else does. `lib/env.ts`'s `isVercelDeployment()` asks the
+  environment, and the root layout only asks for the script when the
+  answer is yes. Everywhere else the request would be a 404, and a 404
+  for a script is a console error on every page load.
+  - The component is loaded with `ssr: false`
+    (`components/analytics-boundary.tsx`) because it works out which route
+    the reader is on by reading the URL, and a URL is runtime data: a
+    client component that reads one cannot be part of a prerender, and the
+    framework reports it on every build.
+- **The error boundaries are two, not one.** `app/error.tsx` catches
+  anything and replaces the whole application with a message. The
+  dashboard has its own, in `app/(dashboard)/dashboard/error.tsx`, so a
+  page that fails takes the content down and not the navigation with it.
+  `app/not-found.tsx` is the 404, and `app/(dashboard)/dashboard/loading.tsx`
+  is the skeleton the dashboard streams while it waits.
+- **`COPYRIGHT_YEAR` is a constant, not a clock.** `new Date()` in a
+  render is an unstable value: the server's clock and the browser's clock
+  can disagree, and the framework refuses to prerender a page whose output
+  changes from one render to the next. The year is content, so it is read
+  once, when the module loads.
 
 ## Patterns
 

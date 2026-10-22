@@ -90,6 +90,16 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   reactCompiler: true,
+  // Cache Components: the static shell is prerendered, and the parts that
+  // depend on the request stream in behind a Suspense boundary. A page
+  // that reads the cookies or the search parameters has to do it inside a
+  // boundary, and the framework says so at build time if it does not.
+  //
+  // Partial Prefetching is the other half: a link prefetches the shell
+  // rather than the whole page, so hovering a link fetches the static
+  // part and nothing else.
+  cacheComponents: true,
+  partialPrefetching: true,
   // The build does not type check. Type checking is a separate, faster
   // gate: `tsrs` is the Rust port of the TypeScript compiler that checks
   // the same project against real TypeScript semantics, and it is the only

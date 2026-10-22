@@ -20,6 +20,7 @@ A self-hosted uptime monitoring application inspired by [Uptime Kuma](https://gi
 
 - **Runtime**: Bun 1.4 canary (install, scripts, tests, lint, format, dev server, production server)
 - **Framework**: Next.js 16.5 canary (App Router, React 19.3, Turbopack) — served by Bun
+- **Rendering**: Cache Components + Partial Prefetching — every dynamic route has a prerendered shell, and the live part streams in
 - **Type checking**: `tsrs` (the Rust port of the TypeScript 7 compiler)
 - **Database**: Supabase (PostgreSQL + Auth + Realtime)
 - **Styling**: Tailwind CSS v4

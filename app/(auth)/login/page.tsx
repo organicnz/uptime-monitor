@@ -9,6 +9,7 @@ import { OAuthButtons } from "@/components/oauth-buttons";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { COPYRIGHT_YEAR } from "@/lib/constants";
 import { createClient } from "@/lib/supabase/client";
 
 function LoginForm() {
@@ -204,7 +205,7 @@ export default function LoginPage() {
 
         {/* Footer */}
         <div className="relative z-10 text-sm text-muted-foreground">
-          © {new Date().getFullYear()} Uptime Monitor. All rights reserved.
+          © {COPYRIGHT_YEAR} Uptime Monitor. All rights reserved.
         </div>
       </div>
 

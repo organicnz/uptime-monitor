@@ -1,8 +1,10 @@
-import { Analytics } from "@vercel/analytics/next";
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Toaster } from "sonner";
 import "./globals.css";
+
+import { AnalyticsBoundary } from "@/components/analytics-boundary";
+import { isVercelDeployment } from "@/lib/env";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -57,7 +59,7 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         {children}
-        <Analytics />
+        {isVercelDeployment() ? <AnalyticsBoundary /> : null}
         <Toaster />
       </body>
     </html>

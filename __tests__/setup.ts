@@ -27,6 +27,26 @@ mock.module("next/navigation", () => ({
 }));
 
 /**
+ * The cache directives belong to the framework, and the framework only
+ * honours them inside a request. A unit test renders a page outside
+ * one, so `cacheLife()` throws.
+ *
+ * What the tests are about is the page's own logic — what a degraded
+ * monitor is called, what a missing status page does — and not the
+ * directive that says how long its data stays fresh. The directive is
+ * replaced here, in the preload, so that the replacement is in place
+ * before any test file loads and no test file has to install one.
+ */
+mock.module("next/cache", () => ({
+  cacheLife: () => {},
+  cacheTag: () => {},
+  revalidatePath: () => {},
+  revalidateTag: () => {},
+  updateTag: () => {},
+  refresh: () => {},
+}));
+
+/**
  * The answers the mocked server actions give.
  *
  * A test that needs a different answer changes it here and puts it back
