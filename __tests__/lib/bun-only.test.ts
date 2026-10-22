@@ -487,6 +487,92 @@ describe("bun-only toolchain: no Node.js in the delivery pipeline", () => {
   });
 });
 
+describe("bun-only toolchain: one type checker", () => {
+  const read = (path: string): string =>
+    readFileSync(join(ROOT, path), "utf-8");
+
+  /**
+   * Every command a YAML file actually runs.
+   *
+   * The commands, not the prose: a comment may explain why a checker was
+   * dropped, and that is not the same as running it. Parsing the YAML and
+   * walking the `run:` values is the difference between "the repository
+   * does not use a second type checker" and "the repository does not
+   * mention one".
+   */
+  function* runCommands(node: unknown): Generator<string> {
+    if (Array.isArray(node)) {
+      for (const item of node) yield* runCommands(item);
+      return;
+    }
+    if (node === null || typeof node !== "object") return;
+
+    for (const [key, value] of Object.entries(node)) {
+      if (key === "run" && typeof value === "string") {
+        yield value;
+        continue;
+      }
+      yield* runCommands(value);
+    }
+  }
+
+  it("type checks with tsrs and with nothing else", () => {
+    // Bun has a type checker of its own, and it used to sit behind
+    // `typecheck:fast` for the pre-commit hook, because `tsrs` could not be
+    // given a file list. It can now, but only with `--ignoreConfig`, which
+    // drops the path aliases and the rest of the project configuration — a
+    // subset check that is not checking the same project. Two checkers mean
+    // two sets of diagnostics, and the second one is the one that is less
+    // conformant with TypeScript.
+    const offenders: string[] = [];
+
+    const scripts = JSON.parse(read("package.json")) as {
+      scripts: Record<string, string>;
+    };
+    for (const [name, command] of Object.entries(scripts.scripts)) {
+      if (/\bbun\s+check\b/.test(command)) {
+        offenders.push(`package.json: ${name}: ${command}`);
+      }
+    }
+
+    const yamlFiles = [
+      "lefthook.yml",
+      ...readdirSync(join(ROOT, ".github", "workflows"))
+        .filter((file) => file.endsWith(".yml") || file.endsWith(".yaml"))
+        .map((file) => join(".github", "workflows", file)),
+    ];
+    for (const file of yamlFiles) {
+      const parsed = Bun.YAML.parse(read(file));
+      for (const command of runCommands(parsed)) {
+        if (/\bbun\s+check\b/.test(command)) {
+          offenders.push(`${file}: ${command.trim()}`);
+        }
+      }
+    }
+
+    for (const file of files) {
+      if (/\bbun\s+check\b/.test(codeOnly(readFileSync(file, "utf-8")))) {
+        offenders.push(file);
+      }
+    }
+
+    expect(offenders).toEqual([]);
+  });
+
+  it("runs the one type checker in the pre-commit hook", () => {
+    // Over the whole project, not over the staged files: a subset check
+    // that cannot see the project configuration is not the same check, and
+    // `tsrs` is incremental, so the second run of the day is a fraction of
+    // a second.
+    const lefthook = Bun.YAML.parse(read("lefthook.yml")) as {
+      "pre-commit"?: { commands?: Record<string, { run?: string }> };
+    };
+    const commands = lefthook["pre-commit"]?.commands ?? {};
+
+    expect(commands.typecheck?.run).toBe("bun run typecheck");
+  });
+});
+
 describe("bun-only toolchain: Bun's own APIs carry the load", () => {
   const read = (path: string): string =>
     readFileSync(join(ROOT, path), "utf-8");

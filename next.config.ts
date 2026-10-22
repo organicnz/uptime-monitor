@@ -91,10 +91,10 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
   reactCompiler: true,
   // The build does not type check. Type checking is a separate, faster
-  // gate: `bun check` is Bun's own checker, and `tsrs` is the Rust port of
-  // the TypeScript compiler that checks the same project against real
-  // TypeScript semantics. Both run in the typecheck workflow, and the
-  // build would otherwise repeat the work with the slowest of the three.
+  // gate: `tsrs` is the Rust port of the TypeScript compiler that checks
+  // the same project against real TypeScript semantics, and it is the only
+  // type checker in the repository. It runs in the typecheck workflow, and
+  // the build would otherwise repeat the work with the slowest of the two.
   typescript: {
     ignoreBuildErrors: true,
   },

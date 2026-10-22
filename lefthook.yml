@@ -23,16 +23,18 @@ pre-commit:
   piped: false
 
   commands:
-    # TypeScript type checking (staged files only)
+    # TypeScript type checking.
     #
-    # `bun check` is Bun's own checker, and it is the only one that can check
-    # a subset: `tsrs` is project-scoped the way `tsc` is, and refuses a file
-    # list outright. The whole-project check is `bun run typecheck`, which
-    # runs `tsrs` and is what CI gates on.
+    # `tsrs`, the whole project, the same check CI gates on. It used to be
+    # `bun check` over the staged files only, because `tsrs` could not be
+    # given a file list; it can now, but only with `--ignoreConfig`, which
+    # drops the path aliases and the rest of the project configuration, so
+    # a subset check would not be checking the same project. `tsrs` is
+    # incremental, so the second run of the day is a fraction of a second,
+    # and one type checker is worth more than a fast second opinion.
     typecheck:
       priority: 1
-      glob: "*.{ts,tsx,mts}"
-      run: bun check {staged_files}
+      run: bun run typecheck
       fail_text: "❌ TypeScript errors found. Fix type issues before committing."
 
     # Lint with auto-fix disabled (check only)

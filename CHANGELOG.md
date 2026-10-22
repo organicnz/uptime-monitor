@@ -34,12 +34,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   - `--checkerAssignment go` puts tsrs on the reference compiler's own file
     assignment and checker history, so the diagnostics match exactly rather
     than approximating.
-  - `bun check` stays as `bun run typecheck:fast`, for the pre-commit hook
-    only: tsrs is project-scoped the way `tsc` is and refuses a file list.
+  - There is now **one** type checker. Bun's own checker used to stay behind
+    `typecheck:fast` for the pre-commit hook, on the theory that `tsrs`
+    could not be given a file list: it refused one outright, and the only way
+    through was `--ignoreConfig`, which drops the path aliases and the rest
+    of the project configuration — a subset check that is not checking the
+    same project. `tsrs` is incremental (`tsconfig.tsbuildinfo`), so the
+    pre-commit hook now runs the whole project for a fraction of a second.
   - `bun run typecheck:watch` and `bun run typecheck:lsp` are new.
-  - Measured on this repository, tsrs is about three times _faster_ than
-    `bun check` over the whole project (249ms against 761ms), so it is the
-    right default rather than the slow-but-thorough one.
+  - Measured on this repository, a warm tsrs run over the whole project is
+    about twice as fast as Bun's own checker (roughly 250ms against 750ms),
+    and a cold one — the first run after the build info goes stale — is
+    around two seconds.
 - **Next.js 16.5 canary**: `next` 16.4.2 → 16.5.0-canary.20, `react` and
   `react-dom` → 19.3.1, `@types/react` and `@types/react-dom` → 19.3.0, and
   `bun-types` → the Bun canary that matches the runtime.

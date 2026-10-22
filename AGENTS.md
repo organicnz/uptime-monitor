@@ -183,7 +183,7 @@ rather than a convention somebody has to remember.
   `#!/usr/bin/env node` shebang, which starts Node.js again. Prefix the
   binary with `bun --bun` to keep it on Bun. Every tool invocation in
   `package.json` and `lefthook.yml` does this, and a unit test enforces it.
-  Native Bun subcommands (`bun check`, `bun test`, `bun audit`, `bun fmt`)
+  Native Bun subcommands (`bun test`, `bun audit`, `bun fmt`)
   are Bun by definition and need no `--bun`.
 - **Prettier is gone; `bun fmt` is the formatter.** Bun's formatter is
   Prettier-compatible by default and additionally covers TOML and YAML, so
@@ -351,11 +351,17 @@ rather than a convention somebody has to remember.
   reference compiler's own file assignment and checker history, so the
   diagnostics match the Go implementation exactly rather than merely
   approximating it. It costs nothing measurable.
-- **`bun check` is the scoped checker** (`bun run typecheck:fast`). It is the
-  only one that can check a subset: `tsrs` is project-scoped the way `tsc` is,
-  and refuses a file list outright. The pre-commit hook uses it, on the
-  staged files only. It is not a gate — on a whole project it is slower than
-  `tsrs` and less conformant with TypeScript.
+- **There is one type checker, and it is `tsrs`.** Bun has a checker of its
+  own, and it used to sit behind `typecheck:fast` for the pre-commit hook,
+  on the theory that `tsrs` could not be given a file list: it refused one
+  outright, and the only way through was `--ignoreConfig`, which drops the
+  path aliases and the rest of the project configuration — a subset check
+  that is not checking the same project. `tsrs` is incremental
+  (`tsconfig.tsbuildinfo`), so a whole-project run in the hook costs a
+  fraction of a second, and one conformant checker is worth more than a fast
+  second opinion. The pre-commit hook runs `bun run typecheck` — the whole
+  project, the same check CI gates on. `__tests__/lib/bun-only.test.ts` fails
+  the build if a second checker appears.
 - **The build does not type check.** `next.config.ts` sets
   `typescript.ignoreBuildErrors`, so `next build` does not repeat the work
   with the slowest of the checkers. The dedicated typecheck workflow is the

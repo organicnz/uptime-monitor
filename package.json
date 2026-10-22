@@ -17,7 +17,6 @@
     "format:check": "bun fmt --check",
     "format:doctor": "bun fmt --doctor",
     "typecheck": "bun --bun tsrs --noEmit --checkerAssignment go",
-    "typecheck:fast": "bun check",
     "typecheck:watch": "bun --bun tsrs --watch --noEmit --checkerAssignment go",
     "typecheck:lsp": "bun --bun tsrs --lsp -stdio",
     "test": "bun test __tests__",

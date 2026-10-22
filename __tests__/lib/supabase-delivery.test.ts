@@ -245,10 +245,14 @@ describe("bun-only toolchain", () => {
       "bun --bun tsrs --noEmit --checkerAssignment go",
     );
     expect(pkg.scripts["typecheck:tsc"]).toBeUndefined();
-    // Bun's own checker stays for the pre-commit hook, which checks only the
-    // staged files. `tsrs` is project-scoped, the way `tsc` is, and refuses a
-    // file list outright.
-    expect(pkg.scripts["typecheck:fast"]).toBe("bun check");
+    // There is no second type checker. Bun's own checker used to sit behind
+    // `typecheck:fast` for the pre-commit hook, because `tsrs` could not be
+    // given a file list; it can now, but only with `--ignoreConfig`, which
+    // drops the path aliases and the rest of the project configuration, so a
+    // subset check would not be checking the same project. `tsrs` is
+    // incremental, so a whole-project run in the hook costs a fraction of a
+    // second — and one checker is worth more than a fast second opinion.
+    expect(pkg.scripts["typecheck:fast"]).toBeUndefined();
 
     // The general rule, so a new script cannot opt out by accident: a
     // third-party binary may only ever appear behind `bun --bun`. Strip

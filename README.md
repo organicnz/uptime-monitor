@@ -38,7 +38,7 @@ script host, not in CI, not as the production runtime.
 | Install / lockfile | `bun install` with `bun.lock`                                          |
 | Task runner        | `bun run <script>`; every third-party binary is invoked as `bun --bun` |
 | Task shell         | Bun's own shell (`bunfig.toml` → `[run] shell = "bun"`)                |
-| Type checker       | `tsrs` (the Rust port of `tsc`); `bun check` for the pre-commit scope  |
+| Type checker       | `tsrs` (the Rust port of `tsc`) — the only one in the repository       |
 | Formatter          | `bun fmt` (Bun's own formatter — Prettier was removed)                 |
 | Linter             | `bun lint` (Bun's own linter — ESLint was removed)                     |
 | Unit tests         | `bun test` (Bun's own runner, happy-dom for the DOM)                   |
@@ -156,26 +156,29 @@ thing the cooldown is for.
 
 ### Type checking: `tsrs`, not `tsc`
 
-| Checker     | Command                  | Time   | What it is                                         |
-| ----------- | ------------------------ | ------ | -------------------------------------------------- |
-| `tsrs`      | `bun run typecheck`      | ~0.25s | The Rust port of the TypeScript compiler (Oxc)     |
-| `bun check` | `bun run typecheck:fast` | ~0.3s  | Bun's own checker, scoped to the files it is given |
+| Checker | Command             | Time  | What it is                                     |
+| ------- | ------------------- | ----- | ---------------------------------------------- |
+| `tsrs`  | `bun run typecheck` | ~0.2s | The Rust port of the TypeScript compiler (Oxc) |
 
 `tsrs` tracks TypeScript 7.1 and is the **only TypeScript 7 checker that runs
 without Node.js**: the `tsc` that ships with the TypeScript 7 beta is a
 `#!/usr/bin/env node` program. It is roughly ten times faster than `tsc` and
 checks the same project against real TypeScript semantics. It is the gate:
-CI and `verify:delivery` both run it.
+CI, `verify:delivery` and the pre-commit hook all run it.
 
 It is invoked with `--checkerAssignment go`, which puts tsrs on the reference
 compiler's own file assignment and checker history. The diagnostics then match
 the Go implementation exactly rather than merely approximating it, and it
 costs nothing measurable.
 
-`bun check` stays for the pre-commit hook, which checks only the staged
-files. `tsrs` is project-scoped the way `tsc` is and refuses a file list
-outright, so it cannot do that job. It is not a gate: on a whole project it is
-slower than `tsrs` and less conformant with TypeScript.
+There is **one** type checker. Bun has a checker of its own, and it used to
+sit behind `typecheck:fast` for the pre-commit hook, on the theory that `tsrs`
+could not be given a file list: it refused one outright, and the only way
+through was `--ignoreConfig`, which drops the path aliases and the rest of the
+project configuration — a subset check that is not checking the same project.
+`tsrs` is incremental (`tsconfig.tsbuildinfo`), so a whole-project run in the
+hook costs a fraction of a second, and one conformant checker is worth more
+than a fast second opinion.
 
 The `typescript` package is still present, pinned to the latest beta
 (`7.1.0-beta`), because Next.js needs it to parse `tsconfig.json` for the
@@ -237,8 +240,8 @@ the OS, which follows its `#!/usr/bin/env node` shebang and starts Node.js
 again; `bun --bun <binary>` runs it on Bun's runtime instead. Every script in
 `package.json` that shells out to a tool is prefixed with it, and a unit test
 (`__tests__/lib/supabase-delivery.test.ts`) fails the build if one is missed.
-Native Bun subcommands — `bun check`, `bun test`, `bun audit`, `bun fmt`,
-`bun lint` — are Bun by definition and need no prefix.
+Native Bun subcommands — `bun test`, `bun audit`, `bun fmt`, `bun lint` — are
+Bun by definition and need no prefix.
 
 ### The linter is Bun's too
 
