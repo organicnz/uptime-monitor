@@ -19,6 +19,13 @@
 
 -- Vault is not optional here: it is the only credential store this
 -- project has for tenant-supplied secrets.
+--
+-- The rows are written without a `secret_type` column. Supabase's vault
+-- has `id`, `name`, `description`, `secret`, `key_id`, `nonce`,
+-- `created_at` and `updated_at` — there is no `secret_type` — and an
+-- insert that names a column the table does not have fails at run time
+-- with a message about the schema cache rather than about the column.
+-- The name carries the type anyway: it is `notification_channel:<id>`.
 CREATE EXTENSION IF NOT EXISTS supabase_vault CASCADE;
 
 ALTER TABLE notification_channels
@@ -179,22 +186,20 @@ BEGIN
   END IF;
 
   IF v_secret_id IS NULL THEN
-    INSERT INTO vault.secrets (name, description, secret, secret_type)
+    INSERT INTO vault.secrets (name, description, secret)
     VALUES (
       'notification_channel:' || p_channel_id::text,
       'Credential fields for notification channel ' || v_name,
-      v_merged::text,
-      'notification_channel'
+      v_merged::text
     )
     RETURNING id INTO v_secret_id;
   ELSE
-    INSERT INTO vault.secrets (id, name, description, secret, secret_type)
+    INSERT INTO vault.secrets (id, name, description, secret)
     VALUES (
       v_secret_id,
       'notification_channel:' || p_channel_id::text,
       'Credential fields for notification channel ' || v_name,
-      v_merged::text,
-      'notification_channel'
+      v_merged::text
     )
     ON CONFLICT (id) DO UPDATE
       SET secret = EXCLUDED.secret,
@@ -363,12 +368,11 @@ BEGIN
     WHERE id = v_row.id;
 
     IF v_secret <> '{}'::jsonb THEN
-      INSERT INTO vault.secrets (name, description, secret, secret_type)
+      INSERT INTO vault.secrets (name, description, secret)
       VALUES (
         'notification_channel:' || v_row.id::text,
         'Credential fields for notification channel ' || v_row.id::text,
-        v_secret::text,
-        'notification_channel'
+        v_secret::text
       )
       RETURNING id INTO v_secret_id;
 

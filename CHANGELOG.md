@@ -128,6 +128,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **The notification credentials never left the browser-readable column.**
+  The migration that moves them into Supabase's vault named a
+  `secret_type` column that the vault does not have — its columns are
+  `id`, `name`, `description`, `secret`, `key_id`, `nonce`, `created_at`
+  and `updated_at` — so the insert failed at run time and the whole
+  migration rolled back. It has failed on every push since it was
+  written, which means the Telegram bot tokens in `notification_channels.config`
+  were still being served to the browser, and the schema-drift gate was
+  reporting the missing `secret_id` column on every run.
+  - The rows are written without the column now, and the name carries the
+    type anyway: it is `notification_channel:<id>`.
+- **The delivery credentials were read as pasted.** The migration and
+  schema-verification scripts read the access token and the project
+  reference straight out of the environment, so a secret pasted with a
+  trailing newline went to the API exactly as it was pasted. The answer
+  is a 401 that reads exactly like an invalid token, and the difference
+  is invisible in a log. Both are trimmed now.
 - **An empty `E2E_BASE_URL` broke the whole e2e suite**: the Playwright
   config read it with `??`, and an empty string is not nullish, so the
   fallback never ran. Playwright was left with no base URL, and every
