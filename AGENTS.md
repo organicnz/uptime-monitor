@@ -230,17 +230,21 @@ rather than a convention somebody has to remember.
     its `eslint-disable` comments apply here too, so a rule that is off for
     the test tree is off here, and a comment that silences a rule silences
     it.
-  - **`__tests__/lib/type-aware-lint.test.ts` runs both.** The fixture in
-    `fixtures/type-aware-violations.ts` breaks one rule of each kind, and
-    the test compares this implementation against the linter it replaces,
-    rule by rule and place by place. The fixture has its own
-    `tsconfig.json`, because some of the rules it breaks can only be
-    broken by code that does not type check, and the compiler is the gate.
-    The one difference is
-    `no-unnecessary-type-assertion`, which the other one also reports for
-    an assertion between two _different_ types that happen to be
-    interchangeable; that one is left out rather than guessed at, because
-    the answer depends on the context the assertion sits in.
+  - **`__tests__/lib/type-aware-lint.test.ts` holds the expectations.**
+    The fixture in `fixtures/type-aware-violations.ts` breaks one rule of
+    each kind, and the expectations are in
+    `fixtures/type-aware-violations.expected.json`. The file was written by
+    running the linter the rules replaced _and_ these rules against the
+    fixture and keeping the findings they agreed on, so a rule that stops
+    firing, fires somewhere else, or fires twice is a change in the file,
+    and the change is visible in the diff.
+  - **The comparison is not made against the linter any more, and that is
+    the point.** Running it would put a second type checker in the chain
+    to check the first one's work, and the chain is what the rest of this
+    repository is about. The expectations are the contract now.
+  - The fixture has its own `tsconfig.json`, because some of the rules it
+    breaks can only be broken by code that does not type check, and the
+    compiler is the gate.
   - Enabling the rules meant fixing 244 findings, and most of them were
     real:
   - **`response.json()` is `any`, and it was the root of most of them.**

@@ -101,9 +101,13 @@ millisecond and a file has thousands of nodes the rules ask about. The
 configuration applies too: `bunfig.toml`'s overrides and its
 `eslint-disable` comments turn rules off here exactly as they do there.
 
-`__tests__/lib/type-aware-lint.test.ts` runs both implementations against a
-fixture that breaks one rule of each kind and compares them rule by rule
-and place by place.
+`__tests__/lib/type-aware-lint.test.ts` holds the expectations: a fixture that
+breaks one rule of each kind, and the findings it is supposed to produce, in
+`fixtures/type-aware-violations.expected.json`. The file was written by
+running the linter the rules replaced _and_ these rules against the fixture
+and keeping the findings they agreed on. The comparison is not made against
+the linter any more, and that is the point — running it would put a second
+type checker in the chain to check the first one's work.
 
 Turning the rules on meant fixing 244 findings, and the biggest cluster had
 one root cause: `response.json()` is typed `any`, and every field read off

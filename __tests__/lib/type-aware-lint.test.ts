@@ -4,17 +4,20 @@ import { describe, expect, it } from "bun:test";
 import { defaultTsconfig, lintProject, rules } from "@/lib/type-aware-lint";
 
 /**
- * The type-aware lint against the linter it replaces.
+ * The type-aware lint, against the findings it is supposed to make.
  *
- * The type-aware rules used to run through the linter's own type checker.
- * They run through `tsrs` now, because this repository has one type
- * checker and it is `tsrs`. That is a change of implementation, and a
- * change of implementation has to be shown to be a change of nothing: the
- * same rules, on the same code, at the same places.
+ * The rules used to run through the linter's own type checker. They run
+ * through `tsrs` now, because this repository has one type checker and it
+ * is `tsrs`.
  *
- * So the test runs both. The fixture is a file with one deliberate
- * violation of every rule, and the two are compared rule by rule and
- * line by line.
+ * The expectations are a file, and the file was written by running both
+ * implementations against the fixture and keeping the findings they
+ * agreed on. A rule that stops firing, fires somewhere else, or fires
+ * twice is a change in the file, and the change is visible in the diff.
+ *
+ * The comparison is not made against the linter any more, and that is
+ * the point: running it would put a second type checker in the chain to
+ * check the first one's work. The expectations are the contract now.
  */
 
 const ROOT = join(import.meta.dir, "..", "..");
@@ -32,35 +35,13 @@ type Finding = {
   message: string;
 };
 
-type LintMessage = {
-  ruleId?: string;
-  line?: number;
-  column?: number;
-  message?: string;
-};
-
-/** What the linter this replaces says about the fixture. */
-function theirs(): Finding[] {
-  const result = Bun.spawnSync(
-    ["bun", "--no-script", "lint", "--type-aware", "--format", "json", FIXTURE],
-    { cwd: ROOT, stdout: "pipe", stderr: "pipe" },
-  );
-
-  const parsed = JSON.parse(result.stdout.toString()) as {
-    messages?: LintMessage[];
-  }[];
-
-  return (parsed[0]?.messages ?? [])
-    .filter((message) => message.ruleId?.startsWith("@typescript-eslint/"))
-    .map((message) => ({
-      rule: message.ruleId ?? "",
-      line: message.line ?? 0,
-      column: message.column ?? 0,
-      message: message.message ?? "",
-    }));
+/** The findings the fixture is supposed to produce. */
+async function expected(): Promise<Finding[]> {
+  const file = join(ROOT, "fixtures", "type-aware-violations.expected.json");
+  return (await Bun.file(file).json()) as Finding[];
 }
 
-/** What this lint says about the fixture. */
+/** The findings this lint produces. */
 async function ours(): Promise<Finding[]> {
   const findings = await lintProject({
     cwd: ROOT,
@@ -75,9 +56,6 @@ async function ours(): Promise<Finding[]> {
   }));
 }
 
-const key = (finding: Finding) =>
-  `${finding.rule} ${finding.line}:${finding.column}`;
-
 /** The findings, in the order they appear in the file. */
 function byPosition(findings: Finding[]): Finding[] {
   return [...findings].sort(
@@ -86,51 +64,8 @@ function byPosition(findings: Finding[]): Finding[] {
 }
 
 describe("the type-aware lint", () => {
-  it("finds everything the linter it replaces finds", async () => {
-    const mine = byPosition(await ours());
-    const theirsFindings = byPosition(theirs());
-
-    // Nothing we report that the other one does not. A rule that fires
-    // where it should not is worse than a rule that stays quiet: it stops
-    // the repository from being able to use the code it is written in.
-    const theirsKeys = new Set(theirsFindings.map(key));
-    const falsePositives = mine.filter(
-      (finding) => !theirsKeys.has(key(finding)),
-    );
-
-    expect(falsePositives).toEqual([]);
-  });
-
-  it("finds the rules the fixture breaks", async () => {
-    const mine = byPosition(await ours());
-    const theirsFindings = byPosition(theirs());
-
-    // The rules the two have in common, and the places they report them.
-    // The fixture cannot carry `no-implied-eval`, because the linter
-    // implements that one without types and so reports it in the ordinary
-    // run as well, and a file that breaks a rule the ordinary linter
-    // enforces cannot live in the tree.
-    const oursByRule = new Map<string, string[]>();
-    for (const finding of mine) {
-      const list = oursByRule.get(finding.rule) ?? [];
-      list.push(`${finding.line}:${finding.column}`);
-      oursByRule.set(finding.rule, list);
-    }
-
-    const theirsByRule = new Map<string, string[]>();
-    for (const finding of theirsFindings) {
-      const list = theirsByRule.get(finding.rule) ?? [];
-      list.push(`${finding.line}:${finding.column}`);
-      theirsByRule.set(finding.rule, list);
-    }
-
-    for (const [rule, places] of oursByRule) {
-      expect({ rule, places, theirs: theirsByRule.get(rule) ?? [] }).toEqual({
-        rule,
-        places,
-        theirs: theirsByRule.get(rule) ?? [],
-      });
-    }
+  it("finds what the fixture breaks", async () => {
+    expect(byPosition(await ours())).toEqual(byPosition(await expected()));
   });
 
   it("finds nothing in the repository", async () => {
@@ -145,7 +80,7 @@ describe("the type-aware lint", () => {
     });
 
     expect(findings).toEqual([]);
-  });
+  }, 60_000); // The whole project, through the checker: a few seconds.
 
   it("implements the rules the linter enables", () => {
     // The rules that need types, as the linter lists them. Each one is a

@@ -557,6 +557,18 @@ describe("bun-only toolchain: one type checker", () => {
       }
     }
 
+    // The test tree as well. A test that shells out to another checker
+    // puts it in the chain, and the chain is what this rule is about: the
+    // tests run in CI, so a checker that runs only in a test still runs
+    // on every push.
+    const tests = join(ROOT, "__tests__");
+    for (const file of walk(tests)) {
+      if (!isSource(file)) continue;
+      if (/\bbun\s+check\b/.test(codeOnly(readFileSync(file, "utf-8")))) {
+        offenders.push(file);
+      }
+    }
+
     expect(offenders).toEqual([]);
   });
 

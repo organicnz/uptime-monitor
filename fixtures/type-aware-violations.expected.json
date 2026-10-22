@@ -1,0 +1,140 @@
+[
+  {
+    "rule": "@typescript-eslint/no-unsafe-assignment",
+    "line": 75,
+    "column": 9,
+    "message": "Unsafe assignment of an `any` value."
+  },
+  {
+    "rule": "@typescript-eslint/no-unsafe-assignment",
+    "line": 80,
+    "column": 14,
+    "message": "Unsafe assignment of an `any` value."
+  },
+  {
+    "rule": "@typescript-eslint/no-unsafe-assignment",
+    "line": 83,
+    "column": 14,
+    "message": "Unsafe assignment of an `any` value."
+  },
+  {
+    "rule": "@typescript-eslint/no-unsafe-assignment",
+    "line": 111,
+    "column": 14,
+    "message": "Unsafe assignment of an `any` value."
+  },
+  {
+    "rule": "@typescript-eslint/no-unsafe-member-access",
+    "line": 83,
+    "column": 32,
+    "message": "Unsafe member access .member on an `any` value."
+  },
+  {
+    "rule": "@typescript-eslint/no-unsafe-return",
+    "line": 87,
+    "column": 3,
+    "message": "Unsafe return of a value of type `any`."
+  },
+  {
+    "rule": "@typescript-eslint/no-unsafe-call",
+    "line": 58,
+    "column": 3,
+    "message": "Unsafe call of an `any` typed value."
+  },
+  {
+    "rule": "@typescript-eslint/no-unsafe-argument",
+    "line": 61,
+    "column": 15,
+    "message": "Unsafe argument of type `any` assigned to a parameter of type `string`."
+  },
+  {
+    "rule": "@typescript-eslint/no-floating-promises",
+    "line": 52,
+    "column": 3,
+    "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with `void`."
+  },
+  {
+    "rule": "@typescript-eslint/no-floating-promises",
+    "line": 55,
+    "column": 3,
+    "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with `void`."
+  },
+  {
+    "rule": "@typescript-eslint/prefer-promise-reject-errors",
+    "line": 55,
+    "column": 3,
+    "message": "Expected the Promise rejection reason to be an Error."
+  },
+  {
+    "rule": "@typescript-eslint/no-unnecessary-type-assertion",
+    "line": 111,
+    "column": 28,
+    "message": "This assertion is unnecessary since it does not change the type of the expression."
+  },
+  {
+    "rule": "@typescript-eslint/require-await",
+    "line": 106,
+    "column": 8,
+    "message": "Async function 'neverAwaits' has no 'await' expression."
+  },
+  {
+    "rule": "@typescript-eslint/require-await",
+    "line": 46,
+    "column": 1,
+    "message": "Async function 'resolves' has no 'await' expression."
+  },
+  {
+    "rule": "@typescript-eslint/restrict-template-expressions",
+    "line": 94,
+    "column": 32,
+    "message": "Invalid type \"Options\" of template literal expression."
+  },
+  {
+    "rule": "@typescript-eslint/no-unsafe-unary-minus",
+    "line": 91,
+    "column": 24,
+    "message": "Argument of unary negation should be assignable to number | bigint but is \"\"a string\"\" instead."
+  },
+  {
+    "rule": "@typescript-eslint/no-array-delete",
+    "line": 98,
+    "column": 1,
+    "message": "Using the `delete` operator with an array expression is unsafe."
+  },
+  {
+    "rule": "@typescript-eslint/no-for-in-array",
+    "line": 101,
+    "column": 1,
+    "message": "For-in loops over arrays skips holes, returns indices as strings, and may visit the prototype chain or other enumerable properties. Use a more robust iteration method such as for-of or array.forEach instead."
+  },
+  {
+    "rule": "@typescript-eslint/unbound-method",
+    "line": 71,
+    "column": 11,
+    "message": "A method that is not declared with `this: void` may cause unintentional scoping of `this` when separated from its object.\nConsider using an arrow function or explicitly `.bind()`ing the method to avoid calling the method with an unintended `this` value. \nIf a function does not access `this`, it can be annotated with `this: void`."
+  },
+  {
+    "rule": "@typescript-eslint/only-throw-error",
+    "line": 65,
+    "column": 11,
+    "message": "Expected an error object to be thrown."
+  },
+  {
+    "rule": "@typescript-eslint/no-base-to-string",
+    "line": 94,
+    "column": 32,
+    "message": "'{ name: \"value\" } as Options' will use Object's default stringification format ('[object Object]') when stringified."
+  },
+  {
+    "rule": "@typescript-eslint/no-duplicate-type-constituents",
+    "line": 114,
+    "column": 34,
+    "message": "Duplicate type constituent 'string'."
+  },
+  {
+    "rule": "@typescript-eslint/no-redundant-type-constituents",
+    "line": 117,
+    "column": 25,
+    "message": "`unknown` is redundant in a union with other types."
+  }
+]

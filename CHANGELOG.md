@@ -24,9 +24,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
     The whole repository is about a second.
   - The rules read `bunfig.toml`'s overrides and its `eslint-disable`
     comments, so a rule that is off for the test tree is off here too.
-  - `__tests__/lib/type-aware-lint.test.ts` runs both implementations
-    against a fixture that breaks one rule of each kind, and compares them
-    rule by rule and place by place.
+  - `__tests__/lib/type-aware-lint.test.ts` holds the expectations: a
+    fixture that breaks one rule of each kind, and the findings it is
+    supposed to produce. The file was written by running the linter the
+    rules replaced and these rules against the fixture and keeping the
+    findings they agreed on. The comparison is not made against the linter
+    any more, and that is the point: running it would put a second type
+    checker in the chain to check the first one's work.
 - **Bun-only runtime**: Node.js is gone from the stack — package manager
   (`bun.lock`), task runner, unit tests, scripts, CI, and the production
   server all run on Bun.
