@@ -166,10 +166,22 @@ without Node.js**: the `tsc` that ships with the TypeScript 7 beta is a
 checks the same project against real TypeScript semantics. It is the gate:
 CI, `verify:delivery` and the pre-commit hook all run it.
 
-It is invoked with `--checkerAssignment go`, which puts tsrs on the reference
-compiler's own file assignment and checker history. The diagnostics then match
-the Go implementation exactly rather than merely approximating it, and it
-costs nothing measurable.
+It is invoked with `--checkerAssignment go --noLazyMembers`. The first flag
+puts tsrs on the reference compiler's own file assignment and checker history;
+the second turns off the lazy checker optimizations, which is what upstream
+names as the closest comparison to the Go implementation — without it, tsrs
+canonicalizes some of that history and the diagnostics can differ near an
+instantiation depth limit. No such case was found in this repository, so the
+flag is insurance rather than a fix, and it costs nothing measurable: the same
+speed to within noise, and about 250MB of resident memory. Upstream still
+notes that the Go parser and resolver races can vary between runs, so
+"closest" is the honest word and "identical" is not.
+
+The other performance options are not used, and the measurements say why.
+`--checkers N` makes no measurable difference on a project this size — about
+140 source files, and tsrs already scales the thread count down to the file
+count. `--checkerCostCache` was within the noise of the uncached run.
+`--singleThreaded` is four times slower for 70MB less resident memory.
 
 There is **one** type checker. Bun has a checker of its own, and it used to
 sit behind `typecheck:fast` for the pre-commit hook, on the theory that `tsrs`

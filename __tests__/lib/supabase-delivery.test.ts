@@ -238,11 +238,14 @@ describe("bun-only toolchain", () => {
     // TypeScript 7 beta is a Node.js program, so it cannot run here at all.
     //
     // `--checkerAssignment go` puts tsrs on the TypeScript 7 reference
-    // compiler's own file assignment and checker history, so the diagnostics
-    // match the Go implementation exactly rather than merely approximating
-    // it. It costs nothing measurable.
+    // compiler's own file assignment and checker history. Upstream's own
+    // note is that the closest comparison to the Go implementation is
+    // `--checkerAssignment go --noLazyMembers`: without the second flag,
+    // tsrs canonicalizes some checker history and the diagnostics can
+    // differ near an instantiation depth limit. Both cost nothing
+    // measurable here.
     expect(pkg.scripts.typecheck).toBe(
-      "bun --bun tsrs --noEmit --checkerAssignment go",
+      "bun --bun tsrs --noEmit --checkerAssignment go --noLazyMembers",
     );
     expect(pkg.scripts["typecheck:tsc"]).toBeUndefined();
     // There is no second type checker. Bun's own checker used to sit behind

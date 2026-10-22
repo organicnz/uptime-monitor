@@ -413,7 +413,7 @@ describe("bun-only toolchain: Bun is configured as the whole toolchain", () => {
     // is a `#!/usr/bin/env node` script. `tsrs` is a self-contained Rust
     // binary, so it is the only TypeScript 7 checker this stack can run.
     expect(pkg.scripts?.["typecheck"]).toBe(
-      "bun --bun tsrs --noEmit --checkerAssignment go",
+      "bun --bun tsrs --noEmit --checkerAssignment go --noLazyMembers",
     );
     expect(pkg.scripts?.["typecheck:tsc"]).toBeUndefined();
     expect(pkg.devDependencies?.["tsrs"]).toBeDefined();

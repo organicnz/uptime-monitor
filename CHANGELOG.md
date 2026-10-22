@@ -26,14 +26,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   - `lib/monitor-checker.ts` probes TCP with `Bun.connect`.
   - CI installs Bun only: `actions/setup-node` is removed from every workflow.
 - **Type checking runs on `tsrs`**: `bun run typecheck` is now
-  `tsrs --noEmit --checkerAssignment go` — the Rust port of the TypeScript 7
-  compiler, which is 100% conformant with the reference implementation and the
-  only TypeScript 7 checker that runs without Node.js. It was previously a
-  second-class gate that only `verify:delivery` and the pre-commit hook
-  reached.
+  `tsrs --noEmit --checkerAssignment go --noLazyMembers` — the Rust port of the
+  TypeScript 7 compiler, which is 100% conformant with the reference
+  implementation and the only TypeScript 7 checker that runs without Node.js.
+  It was previously a second-class gate that only `verify:delivery` and the
+  pre-commit hook reached.
   - `--checkerAssignment go` puts tsrs on the reference compiler's own file
-    assignment and checker history, so the diagnostics match exactly rather
-    than approximating.
+    assignment and checker history, and `--noLazyMembers` turns off the lazy
+    checker optimizations. Upstream names that pair as the closest
+    comparison to the Go implementation: without the second flag, tsrs
+    canonicalizes some of that history and the diagnostics can differ near an
+    instantiation depth limit.
   - There is now **one** type checker. Bun's own checker used to stay behind
     `typecheck:fast` for the pre-commit hook, on the theory that `tsrs`
     could not be given a file list: it refused one outright, and the only way
