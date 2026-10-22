@@ -139,6 +139,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   reporting the missing `secret_id` column on every run.
   - The rows are written without the column now, and the name carries the
     type anyway: it is `notification_channel:<id>`.
+  - The rows go in through `vault.create_secret` and `vault.update_secret`
+    rather than through an insert into `vault.secrets`. The vault encrypts
+    on the way in, and only through those two functions: a direct insert
+    calls the encryption routine as the caller, and `postgres` is not
+    allowed to. The deletes are still direct, because `postgres` may
+    delete from the table.
 - **The delivery credentials were read as pasted.** The migration and
   schema-verification scripts read the access token and the project
   reference straight out of the environment, so a secret pasted with a

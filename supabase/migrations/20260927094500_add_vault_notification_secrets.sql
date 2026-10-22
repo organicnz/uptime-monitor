@@ -185,28 +185,23 @@ BEGIN
     RETURN NULL;
   END IF;
 
+  -- The vault encrypts on the way in, and only through its own functions:
+  -- inserting into `vault.secrets` directly calls the encryption routine
+  -- as the caller, and the caller is not allowed to. `vault.create_secret`
+  -- and `vault.update_secret` are SECURITY DEFINER, so they can.
   IF v_secret_id IS NULL THEN
-    INSERT INTO vault.secrets (name, description, secret)
-    VALUES (
+    v_secret_id := vault.create_secret(
+      v_merged::text,
       'notification_channel:' || p_channel_id::text,
-      'Credential fields for notification channel ' || v_name,
-      v_merged::text
-    )
-    RETURNING id INTO v_secret_id;
+      'Credential fields for notification channel ' || v_name
+    );
   ELSE
-    INSERT INTO vault.secrets (id, name, description, secret)
-    VALUES (
+    PERFORM vault.update_secret(
       v_secret_id,
+      v_merged::text,
       'notification_channel:' || p_channel_id::text,
-      'Credential fields for notification channel ' || v_name,
-      v_merged::text
-    )
-    ON CONFLICT (id) DO UPDATE
-      SET secret = EXCLUDED.secret,
-          name = EXCLUDED.name,
-          description = EXCLUDED.description,
-          updated_at = now()
-    RETURNING id INTO v_secret_id;
+      'Credential fields for notification channel ' || v_name
+    );
   END IF;
 
   UPDATE public.notification_channels
@@ -368,13 +363,12 @@ BEGIN
     WHERE id = v_row.id;
 
     IF v_secret <> '{}'::jsonb THEN
-      INSERT INTO vault.secrets (name, description, secret)
-      VALUES (
+      -- Through the vault's own function, for the reason given above.
+      v_secret_id := vault.create_secret(
+        v_secret::text,
         'notification_channel:' || v_row.id::text,
-        'Credential fields for notification channel ' || v_row.id::text,
-        v_secret::text
-      )
-      RETURNING id INTO v_secret_id;
+        'Credential fields for notification channel ' || v_row.id::text
+      );
 
       UPDATE public.notification_channels
       SET secret_id = v_secret_id
